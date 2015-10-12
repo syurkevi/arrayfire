@@ -85,6 +85,12 @@ void Window::hist(const array& X, const double minval, const double maxval, cons
     AF_THROW(af_draw_hist(get(), X.get(), minval, maxval, &temp));
 }
 
+void Window::surface(const array& xVals, const array& yVals, const array& S, const char* const title)
+{
+    af_cell temp{_r, _c, title, AF_COLORMAP_DEFAULT};
+    AF_THROW(af_draw_surface(get(), xVals.get(), yVals.get(), S.get(), &temp));
+}
+
 void Window::grid(const int rows, const int cols)
 {
     AF_THROW(af_grid(get(), rows, cols));
