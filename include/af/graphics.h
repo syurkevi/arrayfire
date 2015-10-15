@@ -154,6 +154,14 @@ class AFAPI Window {
         void hist(const array& X, const double minval, const double maxval, const char* const title=NULL);
 
         /**
+           Renders the input arrays as a uniform 3D surface plot to the window
+
+           \param[in] S is a \ref matrix with the height of the points along the x,y dimensions
+           \param[in] title parameter is used when this function is called in grid mode
+         */
+        void surface(const array& S, const char* const title);
+
+        /**
            Renders the input arrays as a 3D surface plot to the window
 
            \param[in] X is an \ref array with the x-axis data points
@@ -163,7 +171,7 @@ class AFAPI Window {
 
            \note \p X and \p Y should be vectors \p S should be s 2D array
          */
-	void surface(const array& xVals, const array& yVals, const array& S, const char* const title);
+        void surface(const array& xVals, const array& yVals, const array& S, const char* const title);
 
         /**
            Setup grid layout for multiview mode in a window
@@ -324,6 +332,24 @@ AFAPI af_err af_draw_plot(const af_window wind, const af_array X, const af_array
 AFAPI af_err af_draw_hist(const af_window wind, const af_array X, const double minval, const double maxval, const af_cell* const props);
 
 /**
+   C Interface wrapper for drawing array as a uniform surface
+
+   \param[in]   wind is the window handle
+   \param[in]   S is a \ref af_array matrix with the z-axis data points
+   \param[in]   props is structure \ref af_cell that has the properties that are used
+   for the current rendering.
+
+   \return     \ref AF_SUCCESS if rendering is successful, otherwise an appropriate error code
+   is returned.
+
+   \note \p S should be a 2D array
+
+   \ingroup gfx_func_draw
+*/
+
+af_err af_draw_surface_s(const af_window wind, const af_array S, const af_cell* const props);
+
+/**
    C Interface wrapper for drawing arrayis as a surface
 
    \param[in]   wind is the window handle
@@ -341,7 +367,7 @@ AFAPI af_err af_draw_hist(const af_window wind, const af_array X, const double m
    \ingroup gfx_func_draw
 */
 
-af_err af_draw_surface(const af_window wind, const af_array xVals, const af_array yVals, const af_array S, const af_cell* const props);
+af_err af_draw_surface(const af_window wind, const af_array xVals, const af_array yVals, const af_array zVals, const af_cell* const props);
 
 /**
    C Interface wrapper for grid setup in a window
@@ -397,5 +423,4 @@ AFAPI af_err af_destroy_window(const af_window wind);
 
 #ifdef __cplusplus
 }
-
 #endif
