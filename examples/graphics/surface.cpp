@@ -10,10 +10,12 @@
 #include <arrayfire.h>
 #include <cstdio>
 #include <math.h>
+#include <iostream>
 
 using namespace af;
+using namespace std;
 
-static const int ITERATIONS = 10;
+static const int ITERATIONS = 5;
 static const float PRECISION = 1.0f/ITERATIONS;
 
 int main(int argc, char *argv[])
@@ -21,32 +23,30 @@ int main(int argc, char *argv[])
     try {
         // Initialize the kernel array just once
         af::info();
-        af::Window myWindow(512, 512, "2D Plot example: ArrayFire");
+        af::Window myWindow(512, 512, "3D Surface Example: ArrayFire");
 
-        int sign = 1;
         array X = seq(-af::Pi, af::Pi, PRECISION);
-        array Y = seq(-af::Pi, af::Pi, PRECISION);
-        array Z = randn(X.dims(0), Y.dims(0));
+        array Y = transpose(seq(-af::Pi, af::Pi, PRECISION));
+        unsigned xs = X.dims(0);
+        unsigned ys = Y.dims(1);
+        cout<<xs<<ys<<endl;
+        array Z =randn(xs,ys);// tile(seq(1,X.dims(0)), 1, Y.dims(0));
+
+        X = tile(X, 1, ys);
+        Y = tile(Y, xs);
         af_print(X);
-        af_print(Z);
+        af_print(Y);
+        //Y = flat(transpose(tile(Y, 1, ys)));
 
-        for (double val=-af::Pi; !myWindow.close(); ) {
-
-            //Z = sin(X) + cos(Y);
-
+        static float t=0;
+        do{
+            Z = sin(X) + cos(Y);
+            af_print(Z);
+            //Z = moddims(Z, af::dim4(xs, ys));
+            //myWindow.surface(Z, NULL);
             myWindow.surface(X, Y, Z, NULL);
-
-            X = X + PRECISION * float(sign);
-            Y = Y + PRECISION * float(sign);
-            val += PRECISION * float(sign);
-
-            if (val>af::Pi) {
-                sign = -1;
-            } else if (val<-af::Pi) {
-                sign = 1;
-            }
-        }
-
+            t+=0.1;
+        } while (!myWindow.close());
     } catch (af::exception& e) {
         fprintf(stderr, "%s\n", e.what());
         throw;
