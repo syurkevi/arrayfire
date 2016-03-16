@@ -20,7 +20,6 @@ namespace af
     T moments(const array &in, const af_moment moment)      \
     {                                                       \
         double val;                                         \
-        printf("moment, %d\n",moment);\
         AF_THROW(af_moments(&val, in.get(), moment));       \
         return (T)(val);                                    \
     }                                                       \

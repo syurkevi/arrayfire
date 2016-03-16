@@ -46,8 +46,6 @@ template<typename T>
 void moments(T* val, const Array<T> &in, const af_moment moment)
 {
     in.eval();
-    getQueue().sync();
-
     switch(moment) {
         case M00:
             getQueue().enqueue(kernel::moments<T, M00>, val, in);
@@ -63,9 +61,7 @@ void moments(T* val, const Array<T> &in, const af_moment moment)
             break;
         default:  break;
     }
-
     getQueue().sync();
-
 }
 
 

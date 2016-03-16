@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
 {
     try {
         const static int total_particles = 1000;
-        static const int reset = 500;
+        static const int reset = 1000;
 
         af::info();
 
@@ -109,7 +109,24 @@ int main(int argc, char *argv[])
 
             ids = (pos[0].as(u32) * height) + pos[1].as(u32);
             image(ids) += 255;
+
+            float cx = af::moments<float>(image, M01) / af::moments<float>(image, M00);
+            float cy = af::moments<float>(image, M10) / af::moments<float>(image, M00);
+            printf("(%f, %f)\n", cx, cy);
+
+            unsigned hcma[7];
+            hcma[0] = (unsigned)cx * height + (unsigned)cy;
+            hcma[1] = (unsigned)cx * height + (unsigned)cy + 3;
+            hcma[2] = (unsigned)cx * height + (unsigned)cy + 3 * height;
+            hcma[3] = (unsigned)cx * height + (unsigned)cy + 9;
+            hcma[4] = (unsigned)cx * height + (unsigned)cy - 3;
+            hcma[5] = (unsigned)cx * height + (unsigned)cy - 3 * height;
+            hcma[6] = (unsigned)cx * height + (unsigned)cy - 9;
+            af::array cmids(7, hcma);
+            image(cmids) += 255;
+
             image = convolve2(image, draw_kernel);
+
             myWindow.image(image);
             image = af::constant(0, image.dims());
             frame_count++;
