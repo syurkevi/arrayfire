@@ -361,6 +361,15 @@ typedef enum {
 } af_image_format;
 #endif
 
+#if AF_API_VERSION >=34
+typedef enum {
+    M00 = 0,
+    M01 = 1,
+    M10 = 2,
+    M11 = 3,
+} af_moment;
+#endif
+
 #if AF_API_VERSION >= 32
 typedef enum {
     AF_HOMOGRAPHY_RANSAC = 0,   ///< Computes homography using RANSAC

@@ -11,11 +11,15 @@
 
 #include <Array.hpp>
 #include <graphics_common.hpp>
+#include <af/defines.h>
 
 namespace cpu
 {
     template<typename T>
     void copy_image(const Array<T> &in, const fg::Image* image);
+
+    template<typename T>
+    void moments(T* val, const Array<T> &in, const af_moment moment);
 }
 
 #endif

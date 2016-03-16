@@ -75,6 +75,38 @@ static fg::Image* convert_and_copy_image(const af_array in)
 }
 #endif
 
+template<typename T>
+static inline T moments(const af_array in, const af_moment moment)
+{
+    T val;
+    moments<T>(&val, getArray<T>(in), moment);
+    return val;
+}
+
+af_err af_moments(double *val, const af_array in, const af_moment moment)
+{
+    try {
+        const ArrayInfo in_info = getInfo(in);
+        af_dtype type = in_info.getType();
+
+        switch(type) {
+            case f32: *val = (double)moments<float>(in, moment);          break;
+            case f64: *val = (double)moments<double>(in, moment);         break;
+            case u32: *val = (double)moments<unsigned>(in, moment);       break;
+            case s32: *val = (double)moments<int>(in, moment);            break;
+            case u16: *val = (double)moments<unsigned short>(in, moment); break;
+            case s16: *val = (double)moments<short>(in, moment);          break;
+            case b8:  *val = (double)moments<char>(in, moment);           break;
+            //case c32: moments<>(v, in, moment); (double) v; break;
+            //case c64: moments<>(v, in, moment); (double) v; break;
+          default:   TYPE_ERROR(1, type);
+        }
+    }
+    CATCHALL;
+
+    return AF_SUCCESS;
+}
+
 af_err af_draw_image(const af_window wind, const af_array in, const af_cell* const props)
 {
 #if defined(WITH_GRAPHICS)

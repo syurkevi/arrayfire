@@ -676,6 +676,19 @@ AFAPI array ycbcr2rgb(const array& in, const YCCStd standard=AF_YCC_601);
 AFAPI array rgb2ycbcr(const array& in, const YCCStd standard=AF_YCC_601);
 #endif
 
+#if AF_API_VERSION >= 34
+/**
+   C++ Interface for calculating an image moment
+
+   \param[in]  in is the input image
+   \param[moment] is the moment to calculate
+   \return      the value of the moment
+
+   \ingroup image_func_moments
+ */
+template<typename T> T moments(const array& in, const af_moment moment);
+#endif
+
 }
 #endif
 
@@ -1347,6 +1360,22 @@ extern "C" {
     */
     AFAPI af_err af_rgb2ycbcr(af_array* out, const af_array in, const af_ycc_std standard);
 #endif
+
+#if AF_API_VERSION >= 34
+    /**
+       C Interface for finding image moments
+
+       \param[val] val is a scalar that holds the calculated moment
+       \param[in]  in is an image
+       \param[moment] is the moment to calculate
+       \return     ref AF_SUCCESS if the moment calculation is successful,
+       otherwise an appropriate error code is returned.
+
+       \ingroup image_func_moments
+    */
+    AFAPI af_err af_moments(double *val, const af_array in, const af_moment moment);
+#endif
+
 #ifdef __cplusplus
 }
 #endif
