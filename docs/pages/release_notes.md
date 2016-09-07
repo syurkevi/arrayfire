@@ -1,5 +1,55 @@
 Release Notes {#releasenotes}
 ==============
+v3.4.0
+==============
+The source code with submodules can be downloaded directly from the following link:
+http://arrayfire.com/arrayfire_source/arrayfire-full-3.4.0.tar.bz2
+
+Improvements
+------------
+* New [interpolation methods](https://github.com/arrayfire/arrayfire/issues/1562) for resize, transform, approx1 and approx2
+* Cuda 8 and compute 6.x support
+* Improved [JIT](https://github.com/arrayfire/arrayfire/issues/1472) evaluation heuristics
+* Support for complex mathematical functions
+* User controlled FFT plan caching
+* Cuda [speedups](https://github.com/arrayfire/arrayfire/pull/1411) for wrap, unwrap and approx.
+* New Forge graphics [integration](https://github.com/arrayfire/arrayfire/pull/1555)!
+* Fallback for Cuda-OpenGL [interop](https://github.com/arrayfire/arrayfire/pull/1415)
+* Additional forms of batching with the transform() function. [New behavior defined here.](https://github.com/arrayfire/arrayfire/pull/1412)
+* Update to [OpenCL2 headers](https://github.com/arrayfire/arrayfire/issues/1344) in backend
+* [Median filter for 1-d signals](https://github.com/arrayfire/arrayfire/pull/1479)
+* Support for interacting with [external OpenCL contexts](https://github.com/arrayfire/arrayfire/pull/1140)
+* New [random number generators](https://github.com/arrayfire/arrayfire/issues/868)
+* [Sparse matrix support for all backends](https://github.com/arrayfire/arrayfire/issues/821)
+* New [generalized scan](https://github.com/arrayfire/arrayfire/issues/388) functions
+
+Bug Fixes
+--------------
+
+* Fixes to edge-cases in [morphological operations.](https://github.com/arrayfire/arrayfire/issues/1564)
+* Makes JIT tree size [consistent between devices](https://github.com/arrayfire/arrayfire/issues/1457)
+* Delegate [higher-dimension convolutions](https://github.com/arrayfire/arrayfire/pull/1445) to correct dimension
+* Indexing fixes with [c++11x](https://github.com/arrayfire/arrayfire/pull/1426), [af_indexers](https://github.com/arrayfire/arrayfire/pull/1426), and [empty arrays](https://github.com/arrayfire/arrayfire/issues/799)
+* Single element [median bugfix](https://github.com/arrayfire/arrayfire/pull/1423)
+* Correct time from [timeit()](https://github.com/arrayfire/arrayfire/pull/1414) function
+* Fix floating point numbers in [af::seq and missing size_of() types](https://github.com/arrayfire/arrayfire/pull/1404)
+* Explicitly extantiate [af::device() for void * ](https://github.com/arrayfire/arrayfire/issues/1503)
+
+
+Build
+------
+* Compilation [speedups](https://github.com/arrayfire/arrayfire/pull/1526)
+* Build [fixes](https://github.com/arrayfire/arrayfire/pull/1526) with MKL.
+* Error message when [CUDA Compute Detection fails](https://github.com/arrayfire/arrayfire/issues/1535).
+* Several CMake build issues with Xcode generator fixed
+* Fix [multiple OpenCL definitions](https://github.com/arrayfire/arrayfire/issues/1429) at link-time
+* [Boost compute version update and lapacke detection fix](https://github.com/arrayfire/arrayfire/pull/1423)
+* Fix builds [with GCC 6.1.1](https://github.com/arrayfire/arrayfire/pull/1409) 
+
+Documentation
+-------------
+* Fixed grammar in license
+
 
 v3.5.0
 ==============
