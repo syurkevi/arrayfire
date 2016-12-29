@@ -184,13 +184,12 @@ namespace cuda
             data_dims = new_dims;
         }
 
-        T* device()
+        size_t getAllocatedBytes() const
         {
-            if (!isOwner() || getOffset() || data.use_count() > 1) {
-                *this = Array<T>(dims(), get(), true, true);
-            }
-            return this->get();
+            return data_dims.elements() * sizeof(T);
         }
+
+        T* device();
 
         T* device() const
         {

@@ -28,7 +28,7 @@ namespace JIT
     public:
 
         ScalarNode(T val)
-            : Node(dtype_traits<T>::getName(), shortname<T>(false)),
+            : Node(dtype_traits<T>::getName(), shortname<T>(false), 0),
               m_val(val)
         {
         }

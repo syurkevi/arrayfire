@@ -28,7 +28,7 @@ namespace JIT
         UnaryNode(const char *out_type_str, const char *name_str,
                   const char *op_str,
                   Node_ptr child, int op)
-            : Node(out_type_str, name_str),
+            : Node(out_type_str, name_str, child->getHeight() + 1),
               m_op_str(op_str),
               m_child(child),
               m_op(op)

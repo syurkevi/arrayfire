@@ -26,7 +26,7 @@ namespace JIT
     public:
 
         ScalarNode(T val)
-            : Node(irname<T>(), afShortName<T>(false)),
+            : Node(irname<T>(), afShortName<T>(false), 0),
               m_val(val)
         {
         }

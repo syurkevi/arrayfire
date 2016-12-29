@@ -80,6 +80,8 @@ void edge()
     array sobelFilter   = edge(in, 2);
     array hst = histogram(in, 256, 0, 255);
 
+    myWindow2.setAxesTitles("Bins", "Frequency");
+
     while(!myWindow.close() && !myWindow2.close()) {
 
         /* show input, prewitt and sobel edge detectors in a grid */

@@ -25,11 +25,6 @@ using namespace detail;
 using std::vector;
 using std::swap;
 
-// From src/api/c/moddims.cpp TODO: move to header?
-template<typename T>
-Array<T> modDims(const Array<T>& in, const af::dim4 &newDims);
-
-
 template<typename Tout, typename Tin>
 static
 void assign(Array<Tout> &out, const unsigned &ndims, const af_seq *index, const Array<Tin> &in_)
@@ -85,7 +80,7 @@ template<typename T>
 static
 void assign_helper(Array<T> &out, const unsigned &ndims, const af_seq *index, const af_array &in_)
 {
-    ArrayInfo iInfo = getInfo(in_);
+    const ArrayInfo& iInfo = getInfo(in_);
     af_dtype iType  = iInfo.getType();
 
     if(out.getType() == c64 || out.getType() == c32)
@@ -124,7 +119,7 @@ af_err af_assign_seq(af_array *out,
         ARG_ASSERT(1, (ndims>0));
         ARG_ASSERT(3, (rhs!=0));
 
-        ArrayInfo lInfo = getInfo(lhs);
+        const ArrayInfo& lInfo = getInfo(lhs);
 
         if (ndims == 1 && ndims != lInfo.ndims()) {
             af_array tmp_in, tmp_out;
@@ -132,7 +127,10 @@ af_err af_assign_seq(af_array *out,
             AF_CHECK(af_assign_seq(&tmp_out, tmp_in, ndims, index, rhs));
             AF_CHECK(af_moddims(out, tmp_out, lInfo.ndims(), lInfo.dims().get()));
             AF_CHECK(af_release_array(tmp_in));
-            AF_CHECK(af_release_array(tmp_out));
+            // This can run into a double free issue if tmp_in == tmp_out
+            // The condition ensures release only if both are different
+            // Issue found on Tegra X1
+            if(tmp_in != tmp_out) AF_CHECK(af_release_array(tmp_out));
             return AF_SUCCESS;
         }
 
@@ -157,7 +155,7 @@ af_err af_assign_seq(af_array *out,
         try {
 
             if (lhs != rhs) {
-                ArrayInfo oInfo = getInfo(lhs);
+                const ArrayInfo& oInfo = getInfo(lhs);
                 af_dtype oType  = oInfo.getType();
                 switch(oType) {
                 case c64: assign_helper<cdouble>(getWritableArray<cdouble>(res), ndims, index, rhs);  break;
@@ -225,8 +223,8 @@ af_err af_assign_gen(af_array *out,
         ARG_ASSERT(1, (lhs!=0));
         ARG_ASSERT(4, (rhs!=0));
 
-        ArrayInfo lInfo = getInfo(lhs);
-        ArrayInfo rInfo = getInfo(rhs);
+        const ArrayInfo& lInfo = getInfo(lhs);
+        const ArrayInfo& rInfo = getInfo(rhs);
         dim4 lhsDims    = lInfo.dims();
         dim4 rhsDims    = rInfo.dims();
         af_dtype lhsType= lInfo.getType();
@@ -249,7 +247,10 @@ af_err af_assign_gen(af_array *out,
             AF_CHECK(af_assign_gen(&tmp_out, tmp_in, ndims, indexs, rhs_));
             AF_CHECK(af_moddims(out, tmp_out, lInfo.ndims(), lInfo.dims().get()));
             AF_CHECK(af_release_array(tmp_in));
-            AF_CHECK(af_release_array(tmp_out));
+            // This can run into a double free issue if tmp_in == tmp_out
+            // The condition ensures release only if both are different
+            // Issue found on Tegra X1
+            if(tmp_in != tmp_out) AF_CHECK(af_release_array(tmp_out));
             return AF_SUCCESS;
         }
 
@@ -318,7 +319,7 @@ af_err af_assign_gen(af_array *out,
             if (!indexs[i].isSeq) {
                 // check if all af_arrays have atleast one value
                 // to enable indexing along that dimension
-                ArrayInfo idxInfo = getInfo(indexs[i].idx.arr);
+                const ArrayInfo& idxInfo = getInfo(indexs[i].idx.arr);
                 af_dtype idxType  = idxInfo.getType();
 
                 ARG_ASSERT(3, (idxType!=c32));

@@ -26,7 +26,9 @@ namespace TNJ
         T m_val;
 
     public:
-        ScalarNode(T val) : Node(), m_val(val) {}
+        ScalarNode(T val) : Node(0), m_val(val)
+        {
+        }
 
         void *calc(int x, int y, int z, int w)
         {

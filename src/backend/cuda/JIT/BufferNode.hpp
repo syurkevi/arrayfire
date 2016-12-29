@@ -39,7 +39,7 @@ namespace JIT
 
         BufferNode(const char *type_str,
                    const char *name_str)
-            : Node(type_str, name_str)
+            : Node(type_str, name_str, 0)
         {
         }
 

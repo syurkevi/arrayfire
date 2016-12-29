@@ -242,7 +242,7 @@ string getDriverVersion()
     int x = nvDriverVersion(driverVersion, sizeof(driverVersion));
     if (x != 1) {
         // Windows, OSX, Tegra Need a new way to fetch driver
-        #if !defined(OS_WIN) && !defined(OS_MAC) && !defined(__arm__)
+        #if !defined(OS_WIN) && !defined(OS_MAC) && !defined(__arm__) && !defined(__aarch64__)
         throw runtime_error("Invalid driver");
         #endif
         int driver = 0;
@@ -266,7 +266,7 @@ string getCUDARuntimeVersion()
 
 unsigned getMaxJitSize()
 {
-    const int MAX_JIT_LEN = 20;
+    const int MAX_JIT_LEN = 100;
 
     static int length = 0;
     if (length == 0) {

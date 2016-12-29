@@ -15,6 +15,7 @@
 #include <platform.hpp>
 #include <Array.hpp>
 #include <handle.hpp>
+#include <sparse_handle.hpp>
 #include "err_common.hpp"
 #include <cstring>
 
@@ -48,7 +49,7 @@ af_err af_get_backend_id(af_backend *result, const af_array in)
 {
     try {
         ARG_ASSERT(1, in != 0);
-        ArrayInfo info = getInfo(in, false, false);
+        const ArrayInfo& info = getInfo(in, false, false);
         *result = info.getBackendId();
     } CATCHALL;
     return AF_SUCCESS;
@@ -58,7 +59,7 @@ af_err af_get_device_id(int *device, const af_array in)
 {
     try {
         ARG_ASSERT(1, in != 0);
-        ArrayInfo info = getInfo(in, false, false);
+        const ArrayInfo& info = getInfo(in, false, false);
         *device = info.getDevId();
     } CATCHALL;
     return AF_SUCCESS;
@@ -165,25 +166,43 @@ static inline void eval(af_array arr)
     return;
 }
 
+template<typename T>
+static inline void sparseEval(af_array arr)
+{
+    getSparseArray<T>(arr).eval();
+    return;
+}
+
 af_err af_eval(af_array arr)
 {
     try {
-        af_dtype type = getInfo(arr).getType();
-        switch (type) {
-        case f32: eval<float  >(arr); break;
-        case f64: eval<double >(arr); break;
-        case c32: eval<cfloat >(arr); break;
-        case c64: eval<cdouble>(arr); break;
-        case s32: eval<int    >(arr); break;
-        case u32: eval<uint   >(arr); break;
-        case u8 : eval<uchar  >(arr); break;
-        case b8 : eval<char   >(arr); break;
-        case s64: eval<intl   >(arr); break;
-        case u64: eval<uintl  >(arr); break;
-        case s16: eval<short  >(arr); break;
-        case u16: eval<ushort >(arr); break;
-        default:
-            TYPE_ERROR(0, type);
+        const ArrayInfo& info = getInfo(arr, false);
+        af_dtype type = info.getType();
+
+        if(info.isSparse()) {
+            switch(type) {
+                case f32: sparseEval<float  >(arr); break;
+                case f64: sparseEval<double >(arr); break;
+                case c32: sparseEval<cfloat >(arr); break;
+                case c64: sparseEval<cdouble>(arr); break;
+                default : TYPE_ERROR(0, type);
+            }
+        } else {
+            switch (type) {
+                case f32: eval<float  >(arr); break;
+                case f64: eval<double >(arr); break;
+                case c32: eval<cfloat >(arr); break;
+                case c64: eval<cdouble>(arr); break;
+                case s32: eval<int    >(arr); break;
+                case u32: eval<uint   >(arr); break;
+                case u8 : eval<uchar  >(arr); break;
+                case b8 : eval<char   >(arr); break;
+                case s64: eval<intl   >(arr); break;
+                case u64: eval<uintl  >(arr); break;
+                case s16: eval<short  >(arr); break;
+                case u16: eval<ushort >(arr); break;
+                default: TYPE_ERROR(0, type);
+            }
         }
     } CATCHALL;
 
@@ -207,12 +226,12 @@ static inline void evalMultiple(int num, af_array *arrayPtrs)
 af_err af_eval_multiple(int num, af_array *arrays)
 {
     try {
-        ArrayInfo info = getInfo(arrays[0]);
+        const ArrayInfo& info = getInfo(arrays[0]);
         af_dtype type = info.getType();
         dim4 dims = info.dims();
 
         for (int i = 1; i < num; i++) {
-            ArrayInfo currInfo = getInfo(arrays[i]);
+            const ArrayInfo& currInfo = getInfo(arrays[i]);
 
             // FIXME: This needs to be removed when new functionality is added
             if (type != currInfo.getType()) {

@@ -7,6 +7,7 @@ INCLUDE(CLKernelToH)
 INCLUDE(FindNVVM)
 
 OPTION(USE_LIBDEVICE "Use libdevice for CUDA JIT" ON)
+SET(CUDA_LIBDEVICE_DIR "${CUDA_NVVM_HOME}/libdevice" CACHE PATH "Path where libdevice compute files are located" FORCE)
 
 MARK_AS_ADVANCED(
     CUDA_BUILD_CUBIN
@@ -41,10 +42,15 @@ ENDIF()
 
 LIST(LENGTH COMPUTES_DETECTED_LIST COMPUTES_LEN)
 IF(${COMPUTES_LEN} EQUAL 0 AND ${FALLBACK})
-    MESSAGE(STATUS "No computes detected. Fall back to 20, 30, 50, 60")
     MESSAGE(STATUS "You can use -DCOMPUTES_DETECTED_LIST=\"AB;XY\" (semicolon separated list of CUDA Compute versions to enable the specified computes")
     MESSAGE(STATUS "Individual compute versions flags are also available under CMake Advance options")
-    LIST(APPEND COMPUTES_DETECTED_LIST "20" "30" "50" "60")
+    LIST(APPEND COMPUTES_DETECTED_LIST "30" "50")
+    IF(${CUDA_VERSION_MAJOR} GREATER 7) # Enable 60 only if CUDA 8 or greater
+        MESSAGE(STATUS "No computes detected. Fall back to 30, 50, 60")
+        LIST(APPEND COMPUTES_DETECTED_LIST "60")
+    ELSE(${CUDA_VERSION_MAJOR} GREATER 7)
+        LIST(APPEND COMPUTES_DETECTED_LIST "20")
+    ENDIF(${CUDA_VERSION_MAJOR} GREATER 7)
 ENDIF()
 
 LIST(LENGTH COMPUTES_DETECTED_LIST COMPUTES_LEN)
@@ -79,8 +85,8 @@ IF(${CUDA_VERSION_MAJOR} LESS 8)
       )
         MESSAGE(FATAL_ERROR
                 "CUDA Compute 6x was enabled.\
-                CUDA Compute 6x (Pascal) GPUs require CUDA 8 or greater.\
-                Your CUDA Version is ${CUDA_VERSION}."
+                 CUDA Compute 6x (Pascal) GPUs require CUDA 8 or greater.\
+                 Your CUDA Version is ${CUDA_VERSION}."
                 )
     ENDIF()
 ENDIF(${CUDA_VERSION_MAJOR} LESS 8)
@@ -288,7 +294,12 @@ LIST(LENGTH COMPUTE_VERSIONS COMPUTE_COUNT)
 IF(${COMPUTE_COUNT} EQUAL 1)
     SET(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} ${CUDA_GENERATE_CODE}")
 ELSE()
-    SET(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -arch sm_20")
+    # Use -arch sm_30 if CUDA 8 or greater and compute_20 not defined
+    IF(CUDA_COMPUTE_20 OR ${CUDA_VERSION_MAJOR} LESS 8)
+        SET(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -arch sm_20")
+    ELSE()
+        SET(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -arch sm_30")
+    ENDIF()
 ENDIF()
 
 # PUSH/POP --keep-device-functions flag. Only available in CUDA 8 or newer
@@ -304,8 +315,16 @@ foreach(ptx_src_file ${ptx_sources})
 
       get_filename_component(_name "${ptx_src_file}" NAME_WE)
 
+      # CUDA_COMPILE_PTX from CMake 3.7 has new features that require this change
+      # TODO Fix this with a more complete solution
+      IF(CMAKE_VERSION VERSION_LESS 3.7) # Before 3.7
+        SET(NAME_APPEND "")
+      ELSE(CMAKE_VERSION VERSION_LESS 3.7)  # 3.7 and newer
+        SET(NAME_APPEND "_1")
+      ENDIF(CMAKE_VERSION VERSION_LESS 3.7)
+
       set(_gen_file_name
-        "${PROJECT_BINARY_DIR}/src/backend/cuda/cuda_compile_ptx_generated_${_name}.cu.ptx")
+        "${PROJECT_BINARY_DIR}/src/backend/cuda/cuda_compile_ptx${NAME_APPEND}_generated_${_name}.cu.ptx")
       set(_out_file_name
         "${PROJECT_BINARY_DIR}/src/backend/cuda/${_name}.ptx")
 
@@ -332,20 +351,20 @@ CL_KERNEL_TO_H(
 
 SET(libdevice_bc "")
 IF (USE_LIBDEVICE)
-  SET(libdevice_computes "")
-  LIST(APPEND libdevice_computes "20" "30" "35" "50")
-  FOREACH(libdevice_compute ${libdevice_computes})
-    SET(_libdevice_bc_file "${CUDA_NVVM_HOME}/libdevice/libdevice.compute_${libdevice_compute}.10.bc")
-    SET(_libdevice_bc_copy "${PROJECT_BINARY_DIR}/src/backend/cuda/compute_${libdevice_compute}.bc")
-    IF (EXISTS ${_libdevice_bc_file})
-      ADD_CUSTOM_COMMAND(
-        OUTPUT "${_libdevice_bc_copy}"
-        DEPENDS "${_libdevice_bc_file}"
-        COMMAND ${CMAKE_COMMAND} -E copy "${_libdevice_bc_file}" "${_libdevice_bc_copy}")
-      LIST(APPEND libdevice_bc ${_libdevice_bc_copy})
-      ADD_DEFINITIONS(-D"__LIBDEVICE_COMPUTE_${libdevice_compute}")
-    ENDIF()
-  ENDFOREACH()
+    SET(libdevice_computes "")
+    LIST(APPEND libdevice_computes "20" "30" "35" "50")
+    FOREACH(libdevice_compute ${libdevice_computes})
+        SET(_libdevice_bc_file "${CUDA_LIBDEVICE_DIR}/libdevice.compute_${libdevice_compute}.10.bc")
+        SET(_libdevice_bc_copy "${PROJECT_BINARY_DIR}/src/backend/cuda/compute_${libdevice_compute}.bc")
+        IF (EXISTS ${_libdevice_bc_file})
+            ADD_CUSTOM_COMMAND(
+                OUTPUT "${_libdevice_bc_copy}"
+                DEPENDS "${_libdevice_bc_file}"
+                COMMAND ${CMAKE_COMMAND} -E copy "${_libdevice_bc_file}" "${_libdevice_bc_copy}")
+            LIST(APPEND libdevice_bc ${_libdevice_bc_copy})
+            ADD_DEFINITIONS(-D"__LIBDEVICE_COMPUTE_${libdevice_compute}")
+        ENDIF()
+    ENDFOREACH()
 ENDIF()
 
 LIST(LENGTH libdevice_bc libdevice_bc_len)

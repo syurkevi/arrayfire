@@ -31,8 +31,6 @@ forge::Chart* setup_histogram(const forge::Window* const window,
     Array<T> histogramInput = getArray<T>(in);
     dim_t nBins = histogramInput.elements();
 
-    T freqMax = detail::reduce_all<af_max_t, T, T>(histogramInput);
-
     // Retrieve Forge Histogram with nBins and array type
     ForgeManager& fgMngr = ForgeManager::getInstance();
 
@@ -49,10 +47,30 @@ forge::Chart* setup_histogram(const forge::Window* const window,
     // Set histogram bar colors to orange
     hist->setColor(0.929f, 0.486f, 0.2745f, 1.0f);
 
-    // set x axis limits to maximum and minimum values of data
-    // and y axis limits to range [0, nBins]
-    chart->setAxesLimits(minval, maxval, 0.0f, double(freqMax));
-    chart->setAxesTitles("Bins", "Frequency");
+    // If chart axes limits do not have a manual override
+    // then compute and set axes limits
+    if(!fgMngr.getChartAxesOverride(chart)) {
+        float xMin, xMax, yMin, yMax;
+        chart->getAxesLimits(&xMin, &xMax, &yMin, &yMax);
+        T freqMax = detail::reduce_all<af_max_t, T, T>(histogramInput);
+
+        if(xMin == 0 && xMax == 0 && yMin == 0 && yMax == 0) {
+            // No previous limits. Set without checking
+            xMin = step_round(minval, false);
+            xMax = step_round(maxval, true);
+            yMax = step_round(freqMax, true);
+            // For histogram, always set yMin to 0.
+            yMin = 0;
+        } else {
+            if(xMin > minval)  xMin = step_round(minval, false);
+            if(xMax < maxval)  xMax = step_round(maxval, true);
+            if(yMax < freqMax) yMax = step_round(freqMax, true);
+            // For histogram, always set yMin to 0.
+            yMin = 0;
+        }
+
+        chart->setAxesLimits(xMin, xMax, yMin, yMax);
+    }
 
     copy_histogram<T>(histogramInput, hist);
 
@@ -70,7 +88,7 @@ af_err af_draw_hist(const af_window wind, const af_array X, const double minval,
     }
 
     try {
-        ArrayInfo Xinfo = getInfo(X);
+        const ArrayInfo& Xinfo = getInfo(X);
         af_dtype Xtype  = Xinfo.getType();
 
         ARG_ASSERT(0, Xinfo.isVector());
@@ -92,7 +110,7 @@ af_err af_draw_hist(const af_window wind, const af_array X, const double minval,
 
         // Window's draw function requires either image or chart
         if (props->col > -1 && props->row > -1)
-            window->draw(props->col, props->row, *chart, props->title);
+            window->draw(props->row, props->col, *chart, props->title);
         else
             window->draw(*chart);
     }

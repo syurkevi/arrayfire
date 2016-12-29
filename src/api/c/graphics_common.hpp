@@ -17,6 +17,7 @@
 #include <glbinding/Binding.h>
 #include <vector>
 #include <map>
+#include <utility>
 
 // default to f32(float) type
 template<typename T>
@@ -36,6 +37,8 @@ forge::MarkerType getFGMarker(const af_marker_type af_marker);
 
 void makeContextCurrent(forge::Window *window);
 
+double step_round(const double in, const bool dir);
+
 namespace graphics
 {
 
@@ -48,21 +51,28 @@ static const long long _16BIT = 0x000000000000FFFF;
 static const long long _32BIT = 0x00000000FFFFFFFF;
 static const long long _48BIT = 0x0000FFFFFFFFFFFF;
 
-typedef std::map<long long, forge::Image*> ImageMap_t;
-typedef std::map<long long, forge::Plot*> PlotMap_t;
-typedef std::map<long long, forge::Histogram*> HistogramMap_t;
-typedef std::map<long long, forge::Surface*> SurfaceMap_t;
+typedef std::pair<long long, forge::Chart*> ChartKey_t;
+
+typedef std::map<ChartKey_t, forge::Image*      > ImageMap_t;
+typedef std::map<ChartKey_t, forge::Plot*       > PlotMap_t;
+typedef std::map<ChartKey_t, forge::Histogram*  > HistogramMap_t;
+typedef std::map<ChartKey_t, forge::Surface*    > SurfaceMap_t;
+typedef std::map<ChartKey_t, forge::VectorField*> VectorFieldMap_t;
 
 typedef ImageMap_t::iterator ImgMapIter;
 typedef PlotMap_t::iterator PltMapIter;
 typedef HistogramMap_t::iterator HstMapIter;
 typedef SurfaceMap_t::iterator SfcMapIter;
+typedef VectorFieldMap_t::iterator VcfMapIter;
 
 typedef std::vector<forge::Chart*> ChartVec_t;
 typedef std::map<const forge::Window*, ChartVec_t> ChartMap_t;
 typedef ChartVec_t::iterator ChartVecIter;
 typedef ChartMap_t::iterator ChartMapIter;
 
+// Keeps track of which charts have manually assigned axes limits
+typedef std::map<forge::Chart*, bool> ChartAxesOverride_t;
+typedef ChartAxesOverride_t::iterator ChartAxesOverrideIter;
 
 /**
  * ForgeManager class follows a single pattern. Any user of this class, has
@@ -74,16 +84,19 @@ typedef ChartMap_t::iterator ChartMapIter;
  *             forge::Plot
  *             forge::Histogram
  *             forge::Surface
+ *             forge::VectorField
  * */
 class ForgeManager
 {
     private:
-        ImageMap_t      mImgMap;
-        PlotMap_t       mPltMap;
-        HistogramMap_t  mHstMap;
-        SurfaceMap_t    mSfcMap;
+        ImageMap_t          mImgMap;
+        PlotMap_t           mPltMap;
+        HistogramMap_t      mHstMap;
+        SurfaceMap_t        mSfcMap;
+        VectorFieldMap_t    mVcfMap;
 
-        ChartMap_t      mChartMap;
+        ChartMap_t          mChartMap;
+        ChartAxesOverride_t mChartAxesOverrideMap;
 
     public:
         static ForgeManager& getInstance();
@@ -98,14 +111,18 @@ class ForgeManager
         forge::Chart*   getChart(const forge::Window* window, const int r, const int c,
                                  const forge::ChartType ctype);
 
-        forge::Image* getImage          (int w, int h, forge::ChannelFormat mode,
-                                         forge::dtype type);
-        forge::Image* getImage          (forge::Chart* chart, int w, int h,
-                                         forge::ChannelFormat mode, forge::dtype type);
-        forge::Plot * getPlot           (forge::Chart* chart, int nPoints, forge::dtype dtype,
-                                         forge::PlotType ptype, forge::MarkerType mtype);
-        forge::Histogram* getHistogram  (forge::Chart* chart, int nBins, forge::dtype type);
-        forge::Surface* getSurface      (forge::Chart* chart, int nX, int nY, forge::dtype type);
+        forge::Image*       getImage        (int w, int h, forge::ChannelFormat mode,
+                                             forge::dtype type);
+        forge::Image*       getImage        (forge::Chart* chart, int w, int h,
+                                             forge::ChannelFormat mode, forge::dtype type);
+        forge::Plot *       getPlot         (forge::Chart* chart, int nPoints, forge::dtype dtype,
+                                             forge::PlotType ptype, forge::MarkerType mtype);
+        forge::Histogram*   getHistogram    (forge::Chart* chart, int nBins, forge::dtype type);
+        forge::Surface*     getSurface      (forge::Chart* chart, int nX, int nY, forge::dtype type);
+        forge::VectorField* getVectorField  (forge::Chart* chart, int nPoints, forge::dtype type);
+
+        bool getChartAxesOverride(forge::Chart* chart);
+        void setChartAxesOverride(forge::Chart* chart, bool flag = true);
 
     protected:
         ForgeManager() {}

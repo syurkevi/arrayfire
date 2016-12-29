@@ -17,7 +17,11 @@
 #include <cast.hpp>
 #include <af/dim4.hpp>
 
-const ArrayInfo& getInfo(const af_array arr, bool device_check = true, bool sparse_check = true);
+const ArrayInfo& getInfo(const af_array arr, bool sparse_check = true, bool device_check = true);
+
+// Implemented in src/api/c/moddims.cpp
+template<typename T>
+detail::Array<T> modDims(const detail::Array<T>& in, const af::dim4 &newDims);
 
 template<typename T>
 static const detail::Array<T> &
@@ -37,7 +41,7 @@ detail::Array<To> castArray(const af_array &in)
     using detail::uchar;
     using detail::ushort;
 
-    const ArrayInfo info = getInfo(in);
+    const ArrayInfo& info = getInfo(in);
     switch (info.getType()) {
     case f32: return detail::cast<To, float  >(getArray<float  >(in));
     case f64: return detail::cast<To, double >(getArray<double >(in));

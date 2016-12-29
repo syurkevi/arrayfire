@@ -131,12 +131,12 @@ static inline bool compare_default(const Device *ldev, const Device *rdev)
         if (!is_l_curr_type &&  is_r_curr_type) return false;
     }
 
-    // For GPUs, this ensures discreet > integrated
-    auto is_l_integrared = ldev->getInfo<CL_DEVICE_HOST_UNIFIED_MEMORY>();
-    auto is_r_integrared = rdev->getInfo<CL_DEVICE_HOST_UNIFIED_MEMORY>();
+    // For GPUs, this ensures discrete > integrated
+    auto is_l_integrated = ldev->getInfo<CL_DEVICE_HOST_UNIFIED_MEMORY>();
+    auto is_r_integrated = rdev->getInfo<CL_DEVICE_HOST_UNIFIED_MEMORY>();
 
-    if (!is_l_integrared &&  is_r_integrared) return true;
-    if ( is_l_integrared && !is_r_integrared) return false;
+    if (!is_l_integrated &&  is_r_integrated) return true;
+    if ( is_l_integrated && !is_r_integrated) return false;
 
     // At this point, the devices are of same type.
     // Sort based on emperical evidence of preferred platforms
@@ -190,7 +190,7 @@ static inline bool compare_default(const Device *ldev, const Device *rdev)
         if (rres) return false;
     }
 
-    // Default crietria, sort based on memory
+    // Default criteria, sort based on memory
     // Sort based on memory
     auto l_mem = ldev->getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>();
     auto r_mem = rdev->getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>();
@@ -392,10 +392,6 @@ std::string getDeviceInfo()
         const Platform platform(device->getInfo<CL_DEVICE_PLATFORM>());
 
         string dstr = device->getInfo<CL_DEVICE_NAME>();
-
-        // Remove null termination character from the strings
-        dstr.pop_back();
-
         bool show_braces = ((unsigned)getActiveDeviceId() == nDevices);
 
         string id =
@@ -410,8 +406,6 @@ std::string getDeviceInfo()
         info << " -- ";
         string devVersion = device->getInfo<CL_DEVICE_VERSION>();
         string driVersion = device->getInfo<CL_DRIVER_VERSION>();
-        devVersion.pop_back();
-        driVersion.pop_back();
         info << devVersion;
         info << " -- Device driver " << driVersion;
         info << " -- FP64 Support: "
@@ -431,13 +425,6 @@ std::string getPlatformName(const cl::Device &device)
 {
     const Platform platform(device.getInfo<CL_DEVICE_PLATFORM>());
     std::string platStr = platform.getInfo<CL_PLATFORM_NAME>();
-
-    // BELOW NULL TERMINATION character removal was required with
-    // cl.hpp header, however with cl2.hpp this is not needed anymore.
-    //
-    // Remove null termination character from the strings
-    //platStr.pop_back();
-
     return platformMap(platStr);
 }
 
@@ -849,7 +836,11 @@ bool synchronize_calls() {
 
 unsigned getMaxJitSize()
 {
-    const int MAX_JIT_LEN = 20;
+#if defined(OS_MAC)
+    const int MAX_JIT_LEN = 50;
+#else
+    const int MAX_JIT_LEN = 100;
+#endif
 
     static int length = 0;
     if (length == 0) {

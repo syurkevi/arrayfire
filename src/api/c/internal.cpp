@@ -78,7 +78,7 @@ af_err af_create_strided_array(af_array *arr,
 af_err af_get_strides(dim_t *s0, dim_t *s1, dim_t *s2, dim_t *s3, const af_array in)
 {
     try {
-        ArrayInfo info = getInfo(in);
+        const ArrayInfo& info = getInfo(in);
         *s0 = info.strides()[0];
         *s1 = info.strides()[1];
         *s2 = info.strides()[2];
@@ -164,6 +164,35 @@ af_err af_is_owner(bool *result, const af_array arr)
         }
 
         std::swap(*result, res);
+    }
+    CATCHALL;
+    return AF_SUCCESS;
+}
+
+af_err af_get_allocated_bytes(size_t *bytes, const af_array arr)
+{
+    try {
+        af_dtype ty = getInfo(arr).getType();
+
+        size_t res = 0;
+
+        switch (ty) {
+        case f32: res = getArray<float  >(arr).getAllocatedBytes(); break;
+        case f64: res = getArray<double >(arr).getAllocatedBytes(); break;
+        case c32: res = getArray<cfloat >(arr).getAllocatedBytes(); break;
+        case c64: res = getArray<cdouble>(arr).getAllocatedBytes(); break;
+        case u32: res = getArray<uint   >(arr).getAllocatedBytes(); break;
+        case s32: res = getArray<int    >(arr).getAllocatedBytes(); break;
+        case u64: res = getArray<uintl  >(arr).getAllocatedBytes(); break;
+        case s64: res = getArray<intl   >(arr).getAllocatedBytes(); break;
+        case u16: res = getArray<ushort >(arr).getAllocatedBytes(); break;
+        case s16: res = getArray<short  >(arr).getAllocatedBytes(); break;
+        case b8 : res = getArray<char   >(arr).getAllocatedBytes(); break;
+        case u8 : res = getArray<uchar  >(arr).getAllocatedBytes(); break;
+        default: TYPE_ERROR(6, ty);
+        }
+
+        std::swap(*bytes, res);
     }
     CATCHALL;
     return AF_SUCCESS;

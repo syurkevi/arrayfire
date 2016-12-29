@@ -40,7 +40,7 @@ namespace TNJ
 
     public:
         BinaryNode(Node_ptr lhs, Node_ptr rhs) :
-            Node(),
+            Node(std::max(lhs->getHeight(), rhs->getHeight()) + 1),
             m_lhs(lhs),
             m_rhs(rhs),
             m_val(0)
@@ -79,11 +79,9 @@ namespace TNJ
 
         void reset()
         {
-            if (m_is_eval) {
-                resetCommonFlags();
-                m_lhs->reset();
-                m_rhs->reset();
-            }
+            resetCommonFlags();
+            m_lhs->reset();
+            m_rhs->reset();
         }
 
         bool isLinear(const dim_t *dims)

@@ -169,6 +169,9 @@
      @defgroup hist_mat Histograms
      Image and data histograms
 
+     @defgroup moments_mat Image moments
+     Centroids, areas, etc.
+
      @defgroup transform_mat Image transformations
      rotate, skew, etc.
 
@@ -309,7 +312,7 @@
 #include "af/image.h"
 #include "af/index.h"
 #include "af/lapack.h"
-#include "af/random_engine.h"
+#include "af/random.h"
 #include "af/seq.h"
 #include "af/signal.h"
 #include "af/sparse.h"

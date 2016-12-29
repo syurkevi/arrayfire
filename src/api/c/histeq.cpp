@@ -53,7 +53,7 @@ static af_array hist_equal(const af_array& in, const af_array& hist)
     Array<float> idxArr  = lookup<float, T>(normCdf, getArray<T>(vInput), 0);
 
     Array<T> result = cast<T>(idxArr);
-    result.modDims(input.dims());
+    result = modDims(result, input.dims());
 
     AF_CHECK(af_release_array(vInput));
 
@@ -63,8 +63,8 @@ static af_array hist_equal(const af_array& in, const af_array& hist)
 af_err af_hist_equal(af_array *out, const af_array in, const af_array hist)
 {
     try {
-        ArrayInfo dataInfo = getInfo(in);
-        ArrayInfo histInfo = getInfo(hist);
+        const ArrayInfo& dataInfo = getInfo(in);
+        const ArrayInfo& histInfo = getInfo(hist);
 
         af_dtype dataType  = dataInfo.getType();
         af::dim4 histDims  = histInfo.dims();

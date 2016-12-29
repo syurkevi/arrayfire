@@ -49,7 +49,7 @@ af_err af_sparse_matmul(af_array *out,
 
     try {
         common::SparseArrayBase lhsBase = getSparseArrayBase(lhs);
-        ArrayInfo rhsInfo = getInfo(rhs);
+        const ArrayInfo& rhsInfo = getInfo(rhs);
 
         ARG_ASSERT(2, lhsBase.isSparse() == true && rhsInfo.isSparse() == false);
 
@@ -103,8 +103,8 @@ af_err af_matmul(af_array *out,
     using namespace detail;
 
     try {
-        ArrayInfo lhsInfo = getInfo(lhs, false, true);
-        ArrayInfo rhsInfo = getInfo(rhs, true, true);
+        const ArrayInfo& lhsInfo = getInfo(lhs, false, true);
+        const ArrayInfo& rhsInfo = getInfo(rhs, true, true);
 
         if(lhsInfo.isSparse())
             return af_sparse_matmul(out, lhs, rhs, optLhs, optRhs);
@@ -151,15 +151,15 @@ af_err af_matmul(af_array *out,
     return AF_SUCCESS;
 }
 
-af_err af_dot(      af_array *out,
-                    const af_array lhs, const af_array rhs,
-                    const af_mat_prop optLhs, const af_mat_prop optRhs)
+af_err af_dot(af_array *out,
+              const af_array lhs, const af_array rhs,
+              const af_mat_prop optLhs, const af_mat_prop optRhs)
 {
     using namespace detail;
 
     try {
-        ArrayInfo lhsInfo = getInfo(lhs);
-        ArrayInfo rhsInfo = getInfo(rhs);
+        const ArrayInfo& lhsInfo = getInfo(lhs);
+        const ArrayInfo& rhsInfo = getInfo(rhs);
 
         if (optLhs != AF_MAT_NONE && optLhs != AF_MAT_CONJ) {
             AF_ERROR("Using this property is not yet supported in dot", AF_ERR_NOT_SUPPORTED);
@@ -195,5 +195,55 @@ af_err af_dot(      af_array *out,
         std::swap(*out, output);
     }
     CATCHALL
-        return AF_SUCCESS;
+    return AF_SUCCESS;
+}
+
+template<typename T>
+static inline
+T dotAll(af_array out)
+{
+    T res;
+    AF_CHECK(af_eval(out));
+    AF_CHECK(af_get_data_ptr((void *)&res, out));
+    return res;
+}
+
+af_err af_dot_all(double *rval, double *ival,
+                  const af_array lhs, const af_array rhs,
+                  const af_mat_prop optLhs, const af_mat_prop optRhs)
+{
+    using namespace detail;
+
+    try {
+                  *rval = 0;
+        if (ival) *ival = 0;
+
+        af_array out = 0;
+        AF_CHECK(af_dot(&out, lhs, rhs, optLhs, optRhs));
+
+        ArrayInfo lhsInfo = getInfo(lhs);
+        af_dtype lhs_type = lhsInfo.getType();
+
+        switch(lhs_type) {
+        case f32: *rval = dotAll<float >(out); break;
+        case f64: *rval = dotAll<double>(out); break;
+        case c32:
+        {
+            cfloat temp = dotAll<cfloat>(out);
+                      *rval = real(temp);
+            if (ival) *ival = imag(temp);
+        } break;
+        case c64:
+        {
+            cdouble temp = dotAll<cdouble>(out);
+                      *rval = real(temp);
+            if (ival) *ival = imag(temp);
+        } break;
+        default: TYPE_ERROR(1, lhs_type);
+        }
+
+        if(out != 0) AF_CHECK(af_release_array(out));
+    }
+    CATCHALL
+    return AF_SUCCESS;
 }

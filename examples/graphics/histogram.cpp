@@ -24,6 +24,9 @@ int main(int argc, char *argv[])
         array img = loadImage(ASSETS_DIR"/examples/images/arrow.jpg", false);
         array hist_out = histogram(img, 256, 0, 255);
 
+        myWindow.setAxesTitles("Bins", "Frequency");
+        myWindow.setPos(480, 0);
+
         while (!myWindow.close() && !imgWnd.close()) {
             myWindow.hist(hist_out, 0, 255);
             imgWnd.image(img.as(u8));

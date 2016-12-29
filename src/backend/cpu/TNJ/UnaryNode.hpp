@@ -38,9 +38,9 @@ namespace TNJ
         To m_val;
 
     public:
-        UnaryNode(Node_ptr in) :
-            Node(),
-            m_child(in),
+        UnaryNode(Node_ptr child) :
+            Node(child->getHeight() + 1),
+            m_child(child),
             m_val(0)
         {
         }
@@ -74,10 +74,8 @@ namespace TNJ
 
         void reset()
         {
-            if (m_is_eval) {
-                resetCommonFlags();
-                m_child->reset();
-            }
+            resetCommonFlags();
+            m_child->reset();
         }
 
         bool isLinear(const dim_t *dims)

@@ -17,6 +17,7 @@
 #include <af/device.h>
 #include <af/gfor.h>
 #include <af/algorithm.h>
+#include <af/internal.h>
 #include "error.hpp"
 
 namespace af
@@ -264,6 +265,13 @@ namespace af
         dim_t nElements;
         AF_THROW(af_get_elements(&nElements, get()));
         return nElements * getSizeOf(type());
+    }
+
+    size_t array::allocated() const
+    {
+        size_t result = 0;
+        AF_THROW(af_get_allocated_bytes(&result, get()));
+        return result;
     }
 
     array array::copy() const
@@ -597,6 +605,7 @@ namespace af
     MEM_FUNC(dim4                   , dims)
     MEM_FUNC(unsigned               , numdims)
     MEM_FUNC(size_t                 , bytes)
+    MEM_FUNC(size_t                 , allocated)
     MEM_FUNC(array                  , copy)
     MEM_FUNC(bool                   , isempty)
     MEM_FUNC(bool                   , isscalar)
@@ -1041,8 +1050,10 @@ af::dtype implicit_dtype(af::dtype scalar_type, af::dtype array_type)
 #undef INSTANTIATE
 #undef TEMPLATE_MEM_FUNC
 
-    //FIXME: This needs to be implemented at a later point
+    //FIXME: These functions need to be implemented properly at a later point
     void array::array_proxy::unlock() const {}
+    void array::array_proxy::lock() const {}
+    bool array::array_proxy::isLocked() const { return false; }
 
     int array::nonzeros() const { return count<int>(*this); }
 
@@ -1051,39 +1062,16 @@ af::dtype implicit_dtype(af::dtype scalar_type, af::dtype array_type)
         AF_THROW(af_lock_array(get()));
     }
 
+    bool array::isLocked() const
+    {
+        bool res;
+        AF_THROW(af_is_locked_array(&res, get()));
+        return res;
+    }
+
     void array::unlock() const
     {
         AF_THROW(af_unlock_array(get()));
-    }
-
-    void eval(array &a, array &b)
-    {
-        af_array arrays[] = {a.get(), b.get()};
-        AF_THROW(af_eval_multiple(2, arrays));
-    }
-
-    void eval(array &a, array &b, array &c)
-    {
-        af_array arrays[] = {a.get(), b.get(), c.get()};
-        AF_THROW(af_eval_multiple(3, arrays));
-    }
-
-    void eval(array &a, array &b, array &c, array &d)
-    {
-        af_array arrays[] = {a.get(), b.get(), c.get(), d.get()};
-        AF_THROW(af_eval_multiple(4, arrays));
-    }
-
-    void eval(array &a, array &b, array &c, array &d, array &e)
-    {
-        af_array arrays[] = {a.get(), b.get(), c.get(), d.get(), e.get()};
-        AF_THROW(af_eval_multiple(5, arrays));
-    }
-
-    void eval(array &a, array &b, array &c, array &d, array &e, array &f)
-    {
-        af_array arrays[] = {a.get(), b.get(), c.get(), d.get(), e.get(), f.get()};
-        AF_THROW(af_eval_multiple(6, arrays));
     }
 
     void eval(int num, array **arrays)
