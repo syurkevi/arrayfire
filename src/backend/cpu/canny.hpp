@@ -1,5 +1,5 @@
 /*******************************************************
- * Copyright (c) 2014, ArrayFire
+ * Copyright (c) 2017, ArrayFire
  * All rights reserved.
  *
  * This file is distributed under 3-clause BSD license.
@@ -9,14 +9,10 @@
 
 #include <Array.hpp>
 
-namespace cuda
-{
 namespace cpu
 {
-    template<typename T>
-    Array<T> cholesky(int *info, const Array<T> &in, const bool is_upper);
+Array<float> nonMaximumSuppression(const Array<float>& mag,
+                                   const Array<float>& gx, const Array<float>& gy);
 
-    template<typename T>
-    int cholesky_inplace(Array<T> &in, const bool is_upper);
-}
+Array<char> edgeTrackingByHysteresis(const Array<char>& strong, const Array<char>& weak);
 }

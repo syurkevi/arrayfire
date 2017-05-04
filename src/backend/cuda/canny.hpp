@@ -1,5 +1,5 @@
 /*******************************************************
- * Copyright (c) 2014, ArrayFire
+ * Copyright (c) 2017, ArrayFire
  * All rights reserved.
  *
  * This file is distributed under 3-clause BSD license.
@@ -11,12 +11,8 @@
 
 namespace cuda
 {
-namespace cpu
-{
-    template<typename T>
-    void lu(Array<T> &lower, Array<T> &upper, Array<int> &pivot, const Array<T> &in);
+Array<float> nonMaximumSuppression(const Array<float>& mag,
+                                   const Array<float>& gx, const Array<float>& gy);
 
-    template<typename T>
-    Array<int> lu_inplace(Array<T> &in, const bool convert_pivot = true);
-}
+Array<char> edgeTrackingByHysteresis(const Array<char>& strong, const Array<char>& weak);
 }
