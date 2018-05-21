@@ -309,6 +309,279 @@ CPP_REDUCE_TESTS(anyTrue, any_true, float, unsigned char);
 CPP_REDUCE_TESTS(allTrue, all_true, float, unsigned char);
 CPP_REDUCE_TESTS(count, count, float, unsigned);
 
+TEST(Reduce, sumReduceByKey)
+{
+    const static int testSz = 8;
+    //todo: should teduce by key return unique key array as well?
+    const int   testKeys[testSz] = { 0, 2, 2, 9, 5, 5, 5, 8 };
+    const float testVals[testSz] = { 0, 7, 1, 6, 2, 5, 3, 4 };
+
+    af::array keys(testSz, testKeys);
+    af::array vals(testSz, testVals);
+
+    af::array reduced_keys;
+    af::array reduced_vals;
+
+    sumByKey(reduced_keys, reduced_vals, vals, keys, 0, 0);
+    af_print(reduced_keys);
+
+    const float gold_reduce[testSz] = { 0, 8, 6, 10, 4 };
+    float *h_a = reduced_vals.host<float>();
+
+
+    for (int i = 0; i < testSz; i++) {
+        cout << ", " << h_a[i];
+    }
+    cout << endl;
+
+    for (int i = 0; i < testSz; i++) {
+        ASSERT_EQ(gold_reduce[i], h_a[i]);
+    }
+
+}
+
+TEST(Reduce, productReduceByKey)
+{
+    const static int testSz = 8;
+    //todo: should teduce by key return unique key array as well?
+    const int   testKeys[testSz] = { 0, 2, 2, 9, 5, 5, 5, 8 };
+    const float testVals[testSz] = { 0, 7, 1, 6, 2, 5, 3, 4 };
+
+    af::array keys(testSz, testKeys);
+    af::array vals(testSz, testVals);
+
+    af::array reduced_keys, reduced_vals;
+    productByKey(reduced_keys, reduced_vals, vals, keys, 0, 1);
+    af_print(reduced_keys);
+
+    const float gold_reduce[testSz] = { 0, 7, 6, 30, 4 };
+    float *h_a = reduced_vals.host<float>();
+
+
+    for (int i = 0; i < testSz; i++) {
+        cout << ", " << h_a[i];
+    }
+    cout << endl;
+
+    for (int i = 0; i < testSz; i++) {
+        ASSERT_EQ(gold_reduce[i], h_a[i]);
+    }
+
+}
+
+TEST(Reduce, minReduceByKey)
+{
+    const static int testSz = 8;
+    //todo: should teduce by key return unique key array as well?
+    const int   testKeys[testSz] = { 0, 2, 2, 9, 5, 5, 5, 8 };
+    const float testVals[testSz] = { 0, 7, 1, 6, 2, 5, 3, 4 };
+
+    af::array keys(testSz, testKeys);
+    af::array vals(testSz, testVals);
+
+    af::array reduced_keys, reduced_vals;
+    minByKey(reduced_keys, reduced_vals, vals, keys);
+    af_print(reduced_keys);
+
+    const float gold_reduce[testSz] = { 0, 1, 6, 2, 4 };
+    float *h_a = reduced_vals.host<float>();
+
+
+    for (int i = 0; i < testSz; i++) {
+        cout << ", " << h_a[i];
+    }
+    cout << endl;
+
+    for (int i = 0; i < testSz; i++) {
+        ASSERT_EQ(gold_reduce[i], h_a[i]);
+    }
+
+}
+
+TEST(Reduce, maxReduceByKey)
+{
+    const static int testSz = 8;
+    //todo: should teduce by key return unique key array as well?
+    const int   testKeys[testSz] = { 0, 2, 2, 9, 5, 5, 5, 8 };
+    const float testVals[testSz] = { 0, 7, 1, 6, 2, 5, 3, 4 };
+
+    af::array keys(testSz, testKeys);
+    af::array vals(testSz, testVals);
+
+    af::array reduced_keys, reduced_vals;
+    maxByKey(reduced_keys, reduced_vals, vals, keys);
+    af_print(reduced_keys);
+
+    const float gold_reduce[testSz] = { 0, 7, 6, 5, 4 };
+    float *h_a = reduced_vals.host<float>();
+
+
+    for (int i = 0; i < testSz; i++) {
+        cout << ", " << h_a[i];
+    }
+    cout << endl;
+
+    for (int i = 0; i < testSz; i++) {
+        ASSERT_EQ(gold_reduce[i], h_a[i]);
+    }
+
+}
+
+TEST(Reduce, allTrueReduceByKey)
+{
+    const static int testSz = 8;
+    //todo: should teduce by key return unique key array as well?
+    const int   testKeys[testSz] = { 0, 2, 2, 9, 5, 5, 5, 8 };
+    const float testVals[testSz] = { 0, 1, 1, 1, 0, 1, 1, 1 };
+
+    af::array keys(testSz, testKeys);
+    af::array vals(testSz, testVals);
+
+    af::array reduced_keys, reduced_vals;
+    minByKey(reduced_keys, reduced_vals, keys, vals);
+    af_print(reduced_keys);
+
+    const float gold_reduce[testSz] = { 0, 1, 1, 0, 1 };
+    float *h_a = reduced_vals.host<float>();
+
+
+    for (int i = 0; i < testSz; i++) {
+        cout << ", " << h_a[i];
+    }
+    cout << endl;
+
+    for (int i = 0; i < testSz; i++) {
+        ASSERT_EQ(gold_reduce[i], h_a[i]);
+    }
+
+}
+
+TEST(Reduce, anyTrueReduceByKey)
+{
+    const static int testSz = 8;
+    //todo: should teduce by key return unique key array as well?
+    const int   testKeys[testSz] = { 0, 2, 2, 9, 5, 5, 5, 8 };
+    const float testVals[testSz] = { 0, 1, 1, 1, 0, 1, 1, 1 };
+
+    af::array keys(testSz, testKeys);
+    af::array vals(testSz, testVals);
+
+    af::array reduced_keys, reduced_vals;
+    minByKey(reduced_keys, reduced_vals, keys, vals);
+    af_print(reduced_keys);
+
+    const float gold_reduce[testSz] = { 0, 1, 1, 1, 1 };
+    float *h_a = reduced_vals.host<float>();
+
+
+    for (int i = 0; i < testSz; i++) {
+        cout << ", " << h_a[i];
+    }
+    cout << endl;
+
+    for (int i = 0; i < testSz; i++) {
+        ASSERT_EQ(gold_reduce[i], h_a[i]);
+    }
+
+}
+
+TEST(Reduce, countReduceByKey)
+{
+    const static int testSz = 8;
+    //todo: should teduce by key return unique key array as well?
+    const int   testKeys[testSz] = { 0, 2, 2, 9, 5, 5, 5, 5 };
+    const float testVals[testSz] = { 0, 1, 1, 1, 0, 1, 1, 1 };
+
+    af::array keys(testSz, testKeys);
+    af::array vals(testSz, testVals);
+
+    af::array reduced_keys, reduced_vals;
+    minByKey(reduced_keys, reduced_vals, keys, vals);
+    af_print(reduced_keys);
+
+    const float gold_reduce[testSz] = { 0, 2, 1, 3 };
+    float *h_a = reduced_vals.host<float>();
+
+
+    for (int i = 0; i < testSz; i++) {
+        cout << ", " << h_a[i];
+    }
+    cout << endl;
+
+    for (int i = 0; i < testSz; i++) {
+        ASSERT_EQ(gold_reduce[i], h_a[i]);
+    }
+
+}
+
+TEST(Reduce, ReduceByKeyNDims)
+{
+    const static int testDim0 = 4;
+    const static int testDim1 = 4;
+    //todo: should teduce by key return unique key array as well?
+    const int   testKeys[testDim0 * testDim1] = { 0, 2, 2, 1,
+                                                  1, 2, 1, 1,
+                                                  2, 0, 0, 2,
+                                                  0, 1, 0, 0 };
+
+    const float testVals[testDim0 * testDim1] = { 1, 2, 3, 4,
+                                                  5, 6, 7, 8,
+                                                  8, 7, 6, 5,
+                                                  4, 3, 2, 1 };
+
+    af::array keys(testDim0, testDim1, testKeys);
+    af::array vals(testDim0, testDim1, testVals);
+
+    af::array reduced_keys, reduced_vals;
+    sumByKey(reduced_keys, reduced_vals, vals, keys, 1, 0);
+    //cout << "n-dim reduceByKey" << endl;
+    //af_print(reduced);
+
+    //TODO: make sure reduced values conceptually correct
+    const float gold_reduce[testDim0 * 3] = { 5, 7, 8, 1,
+                                              5, 3, 7, 12,
+                                              8, 8, 3, 5 };
+
+    float *h_a = reduced_vals.host<float>();
+
+    for (int i = 0; i < testDim0 * testDim1; i++) {
+        cout << ", " << h_a[i];
+    }
+    cout << endl;
+
+    for (int i = 0; i < testDim0 * testDim1; i++) {
+        ASSERT_EQ(gold_reduce[i], h_a[i]);
+    }
+}
+
+TEST(Reduce, ReduceByKeyNans)
+{
+    const static int testSz = 8;
+    //todo: should teduce by key return unique key array as well?
+    const int   testKeys[testSz] = { 0, 2, 2, 9, 5, 5, 5, 8 };
+    const float testVals[testSz] = { 0, 7, NAN, 6, 2, 5, 3, 4 };
+
+    af::array keys(testSz, testKeys);
+    af::array vals(testSz, testVals);
+
+    af::array reduced_keys, reduced_vals;
+    productByKey(reduced_keys, reduced_vals, vals, keys, 0, 1);
+    //af_print(reduced);
+
+    const float gold_reduce[testSz] = { 0, 7, 6, 30, 4 };
+    float *h_a = reduced_vals.host<float>();
+
+
+    for (int i = 0; i < testSz; i++) {
+        cout << ", " << h_a[i];
+    }
+    cout << endl;
+
+    for (int i = 0; i < testSz; i++) {
+        ASSERT_EQ(gold_reduce[i], h_a[i]);
+    }
+}
+
 TEST(Reduce, Test_Product_Global)
 {
     const int num = 100;
@@ -727,4 +1000,21 @@ TEST(Reduce, AllSmallIndexed)
     array a = af::range(dim4(len, 2));
     array b = a(seq(len/2), span);
     ASSERT_EQ(max<float>(b), len/2-1);
+}
+
+TEST(Reduce, Test_Sum_By_Key_Global)
+{
+    int num = 10000;
+    af::array a = af::round(2 * af::randu(num, 1));
+
+    float res = af::sum<float>(a);
+    float *h_a = a.host<float>();
+    float gold = 0;
+
+    for (int i = 0; i < num; i++) {
+        gold += h_a[i];
+    }
+
+    ASSERT_EQ(gold, res);
+    delete[] h_a;
 }

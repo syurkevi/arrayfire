@@ -16,6 +16,9 @@ namespace opencl
     template<af_op_t op, typename Ti, typename To>
     Array<To> reduce(const Array<Ti> &in, const int dim, bool change_nan=false, double nanval=0);
 
+    template<af_op_t op, typename Ti, typename Tk, typename To>
+    Array<To> reduce_by_key(const Array<Ti> &in, const Array<Tk> &key, const int dim, bool change_nan=false, double nanval=0);
+
     template<af_op_t op, typename Ti, typename To>
     To reduce_all(const Array<Ti> &in, bool change_nan=false, double nanval=0);
 }

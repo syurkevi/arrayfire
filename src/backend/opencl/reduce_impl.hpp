@@ -12,6 +12,7 @@
 #include <Array.hpp>
 #include <reduce.hpp>
 #include <kernel/reduce.hpp>
+#include <kernel/reduce_by_key.hpp>
 #include <err_opencl.hpp>
 
 using std::swap;
@@ -28,6 +29,16 @@ namespace opencl
         return out;
     }
 
+    template<af_op_t op, typename Ti, typename Tk, typename To>
+    Array<To> reduce_by_key(const Array<Ti> &in, const Array<Tk> &key, const int dim, bool change_nan=false, double nanval=0)
+    {
+        dim4 odims = in.dims();
+        odims[dim] = 1;
+        Array<To> out = createEmptyArray<To>(odims);
+        kernel::reduce_by_key<Ti, Tk, To, op>(out, in, key, dim, change_nan, nanval);
+        return out;
+    }
+
     template<af_op_t op, typename Ti, typename To>
     To reduce_all(const Array<Ti> &in, bool change_nan, double nanval)
     {
@@ -35,7 +46,9 @@ namespace opencl
     }
 }
 
-#define INSTANTIATE(Op, Ti, To)                                         \
-    template Array<To> reduce<Op, Ti, To>(const Array<Ti> &in, const int dim, \
-                                          bool change_nan, double nanval); \
+#define INSTANTIATE(Op, Ti, To)                                                                       \
+    template Array<To> reduce<Op, Ti, To>(const Array<Ti> &in, const int dim,                         \
+                                          bool change_nan, double nanval);                            \
+    template Array<To> reduce_by_key<Op, Ti, int, To>(const Array<Ti> &in, const Array<int> &key,     \
+                                                      const int dim, bool change_nan, double nanval); \
     template To reduce_all<Op, Ti, To>(const Array<Ti> &in, bool change_nan, double nanval);

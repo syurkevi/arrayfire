@@ -29,6 +29,18 @@ static inline af_array reduce(const af_array in, const int dim,
     return getHandle(reduce<op,Ti,To>(getArray<Ti>(in), dim, change_nan, nanval));
 }
 
+template<af_op_t op, typename Ti, typename Tk, typename To>
+static inline void reduce_by_key(af_array *keys_out, af_array *vals_out, const af_array keys, const af_array vals, const int dim, bool change_nan = false, double nanval = 0)
+{
+    Array<Tk> oKeyArray = createEmptyArray<Tk>(af::dim4());
+    Array<To> oValArray = createEmptyArray<To>(af::dim4());
+
+    reduce_by_key<op,Ti,Tk,To>(oKeyArray, oValArray, getArray<Tk>(keys), getArray<Ti>(vals), dim, change_nan, nanval);
+
+    *keys_out = getHandle(oKeyArray);
+    *vals_out = getHandle(oValArray);
+}
+
 template<af_op_t op, typename To>
 static af_err reduce_type(af_array *out, const af_array in, const int dim)
 {
@@ -64,6 +76,47 @@ static af_err reduce_type(af_array *out, const af_array in, const int dim)
         }
 
         std::swap(*out, res);
+    }
+    CATCHALL;
+
+    return AF_SUCCESS;
+}
+
+template<af_op_t op, typename To>
+static af_err reduce_type_by_key(af_array *keys_out, af_array *vals_out, const af_array keys, const af_array vals, const int dim)
+{
+    try {
+
+        ARG_ASSERT(4, dim >= 0);
+        ARG_ASSERT(4, dim <  4);
+
+        const ArrayInfo& in_info = getInfo(vals);
+
+        //if (dim >= (int)in_info.ndims()) {
+            //*out = retain(in);
+            //return AF_SUCCESS;
+        //}
+
+        af_dtype type = in_info.getType();
+        af_array res;
+
+        switch(type) {
+        case f32:  reduce_by_key<op, float  , int, To>(keys_out, vals_out, keys, vals, dim); break;
+        case f64:  reduce_by_key<op, double , int, To>(keys_out, vals_out, keys, vals, dim); break;
+        case c32:  reduce_by_key<op, cfloat , int, To>(keys_out, vals_out, keys, vals, dim); break;
+        case c64:  reduce_by_key<op, cdouble, int, To>(keys_out, vals_out, keys, vals, dim); break;
+        case u32:  reduce_by_key<op, uint   , int, To>(keys_out, vals_out, keys, vals, dim); break;
+        case s32:  reduce_by_key<op, int    , int, To>(keys_out, vals_out, keys, vals, dim); break;
+        case u64:  reduce_by_key<op, uintl  , int, To>(keys_out, vals_out, keys, vals, dim); break;
+        case s64:  reduce_by_key<op, intl   , int, To>(keys_out, vals_out, keys, vals, dim); break;
+        case u16:  reduce_by_key<op, ushort , int, To>(keys_out, vals_out, keys, vals, dim); break;
+        case s16:  reduce_by_key<op, short  , int, To>(keys_out, vals_out, keys, vals, dim); break;
+        case b8:   reduce_by_key<op, char   , int, To>(keys_out, vals_out, keys, vals, dim); break;
+        case u8:   reduce_by_key<op, uchar  , int, To>(keys_out, vals_out, keys, vals, dim); break;
+        default:   TYPE_ERROR(1, type);
+        }
+
+        //std::swap(*out, res);
     }
     CATCHALL;
 
@@ -111,6 +164,46 @@ static af_err reduce_common(af_array *out, const af_array in, const int dim)
 }
 
 template<af_op_t op>
+static af_err reduce_common_by_key(af_array *keys_out, af_array *vals_out, const af_array keys, const af_array vals, const int dim)
+{
+    try {
+
+        ARG_ASSERT(4, dim >= 0);
+        ARG_ASSERT(4, dim <  4);
+
+        const ArrayInfo& in_info = getInfo(vals);
+
+        //if (dim >= (int)in_info.ndims()) {
+            //return af_retain_array(out, vals);
+        //}
+
+        af_dtype type = in_info.getType();
+        af_array res;
+
+        switch(type) {
+        case f32:  reduce_by_key<op, float  , int, float  >(keys_out, vals_out, keys, vals, dim); break;
+        case f64:  reduce_by_key<op, double , int, double >(keys_out, vals_out, keys, vals, dim); break;
+        case c32:  reduce_by_key<op, cfloat , int, cfloat >(keys_out, vals_out, keys, vals, dim); break;
+        case c64:  reduce_by_key<op, cdouble, int, cdouble>(keys_out, vals_out, keys, vals, dim); break;
+        case u32:  reduce_by_key<op, uint   , int, uint   >(keys_out, vals_out, keys, vals, dim); break;
+        case s32:  reduce_by_key<op, int    , int, int    >(keys_out, vals_out, keys, vals, dim); break;
+        case u64:  reduce_by_key<op, uintl  , int, uintl  >(keys_out, vals_out, keys, vals, dim); break;
+        case s64:  reduce_by_key<op, intl   , int, intl   >(keys_out, vals_out, keys, vals, dim); break;
+        case u16:  reduce_by_key<op, ushort , int, ushort >(keys_out, vals_out, keys, vals, dim); break;
+        case s16:  reduce_by_key<op, short  , int, short  >(keys_out, vals_out, keys, vals, dim); break;
+        case b8:   reduce_by_key<op, char   , int, char   >(keys_out, vals_out, keys, vals, dim); break;
+        case u8:   reduce_by_key<op, uchar  , int, uchar  >(keys_out, vals_out, keys, vals, dim); break;
+        default:   TYPE_ERROR(1, type);
+        }
+
+        //std::swap(*out, res);
+    }
+    CATCHALL;
+
+    return AF_SUCCESS;
+}
+
+template<af_op_t op>
 static af_err reduce_promote(af_array *out, const af_array in, const int dim,
                              bool change_nan=false, double nanval=0)
 {
@@ -146,6 +239,47 @@ static af_err reduce_promote(af_array *out, const af_array in, const int dim,
         default:   TYPE_ERROR(1, type);
         }
         std::swap(*out, res);
+    }
+    CATCHALL;
+
+    return AF_SUCCESS;
+}
+
+template<af_op_t op>
+static af_err reduce_promote_by_key(af_array *keys_out, af_array *vals_out, const af_array keys, const af_array vals, const int dim, bool change_nan=false, double nanval=0)
+{
+    try {
+
+        ARG_ASSERT(4, dim >= 0);
+        ARG_ASSERT(4, dim <  4);
+
+        const ArrayInfo& in_info = getInfo(vals);
+
+        //if (dim >= (int)in_info.ndims()) {
+            ////*out = retain(in);
+            //return AF_SUCCESS;
+        //}
+
+        af_dtype type = in_info.getType();
+        af_array res;
+
+        switch(type) {
+        case f32:  reduce_by_key<op, float  , int, float  >(keys_out, vals_out, keys, vals, dim, change_nan, nanval); break;
+        case f64:  reduce_by_key<op, double , int, double >(keys_out, vals_out, keys, vals, dim, change_nan, nanval); break;
+        case c32:  reduce_by_key<op, cfloat , int, cfloat >(keys_out, vals_out, keys, vals, dim, change_nan, nanval); break;
+        case c64:  reduce_by_key<op, cdouble, int, cdouble>(keys_out, vals_out, keys, vals, dim, change_nan, nanval); break;
+        case u32:  reduce_by_key<op, uint   , int, uint   >(keys_out, vals_out, keys, vals, dim, change_nan, nanval); break;
+        case s32:  reduce_by_key<op, int    , int, int    >(keys_out, vals_out, keys, vals, dim, change_nan, nanval); break;
+        case u64:  reduce_by_key<op, uintl  , int, uintl  >(keys_out, vals_out, keys, vals, dim, change_nan, nanval); break;
+        case s64:  reduce_by_key<op, intl   , int, intl   >(keys_out, vals_out, keys, vals, dim, change_nan, nanval); break;
+        case u16:  reduce_by_key<op, ushort , int, uint   >(keys_out, vals_out, keys, vals, dim, change_nan, nanval); break;
+        case s16:  reduce_by_key<op, short  , int, int    >(keys_out, vals_out, keys, vals, dim, change_nan, nanval); break;
+        case u8:   reduce_by_key<op, uchar  , int, uint   >(keys_out, vals_out, keys, vals, dim, change_nan, nanval); break;
+            // Make sure you are adding only "1" for every non ze(keys_out, vals_out, keys, vals,ro value, even if op == af_add_t
+        case b8:   reduce_by_key<af_notzero_t, char  , int, uint   >(keys_out, vals_out, keys, vals, dim, change_nan, nanval); break;
+        default:   TYPE_ERROR(1, type);
+        }
+        //std::swap(*out, res);
     }
     CATCHALL;
 
@@ -195,6 +329,52 @@ af_err af_all_true(af_array *out, const af_array in, const int dim)
 af_err af_any_true(af_array *out, const af_array in, const int dim)
 {
     return reduce_type<af_or_t, char>(out, in, dim);
+}
+
+//by key versions
+af_err af_min_by_key(af_array *keys_out, af_array *vals_out, const af_array keys, const af_array vals, const int dim)
+{
+    return reduce_common_by_key<af_min_t>(keys_out, vals_out, keys, vals, dim);
+}
+
+af_err af_max_by_key(af_array *keys_out, af_array *vals_out, const af_array keys, const af_array vals, const int dim)
+{
+    return reduce_common_by_key<af_max_t>(keys_out, vals_out, keys, vals, dim);
+}
+
+af_err af_sum_by_key(af_array *keys_out, af_array *vals_out, const af_array keys, const af_array vals, const int dim)
+{
+    return reduce_promote_by_key<af_add_t>(keys_out, vals_out, keys, vals, dim);
+}
+
+af_err af_product_by_key(af_array *keys_out, af_array *vals_out, const af_array keys, const af_array vals, const int dim)
+{
+    return reduce_promote_by_key<af_mul_t>(keys_out, vals_out, keys, vals, dim);
+}
+
+af_err af_sum_nan_by_key(af_array *keys_out, af_array *vals_out, const af_array keys, const af_array vals, const int dim, const double nanval)
+{
+    return reduce_promote_by_key<af_add_t>(keys_out, vals_out, keys, vals, dim, true, nanval);
+}
+
+af_err af_product_nan_by_key(af_array *keys_out, af_array *vals_out, const af_array keys, const af_array vals, const int dim, const double nanval)
+{
+    return reduce_promote_by_key<af_mul_t>(keys_out, vals_out, keys, vals, dim, true, nanval);
+}
+
+af_err af_count_by_key(af_array *keys_out, af_array *vals_out, const af_array keys, const af_array vals, const int dim)
+{
+    return reduce_type_by_key<af_notzero_t, uint>(keys_out, vals_out, keys, vals, dim);
+}
+
+af_err af_all_true_by_key(af_array *keys_out, af_array *vals_out, const af_array keys, const af_array vals, const int dim)
+{
+    return reduce_type_by_key<af_and_t, char>(keys_out, vals_out, keys, vals, dim);
+}
+
+af_err af_any_true_by_key(af_array *keys_out, af_array *vals_out, const af_array keys, const af_array vals, const int dim)
+{
+    return reduce_type_by_key<af_or_t, char>(keys_out, vals_out, keys, vals, dim);
 }
 
 template<af_op_t op, typename Ti, typename To>
