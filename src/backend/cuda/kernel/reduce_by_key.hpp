@@ -154,6 +154,17 @@ namespace kernel
     }
 
     //swaps key and value according to key ordering and target direction
+    template<typename Ti, typename Tk>
+    __device__ int kv_swap(Tk &k, Ti &v, int mask, int dir)
+    {
+        Tk ky = __shfl_xor_sync(FULL_MASK, k, mask);
+        Ti vy = __shfl_xor_sync(FULL_MASK, v, mask);
+        bool swap = (k < ky == dir) && (k != ky);
+        k = swap ? ky : k;
+        v = swap ? vy : v;
+    }
+
+    //specialization for cfloat
     template<typename Tk>
     __device__ int kv_swap(Tk &k, cuda::cfloat &v, int mask, int dir)
     {
@@ -166,29 +177,35 @@ namespace kernel
         v = swap ? vy : v;
     }
 
-    //swaps key and value according to key ordering and target direction
-    template<typename Ti, typename Tk>
-    __device__ int kv_swap(Tk &k, Ti &v, int mask, int dir)
+    //specialization for cdouble
+    template<typename Tk>
+    __device__ int kv_swap(Tk &k, cuda::cdouble &v, int mask, int dir)
     {
-        Tk ky = __shfl_xor_sync(FULL_MASK, k, mask);
-        Ti vy = __shfl_xor_sync(FULL_MASK, v, mask);
+        Tk   ky;
+        cuda::cdouble vy;
+        //int   ky = __shfl_xor_sync(FULL_MASK, k, mask);
+        //float vy = __shfl_xor_sync(FULL_MASK, v, mask);
         bool swap = (k < ky == dir) && (k != ky);
         k = swap ? ky : k;
         v = swap ? vy : v;
     }
 
+
+    //__shfl_down_sync wrapper
     template<typename T>
-    __device__ T shfl_down(unsigned mask, T var, int delta) {
+    __device__ T shfl_down_sync(unsigned mask, T var, int delta) {
         return __shfl_down_sync(mask, var, delta);
     }
-    template<>
-    __device__ cuda::cfloat shfl_down(unsigned mask, cuda::cfloat var, int delta) {
+    //specialization for cfloat
+    template<> inline
+    __device__ cuda::cfloat shfl_down_sync(unsigned mask, cuda::cfloat var, int delta) {
         cuda::cfloat res = { __shfl_down_sync(mask, var.x, delta), 
                              __shfl_down_sync(mask, var.y, delta)};
         return res;
     }
-    template<>
-    __device__ cuda::cdouble shfl_down(unsigned mask, cuda::cdouble var, int delta) {
+    //specialization for cdouble
+    template<> inline
+    __device__ cuda::cdouble shfl_down_sync(unsigned mask, cuda::cdouble var, int delta) {
         cuda::cdouble res = { __shfl_down_sync(mask, var.x, delta), 
                               __shfl_down_sync(mask, var.y, delta)};
         return res;
@@ -336,6 +353,7 @@ namespace kernel
            k = scalar<Tk>(INFINITY);
            v = scalar<Ti>(INFINITY);
         }
+/*
 
         //__syncwarp();
 
@@ -372,50 +390,51 @@ namespace kernel
         //special case of single key per warp
         char all_eq = (k == __shfl_down_sync(0xFFFFFFFF, k , 1));
         if(__all_sync(0xFFFFFFFF, all_eq)) {
-            v += __shfl_down_sync(FULL_MASK, v , 1);
-            v += __shfl_down_sync(FULL_MASK, v , 2);
-            v += __shfl_down_sync(FULL_MASK, v , 4);
-            v += __shfl_down_sync(FULL_MASK, v , 8);
-            v += __shfl_down_sync(FULL_MASK, v , 16);
+            v = v + shfl_down_sync(FULL_MASK, v , 1);
+            v = v + shfl_down_sync(FULL_MASK, v , 2);
+            v = v + shfl_down_sync(FULL_MASK, v , 4);
+            v = v + shfl_down_sync(FULL_MASK, v , 8);
+            v = v + shfl_down_sync(FULL_MASK, v , 16);
         } else {
             //preform reduction for each of the unique keys
             int update_key = (k == __shfl_down_sync(0xFFFFFFFF, k , 1)) && (laneid < 31);
             unsigned shflmask = __ballot_sync(0xFFFFFFFF, update_key);
             shflmask |= (shflmask << 1);
-            float uval = __shfl_down_sync(shflmask, v , 1); //primitive version for now
-            v += update_key ?  uval : scalar<Ti>(0);
+            Ti uval = shfl_down_sync(shflmask, v , 1); //primitive version for now
+            v = update_key ?  (v + uval) : v;
             //__syncwarp();
 
             update_key = (k == __shfl_down_sync(0xFFFFFFFF, k , 2)) && (laneid < 30);
             shflmask = __ballot_sync(0xFFFFFFFF, update_key);
             shflmask |= (shflmask << 2);
-            uval = __shfl_down_sync(shflmask, v , 2);
-            v += update_key ?  uval : scalar<Ti>(0);
+            uval = shfl_down_sync(shflmask, v , 2);
+            v = update_key ?  (v + uval) : v;
             //__syncwarp();
 
             update_key = (k == __shfl_down_sync(0xFFFFFFFF, k , 4)) && (laneid < 28);
             shflmask = __ballot_sync(0xFFFFFFFF, update_key);
             shflmask |= (shflmask << 4);
-            uval = __shfl_down_sync(shflmask, v , 4);
-            v += update_key ?  uval : scalar<Ti>(0);
+            uval = shfl_down_sync(shflmask, v , 4);
+            v = update_key ?  (v + uval) : v;
             //__syncwarp();
 
             update_key = (k == __shfl_down_sync(0xFFFFFFFF, k , 8)) && (laneid < 24);
             shflmask = __ballot_sync(0xFFFFFFFF, update_key);
             shflmask |= (shflmask << 8);
-            uval = __shfl_down_sync(shflmask, v , 8);
-            v += update_key ?  uval : scalar<Ti>(0);
+            uval = shfl_down_sync(shflmask, v , 8);
+            v = update_key ?  (v + uval) : v;
             //__syncwarp();
 
             update_key = (k == __shfl_down_sync(0xFFFFFFFF, k , 16)) && (laneid < 16);
             shflmask = __ballot_sync(0xFFFFFFFF, update_key);
             shflmask |= (shflmask << 16);
-            uval = __shfl_down_sync(shflmask, v , 16);
-            v += update_key ?  uval : scalar<Ti>(0);
+            uval = shfl_down_sync(shflmask, v , 16);
+            v = update_key ?  (v + uval) : v;
             //__syncwarp();
         }
 
         //__syncthreads();//TMP
+        */
         /*
 
         char unique_flag = ((k != __shfl_up_sync(0xFFFFFFFF, k , 1)) || (laneid == 0)) && (tid < n);
