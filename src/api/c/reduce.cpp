@@ -91,14 +91,16 @@ static af_err reduce_type_by_key(af_array *keys_out, af_array *vals_out, const a
         ARG_ASSERT(4, dim <  4);
 
         const ArrayInfo& in_info = getInfo(vals);
-
-        //if (dim >= (int)in_info.ndims()) {
-            //*out = retain(in);
-            //return AF_SUCCESS;
-        //}
-
         af_dtype type = in_info.getType();
-        af_array res;
+
+        if(!in_info.isVector()) {
+            AF_ERROR("Only 1-dimensional reduce_by_key is currently supported.", AF_ERR_NOT_SUPPORTED);
+        }
+
+        const ArrayInfo& kinfo = getInfo(keys);
+        if(in_info.dims() != kinfo.dims()) {
+            AF_ERROR("Mismatching key/value dimensions.", AF_ERR_SIZE);
+        }
 
         switch(type) {
         case f32:  reduce_by_key<op, float  , int, To>(keys_out, vals_out, keys, vals, dim); break;
@@ -116,7 +118,6 @@ static af_err reduce_type_by_key(af_array *keys_out, af_array *vals_out, const a
         default:   TYPE_ERROR(1, type);
         }
 
-        //std::swap(*out, res);
     }
     CATCHALL;
 
@@ -172,13 +173,16 @@ static af_err reduce_common_by_key(af_array *keys_out, af_array *vals_out, const
         ARG_ASSERT(4, dim <  4);
 
         const ArrayInfo& in_info = getInfo(vals);
-
-        //if (dim >= (int)in_info.ndims()) {
-            //return af_retain_array(out, vals);
-        //}
-
         af_dtype type = in_info.getType();
-        af_array res;
+
+        if(!in_info.isVector()) {
+            AF_ERROR("Only 1-dimensional reduce_by_key is currently supported.", AF_ERR_NOT_SUPPORTED);
+        }
+
+        const ArrayInfo& kinfo = getInfo(keys);
+        if(in_info.dims() != kinfo.dims()) {
+            AF_ERROR("Mismatching key/value dimensions.", AF_ERR_SIZE);
+        }
 
         switch(type) {
         case f32:  reduce_by_key<op, float  , int, float  >(keys_out, vals_out, keys, vals, dim); break;
@@ -196,7 +200,6 @@ static af_err reduce_common_by_key(af_array *keys_out, af_array *vals_out, const
         default:   TYPE_ERROR(1, type);
         }
 
-        //std::swap(*out, res);
     }
     CATCHALL;
 
@@ -254,14 +257,16 @@ static af_err reduce_promote_by_key(af_array *keys_out, af_array *vals_out, cons
         ARG_ASSERT(4, dim <  4);
 
         const ArrayInfo& in_info = getInfo(vals);
-
-        //if (dim >= (int)in_info.ndims()) {
-            ////*out = retain(in);
-            //return AF_SUCCESS;
-        //}
-
         af_dtype type = in_info.getType();
-        af_array res;
+
+        if(!in_info.isVector()) {
+            AF_ERROR("Only 1-dimensional reduce_by_key is currently supported.", AF_ERR_NOT_SUPPORTED);
+        }
+
+        const ArrayInfo& kinfo = getInfo(keys);
+        if(in_info.dims() != kinfo.dims()) {
+            AF_ERROR("Mismatching key/value dimensions.", AF_ERR_SIZE);
+        }
 
         switch(type) {
         case f32:  reduce_by_key<op, float  , int, float  >(keys_out, vals_out, keys, vals, dim, change_nan, nanval); break;
@@ -275,11 +280,9 @@ static af_err reduce_promote_by_key(af_array *keys_out, af_array *vals_out, cons
         case u16:  reduce_by_key<op, ushort , int, uint   >(keys_out, vals_out, keys, vals, dim, change_nan, nanval); break;
         case s16:  reduce_by_key<op, short  , int, int    >(keys_out, vals_out, keys, vals, dim, change_nan, nanval); break;
         case u8:   reduce_by_key<op, uchar  , int, uint   >(keys_out, vals_out, keys, vals, dim, change_nan, nanval); break;
-            // Make sure you are adding only "1" for every non ze(keys_out, vals_out, keys, vals,ro value, even if op == af_add_t
         case b8:   reduce_by_key<af_notzero_t, char  , int, uint   >(keys_out, vals_out, keys, vals, dim, change_nan, nanval); break;
         default:   TYPE_ERROR(1, type);
         }
-        //std::swap(*out, res);
     }
     CATCHALL;
 

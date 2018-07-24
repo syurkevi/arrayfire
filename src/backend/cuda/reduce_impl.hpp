@@ -17,9 +17,11 @@
 #include <kernel/reduce_by_key.hpp>
 #include <err_cuda.hpp>
 #include <set.hpp>
+#include <cub/device/device_scan.cuh>
 
 using std::swap;
 using af::dim4;
+
 namespace cuda
 {
     template<af_op_t op, typename Ti, typename To>
@@ -33,77 +35,133 @@ namespace cuda
         return out;
     }
 
-    template<af_op_t op, typename Ti, typename Tk, typename To>
-    void reduce_by_key(Array<Tk> &keys_out, Array<To> &vals_out, const Array<Tk> &keys, const Array<Ti> &vals, const int dim, bool change_nan, double nanval)
-    {
-        //TODO: use unique set to determine output size ahead of time?
-        //Array<Tk> fkey = keys;
-        //fkey.modDims(dim4(keys.elements()));
-        //Array<Tk> unique_keys = setUnique(fkey, is_sorted);
-        //dim4 udims = unique_keys.dims();
-        //dim4 odims = vals.dims();
-        //odims[dim] = udims[0];
 
+    template<af_op_t op, typename Ti, typename Tk, typename To>
+    void reduce_by_key_dim(Array<Tk> &keys_out,     Array<To> &vals_out,
+                           const Array<Tk> &keys, const Array<Ti> &vals,
+                           int dim, bool change_nan, double nanval)
+    { }
+
+    template<af_op_t op, typename Ti, typename Tk, typename To>
+    void reduce_by_key_first(Array<Tk> &keys_out,     Array<To> &vals_out,
+                             const Array<Tk> &keys, const Array<Ti> &vals,
+                             bool change_nan, double nanval)
+    {
+        dim4 idims = keys.dims();
         dim4 odims = vals.dims();
 
-        Array<Tk> temp_keys    = createEmptyArray<Tk>(odims);
-        Array<Tk> reduced_keys = createEmptyArray<Tk>(odims);
-        Array<To> temp_vals    = createEmptyArray<To>(odims);
-        Array<To> reduced_vals = createEmptyArray<To>(odims);
+        //allocate space for output and temporary working arrays
+        Array<Tk> reduced_keys   = createEmptyArray<Tk>(odims);
+        Array<To> reduced_vals   = createEmptyArray<To>(odims);
 
-        cub::DoubleBuffer<Tk> db_keys((Tk*)getDevicePtr(reduced_keys), (Tk*)getDevicePtr(temp_keys));
-        cub::DoubleBuffer<To> db_vals((To*)getDevicePtr(reduced_vals), (To*)getDevicePtr(temp_vals));
+        Array<Tk> t_reduced_keys = createEmptyArray<Tk>(odims);
+        Array<To> t_reduced_vals = createEmptyArray<To>(odims);
 
+        //flags determining more reduction is necessary
+        auto needs_another_reduction        = memAlloc<int>(1);
+        auto needs_block_boundary_reduction = memAlloc<int>(1);
 
-        auto needs_reduction = memAlloc<int>(1);
+        //reset flags
+        CUDA_CHECK(cudaMemset(needs_another_reduction.get(), 0, sizeof(int)));
+        CUDA_CHECK(cudaMemset(needs_block_boundary_reduction.get(), 0, sizeof(int)));
 
-        int n_reduced_after_initial;
-        n_reduced_after_initial= kernel::reduce_first_by_key_launcher<Ti, Tk, To, op, 128>(reduced_keys, reduced_vals, keys, vals, change_nan, nanval);
+        int nelems = idims[0];
 
-        printf("n_reduced_after_initial: %d\n", n_reduced_after_initial);
+        const unsigned int numThreads = 128;
+        int numBlocks = divup(nelems, numThreads);
 
-        /*
-        //prep temporary working memory
-        cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes, db_keys, db_vals, n_reduced_after_initial, 0, sizeof(int)*8, (cudaStream_t)0, false);
+        auto reduced_block_sizes = memAlloc<int>(numBlocks);
 
-        void *d_temp_storage;
+        CUDA_LAUNCH((kernel::reduce_blocks_by_key<Ti, Tk, To, op, numThreads>), numBlocks, numThreads, 
+                reduced_block_sizes.get(), reduced_keys, reduced_vals, keys, vals, nelems, change_nan, scalar<To>(nanval));
+        POST_LAUNCH_CHECK();
+
         size_t temp_storage_bytes = 0;
+        cub::DeviceScan::InclusiveSum(NULL, temp_storage_bytes, reduced_block_sizes.get(), reduced_block_sizes.get(), numBlocks);
+        auto d_temp_storage = memAlloc<char>(temp_storage_bytes);
 
-        CUDA(cudaMalloc(&d_temp_storage, temp_storage_bytes));
+        cub::DeviceScan::InclusiveSum((void*)d_temp_storage.get(), temp_storage_bytes, reduced_block_sizes.get(), reduced_block_sizes.get(), numBlocks);
 
-        //perform sort by key
-        cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes, db_keys, db_vals, n_reduced_after_initial, 0, sizeof(int)*8, (cudaStream_t)0, false);
+        CUDA_LAUNCH((kernel::compact<Tk, To>), numBlocks, numThreads, reduced_block_sizes.get(), t_reduced_keys, t_reduced_vals, reduced_keys, reduced_vals);
+        POST_LAUNCH_CHECK();
 
-        //TODO: correct launch invocation
-        bool needs_another_reduction = test_reduction_launcher();
+        int n_reduced_host;
+        CUDA_CHECK(cudaMemcpy(&n_reduced_host, reduced_block_sizes.get() + (numBlocks - 1), sizeof(int), cudaMemcpyDeviceToHost));
 
-        int n_reduced_after_iteration = n_reduced_after_initial;
-        while(another_reduction) {
+        numBlocks = divup(n_reduced_host, numThreads);
+        CUDA_LAUNCH((kernel::test_needs_reduction<Tk>), numBlocks, numThreads,
+                needs_another_reduction.get(), needs_block_boundary_reduction.get(), t_reduced_keys, n_reduced_host);
+        POST_LAUNCH_CHECK();
 
-            //TODO: correct launch invocation
-            n_reduced_after_iteration = reduce_first_by_key_launcher<>();
-            //reduce_by_key_block<<<numBlocks, numThreads>>>(n_reduced, db_keys.Alternate(), db_vals.Alternate(), db_keys.Current(), db_vals.Current(), n_reduced_after_iteration);
+        int needs_another_reduction_host;
+        CUDA_CHECK(cudaMemcpy(&needs_another_reduction_host, needs_another_reduction.get(), sizeof(int), cudaMemcpyDeviceToHost));
 
-            db_keys.selector = !db_keys.selector;
-            db_vals.selector = !db_vals.selector;
+        int needs_block_boundary_reduction_host;
+        CUDA_CHECK(cudaMemcpy(&needs_block_boundary_reduction_host, needs_block_boundary_reduction.get(), sizeof(int), cudaMemcpyDeviceToHost));
 
-            //TODO: correct launch invocation
-            bool needs_another_reduction = test_reduction_launcher();
+        while(needs_another_reduction_host || needs_block_boundary_reduction_host) {
+            numBlocks = divup(n_reduced_host, numThreads);
+
+            CUDA_LAUNCH((kernel::reduce_blocks_by_key<To, Tk, To, op, numThreads>), numBlocks, numThreads, reduced_block_sizes.get(), reduced_keys, reduced_vals, t_reduced_keys, t_reduced_vals, n_reduced_host, change_nan, scalar<To>(nanval));
+            POST_LAUNCH_CHECK();
+
+            cub::DeviceScan::InclusiveSum((void*)d_temp_storage.get(), temp_storage_bytes, reduced_block_sizes.get(), reduced_block_sizes.get(), numBlocks);
+
+            CUDA_LAUNCH((kernel::compact<Tk, To>), numBlocks, numThreads, reduced_block_sizes.get(), t_reduced_keys, t_reduced_vals, reduced_keys, reduced_vals);
+            POST_LAUNCH_CHECK();
+
+            CUDA_CHECK(cudaMemcpy(&n_reduced_host, reduced_block_sizes.get() + (numBlocks - 1), sizeof(int), cudaMemcpyDeviceToHost));
+
+            //reset flags
+            //TODO: make async
+            CUDA_CHECK(cudaMemset(needs_another_reduction.get(), 0, sizeof(int)));
+            CUDA_CHECK(cudaMemset(needs_block_boundary_reduction.get(), 0, sizeof(int)));
+
+            numBlocks = divup(n_reduced_host, numThreads);
+            CUDA_LAUNCH((kernel::test_needs_reduction<Tk>), numBlocks, numThreads,
+                    needs_another_reduction.get(), needs_block_boundary_reduction.get(), t_reduced_keys, n_reduced_host);
+            POST_LAUNCH_CHECK();
+
+            CUDA_CHECK(cudaMemcpy(&needs_another_reduction_host, needs_another_reduction.get(), sizeof(int), cudaMemcpyDeviceToHost));
+            CUDA_CHECK(cudaMemcpy(&needs_block_boundary_reduction_host, needs_block_boundary_reduction.get(), sizeof(int), cudaMemcpyDeviceToHost));
+
+            if(needs_block_boundary_reduction_host) {
+                CUDA_LAUNCH((kernel::final_boundary_reduce<Tk, To, op>), numBlocks, numThreads, reduced_block_sizes.get(), t_reduced_keys, t_reduced_vals, n_reduced_host);
+                POST_LAUNCH_CHECK();
+
+                cub::DeviceScan::InclusiveSum((void*)d_temp_storage.get(), temp_storage_bytes, reduced_block_sizes.get(), reduced_block_sizes.get(), numBlocks);
+
+                CUDA_CHECK(cudaMemcpy(&n_reduced_host, reduced_block_sizes.get() + (numBlocks - 1), sizeof(int), cudaMemcpyDeviceToHost));
+
+                CUDA_LAUNCH((kernel::compact<Tk, To>), numBlocks, numThreads, reduced_block_sizes.get(), reduced_keys, reduced_vals, t_reduced_keys, t_reduced_vals);
+                POST_LAUNCH_CHECK();
+
+                swap(t_reduced_keys, reduced_keys);
+                swap(t_reduced_vals, reduced_vals);
+            }
         }
 
-        //TODO: prep final output pointer
-        if(db_keys.Current() != *keys_out) {
-            CUDA(cudaFree(*keys_out));
-            *keys_out = db_keys.Current();
-        }
-        if(db_vals.Current() != *vals_out) {
-            CUDA(cudaFree(*vals_out));
-            *vals_out = db_vals.Current();
+        odims[0] = n_reduced_host;
+        std::vector<af_seq> index;
+        for(int i=0; i<odims.ndims(); ++i) {
+            af_seq s = { 0.0, (double)odims[i] - 1 , 1.0 };
+            index.push_back(s);
         }
 
-        CUDA_CHECK(cudaMemcpy(nreduced, n_reduced, sizeof(int), cudaMemcpyDeviceToHost));
-        CUDA_CHECK(cudaFree(n_reduced));
-        */
+        keys_out = createSubArray<Tk>(t_reduced_keys, index, true);
+        vals_out = createSubArray<To>(t_reduced_vals, index, true);
+    }
+
+    template<af_op_t op, typename Ti, typename Tk, typename To>
+    void reduce_by_key(Array<Tk> &keys_out,     Array<To> &vals_out,
+                       const Array<Tk> &keys, const Array<Ti> &vals,
+                       const int dim, bool change_nan, double nanval)
+    {
+        if(dim == 0) {
+            reduce_by_key_first<op, Ti, Tk, To>(keys_out, vals_out, keys, vals, change_nan, nanval);
+        } else {
+            reduce_by_key_dim<op, Ti, Tk, To>(keys_out, vals_out, keys, vals, dim, change_nan, nanval);
+        }
     }
 
     template<af_op_t op, typename Ti, typename To>

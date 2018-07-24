@@ -68,25 +68,13 @@ struct reduce_dim<op, Ti, To, 0>
 template<af_op_t op, typename Ti, typename Tk, typename To, int D>
 struct reduce_dim_by_key
 {
-    void operator()(Param<To> out, const dim_t outOffset,
-                    CParam<Tk> unique_key, CParam<Tk> key, const dim_t keyOffset,
-                    CParam<Ti> in, const dim_t inOffset,
-                    const int dim, bool change_nan, double nanval)
+    void operator()(Param<Tk> okeys, const dim_t okeysOffset,
+                    Param<To> ovals, const dim_t ovalsOffset,
+                    CParam<Tk> keys, const dim_t keysOffset,
+                    CParam<Ti> vals, const dim_t valsOffset,
+                    int *n_reduced, const int dim,  bool change_nan, double nanval)
     {
-        static const int D1 = D - 1;
-        reduce_dim_by_key<op, Ti, Tk, To, D1> reduce_dim_next;
-
-        const af::dim4 ostrides = out.strides();
-        const af::dim4 kstrides = key.strides();
-        const af::dim4 istrides = in.strides();
-        const af::dim4 odims    = out.dims();
-
-        for (dim_t i = 0; i < odims[D1]; i++) {
-            reduce_dim_next(out, outOffset + i * ostrides[D1],
-                            unique_key, key, keyOffset + i * kstrides[D1],
-                            in, inOffset + i * istrides[D1],
-                            dim, change_nan, nanval);
-        }
+        AF_ERROR("Only 1-dimensional reduce_by_key is currently supported.", AF_ERR_NOT_SUPPORTED);
     }
 };
 
@@ -96,35 +84,51 @@ struct reduce_dim_by_key<op, Ti, Tk, To, 0>
 
     Transform<Ti, To, op> transform;
     Binary<To, op> reduce;
-    void operator()(Param<To> out,  const dim_t outOffset,
-                    CParam<Tk> unique_key, CParam<Tk> key, const dim_t keyOffset,
-                    CParam<Ti> in,  const dim_t inOffset,
-                    const int dim,  bool change_nan, double nanval)
+    void operator()(Param<Tk> okeys, const dim_t okeysOffset,
+                    Param<To> ovals, const dim_t ovalsOffset,
+                    CParam<Tk> keys, const dim_t keysOffset,
+                    CParam<Ti> vals, const dim_t valsOffset,
+                    int *n_reduced, const int dim,  bool change_nan, double nanval)
     {
-        const af::dim4 istrides = in.strides();
-        const af::dim4 idims    = in.dims();
-        const af::dim4 ukdims   = unique_key.dims();
+        // keys.dims() should== vals.dims()
+        const af::dim4 istrides = keys.strides();
+        const af::dim4 idims    = keys.dims();
 
-        To * const outPtr = out.get() + outOffset;
-        Tk const * const keyPtr = key.get() + keyOffset;
-        Ti const * const inPtr  = in.get()  + inOffset;
-        dim_t stride = istrides[dim];
+        Tk const * const inKeysPtr = keys.get()  + keysOffset;
+        Ti const * const inValsPtr = vals.get()  + valsOffset;
+        Tk * const outKeysPtr      = okeys.get() + okeysOffset;
+        To * const outValsPtr      = ovals.get() + ovalsOffset;
 
-        auto num_unique_keys = ukdims[0];
-        for(dim_t k = 0; k < num_unique_keys; ++k) {
-            Tk current_key = unique_key.get()[k];
-            To out_val = reduce.init();
-            //printf("%d\n", current_key);
-            for (dim_t i = 0; i < idims[dim]; i++) {
-                Tk keyval = keyPtr[i * stride];
-                if(keyval == current_key) {
-                    To in_val = transform(inPtr[i * stride]);
-                    if (change_nan) in_val = IS_NAN(in_val) ? nanval : in_val;
-                    out_val = reduce(in_val, out_val);
-                }
+
+        //TODO: valid assumption? whatif empty? handle outside
+        int nkeys = 0;
+        Tk current_key = inKeysPtr[0];
+        To out_val = reduce.init();
+
+        for (dim_t i = 0; i < idims[0]; i++) {
+            Tk keyval  = inKeysPtr[i];
+
+            if(keyval == current_key) {
+                To in_val = transform(inValsPtr[i]);
+                if (change_nan) in_val = IS_NAN(in_val) ? nanval : in_val;
+                out_val = reduce(in_val, out_val);
+
+            } else {
+                outKeysPtr[nkeys] = current_key;
+                outValsPtr[nkeys] = out_val;
+
+                current_key = keyval;
+                out_val = transform(inValsPtr[i]);
+                ++nkeys;
             }
-            outPtr[k] = out_val;
+
+            if(i == (idims[0] - 1)) {
+                outKeysPtr[nkeys] = current_key;
+                outValsPtr[nkeys] = out_val;
+            }
         }
+
+        *n_reduced = nkeys;
     }
 };
 

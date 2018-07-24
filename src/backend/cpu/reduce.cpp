@@ -62,34 +62,38 @@ Array<To> reduce(const Array<Ti> &in, const int dim, bool change_nan, double nan
 }
 
 template<af_op_t op, typename Ti, typename Tk, typename To>
-using reduce_dim_func_by_key = std::function<void(Param<To>, const dim_t,
-                                                  CParam<Tk>, CParam<Tk>, const dim_t,
-                                                  CParam<Ti>, const dim_t,
-                                                  const int, bool, double)>;
+using reduce_dim_func_by_key = std::function<void(Param<Tk> okeys, const dim_t okeysOffset,
+                                                  Param<To> ovals, const dim_t ovalsOffset,
+                                                  CParam<Tk> keys, const dim_t keysOffset,
+                                                  CParam<Ti> vals, const dim_t valsOffset,
+                                                  int *n_reduced, const int dim,  bool change_nan, double nanval)>;
 
 template<af_op_t op, typename Ti, typename Tk, typename To>
-void reduce_by_key(Array<Tk> &keys_out, Array<To> &vals_out, const Array<Tk> &keys, const Array<Ti> &vals, const int dim, bool change_nan=false, double nanval=0)
+void reduce_by_key(Array<Tk> &keys_out, Array<To> &vals_out, const Array<Tk> &keys, const Array<Ti> &vals, const int dim, bool change_nan, double nanval)
 {
+    dim4 odims = keys.dims();
+    Array<Tk> fullsz_okeys = createEmptyArray<Tk>(odims);
+    Array<To> fullsz_ovals = createEmptyArray<To>(odims);
+    keys.eval();
+    vals.eval();
 
-    const bool is_sorted = false; //TODO: determine consistent convention
-    Array<Tk> fkey = key;
-    fkey.modDims(dim4(key.elements()));
-    Array<Tk> rVals = setUnique(fkey, is_sorted);
-    dim4 rdims = rVals.dims();
-
-    dim4 odims = in.dims();
-    odims[dim] = rdims[0];
-    in.eval();
-
-    Array<To> out = createEmptyArray<To>(odims);
-    static const reduce_dim_func_by_key<op, Ti, Tk, To>  reduce_funcs[4] = { kernel::reduce_dim_by_key<op, Ti, Tk, To, 1>()
+    static const reduce_dim_func_by_key<op, Ti, Tk, To>  reduce_funcs[4] = { kernel::reduce_dim_by_key<op, Ti, Tk, To, 0>()
+                                                                           , kernel::reduce_dim_by_key<op, Ti, Tk, To, 1>()
                                                                            , kernel::reduce_dim_by_key<op, Ti, Tk, To, 2>()
-                                                                           , kernel::reduce_dim_by_key<op, Ti, Tk, To, 3>()
-                                                                           , kernel::reduce_dim_by_key<op, Ti, Tk, To, 4>() };
+                                                                           , kernel::reduce_dim_by_key<op, Ti, Tk, To, 3>() };
 
-    getQueue().enqueue(reduce_funcs[in.ndims() - 1], out, 0, rVals, key, 0, in, 0, dim, change_nan, nanval);
+    int n_reduced;
+    getQueue().enqueue(reduce_funcs[odims.ndims() - 1], fullsz_okeys, 0, fullsz_ovals, 0, keys, 0, vals, 0, &n_reduced, dim, change_nan, nanval);
 
-    return out;
+    odims[dim] = n_reduced;
+    std::vector<af_seq> index;
+    for(int i=0; i<odims.ndims(); ++i) {
+        af_seq s = { 0.0, (double)odims[i], 1.0 };
+        index.push_back(s);
+    }
+
+    keys_out = createSubArray<Tk>(fullsz_okeys, index, false);
+    vals_out = createSubArray<To>(fullsz_ovals, index, false);
 }
 
 template<af_op_t op, typename Ti, typename To>
@@ -131,12 +135,15 @@ To reduce_all(const Array<Ti> &in, bool change_nan, double nanval)
     return out;
 }
 
-#define INSTANTIATE(ROp, Ti, To)                                                                   \
-    template Array<To> reduce<ROp, Ti, To>(const Array<Ti> &in, const int dim,                     \
-                                           bool change_nan, double nanval);                        \
-    template Array<To> reduce_by_key<ROp, Ti, int, To>(const Array<Ti> &in, const Array<int> &key, \
-                                           const int dim, bool change_nan, double nanval);         \
-    template To reduce_all<ROp, Ti, To>(const Array<Ti> &in,                                       \
+#define INSTANTIATE(ROp, Ti, To)                                                                \
+    template Array<To> reduce<ROp, Ti, To>(const Array<Ti> &in, const int dim,                  \
+                                           bool change_nan, double nanval);                     \
+                                                                                                \
+    template void reduce_by_key<ROp, Ti, int, To>(Array<int> &keys_out, Array<To> &vals_out,    \
+                                                 const Array<int> &keys, const Array<Ti> &vals, \
+                                                 const int dim, bool change_nan, double nanval);\
+                                                                                                \
+    template To reduce_all<ROp, Ti, To>(const Array<Ti> &in,                                    \
                                         bool change_nan, double nanval);
 
 //min

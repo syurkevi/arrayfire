@@ -29,168 +29,6 @@ namespace cuda
 namespace kernel
 {
 
-    template<typename Ti, typename Tk, typename To, af_op_t op, uint dim, uint DIMY>
-    __global__
-    static void reduce_dim_kernel_by_key(Param<To> out,
-                                  CParam <Tk> key,
-                                  CParam <Ti> in,
-                                  uint blocks_x, uint blocks_y, uint offset_dim,
-                                  bool change_nan, To nanval)
-    {
-        /*
-        const uint tidx = threadIdx.x;
-        const uint tidy = threadIdx.y;
-        const uint tid  = tidy * THREADS_X + tidx;
-
-        const uint zid = blockIdx.x / blocks_x;
-        const uint blockIdx_x = blockIdx.x - (blocks_x) * zid;
-        const uint xid = blockIdx_x * blockDim.x + tidx;
-
-        __shared__ To s_val[THREADS_X * DIMY];
-
-        const uint wid = (blockIdx.y + blockIdx.z * gridDim.y) / blocks_y;
-        const uint blockIdx_y = (blockIdx.y + blockIdx.z * gridDim.y) - (blocks_y) * wid;
-        const uint yid = blockIdx_y; // yid  of output. updated for input later.
-
-        uint ids[4] = {xid, yid, zid, wid};
-
-        // There is only one element per block for out
-        // There are blockDim.y elements per block for in
-        // Hence increment ids[dim] just after offseting out and before offsetting in
-        To * const optr = out.ptr + ids[3] * out.strides[3] +
-                                    ids[2] * out.strides[2] +
-                                    ids[1] * out.strides[1] + ids[0];
-
-        const uint blockIdx_dim = ids[dim];
-        ids[dim] = ids[dim] * blockDim.y + tidy;
-
-        const Ti * iptr = in.ptr + ids[3] * in.strides[3] +
-                                   ids[2] * in.strides[2] +
-                                   ids[1] * in.strides[1] + ids[0];
-
-        const uint id_dim_in = ids[dim];
-        const uint istride_dim = in.strides[dim];
-
-        bool is_valid =
-            (ids[0] < in.dims[0]) &&
-            (ids[1] < in.dims[1]) &&
-            (ids[2] < in.dims[2]) &&
-            (ids[3] < in.dims[3]);
-
-        Transform<Ti, To, op> transform;
-        Binary<To, op> reduce;
-        To out_val = reduce.init();
-        for (int id = id_dim_in; is_valid && (id < in.dims[dim]); id += offset_dim * blockDim.y) {
-            To in_val = transform(*iptr);
-            if (change_nan) in_val = !IS_NAN(in_val) ? in_val : nanval;
-            out_val = reduce(in_val, out_val);
-            iptr = iptr + offset_dim * blockDim.y * istride_dim;
-        }
-
-        s_val[tid] = out_val;
-
-        To *s_ptr = s_val + tid;
-        __syncthreads();
-
-        if (DIMY == 8) {
-            if (tidy < 4) *s_ptr = reduce(*s_ptr, s_ptr[THREADS_X * 4]);
-            __syncthreads();
-        }
-
-        if (DIMY >= 4) {
-            if (tidy < 2) *s_ptr = reduce(*s_ptr, s_ptr[THREADS_X * 2]);
-            __syncthreads();
-        }
-
-        if (DIMY >= 2) {
-            if (tidy < 1) *s_ptr = reduce(*s_ptr, s_ptr[THREADS_X * 1]);
-            __syncthreads();
-        }
-
-        if (tidy == 0 && is_valid &&
-            (blockIdx_dim < out.dims[dim])) {
-            *optr = *s_ptr;
-        }
-        */
-    }
-
-    template<typename Ti, typename Tk, typename To, af_op_t op, int dim>
-    void reduce_dim_launcher_by_key(Param<To> out, CParam<Ti> in, CParam<Tk> key,
-                             const uint threads_y, const dim_t blocks_dim[4],
-                             bool change_nan, double nanval)
-    {
-        /*
-         * TODO: throw not yet implemented error
-        dim3 threads(THREADS_X, threads_y);
-
-        dim3 blocks(blocks_dim[0] * blocks_dim[2],
-                    blocks_dim[1] * blocks_dim[3]);
-
-        const int maxBlocksY = cuda::getDeviceProp(cuda::getActiveDeviceId()).maxGridSize[1];
-        blocks.z = divup(blocks.y, maxBlocksY);
-        blocks.y = divup(blocks.y, blocks.z);
-
-        switch (threads_y) {
-        case 8:
-            CUDA_LAUNCH((reduce_dim_kernel<Ti, To, op, dim, 8>), blocks, threads,
-                out, in, blocks_dim[0], blocks_dim[1], blocks_dim[dim],
-                change_nan, scalar<To>(nanval)); break;
-        case 4:
-            CUDA_LAUNCH((reduce_dim_kernel<Ti, To, op, dim, 4>), blocks, threads,
-                out, in, blocks_dim[0], blocks_dim[1], blocks_dim[dim],
-                change_nan, scalar<To>(nanval)); break;
-        case 2:
-            CUDA_LAUNCH((reduce_dim_kernel<Ti, To, op, dim, 2>), blocks, threads,
-                out, in, blocks_dim[0], blocks_dim[1], blocks_dim[dim],
-                change_nan, scalar<To>(nanval)); break;
-        case 1:
-            CUDA_LAUNCH((reduce_dim_kernel<Ti, To, op, dim, 1>), blocks, threads,
-                out, in, blocks_dim[0], blocks_dim[1], blocks_dim[dim],
-                change_nan, scalar<To>(nanval)); break;
-        }
-
-        POST_LAUNCH_CHECK();
-        */
-    }
-
-    //swaps key and value according to key ordering and target direction
-    template<typename Ti, typename Tk>
-    __device__ int kv_swap(Tk &k, Ti &v, int mask, int dir)
-    {
-        Tk ky = __shfl_xor_sync(FULL_MASK, k, mask);
-        Ti vy = __shfl_xor_sync(FULL_MASK, v, mask);
-        bool swap = (k < ky == dir) && (k != ky);
-        k = swap ? ky : k;
-        v = swap ? vy : v;
-    }
-
-    //specialization for cfloat
-    template<typename Tk>
-    __device__ int kv_swap(Tk &k, cuda::cfloat &v, int mask, int dir)
-    {
-        Tk   ky;
-        cuda::cfloat vy;
-        //int   ky = __shfl_xor_sync(FULL_MASK, k, mask);
-        //float vy = __shfl_xor_sync(FULL_MASK, v, mask);
-        bool swap = (k < ky == dir) && (k != ky);
-        k = swap ? ky : k;
-        v = swap ? vy : v;
-    }
-
-    //specialization for cdouble
-    template<typename Tk>
-    __device__ int kv_swap(Tk &k, cuda::cdouble &v, int mask, int dir)
-    {
-        Tk   ky;
-        cuda::cdouble vy;
-        //int   ky = __shfl_xor_sync(FULL_MASK, k, mask);
-        //float vy = __shfl_xor_sync(FULL_MASK, v, mask);
-        bool swap = (k < ky == dir) && (k != ky);
-        k = swap ? ky : k;
-        v = swap ? vy : v;
-    }
-
-
     //__shfl_down_sync wrapper
     template<typename T>
     __device__ T shfl_down_sync(unsigned mask, T var, int delta) {
@@ -211,249 +49,281 @@ namespace kernel
         return res;
     }
 
-    __device__ __forceinline__ unsigned bfe(int x, int bf) {
-        return (x >> bf) & 1;
+    //__shfl_up_sync wrapper
+    template<typename T>
+    __device__ T shfl_up_sync(unsigned mask, T var, int delta) {
+        return __shfl_up_sync(mask, var, delta);
+    }
+    //specialization for cfloat
+    template<> inline
+    __device__ cuda::cfloat shfl_up_sync(unsigned mask, cuda::cfloat var, int delta) {
+        cuda::cfloat res = { __shfl_up_sync(mask, var.x, delta), 
+                             __shfl_up_sync(mask, var.y, delta)};
+        return res;
+    }
+    //specialization for cdouble
+    template<> inline
+    __device__ cuda::cdouble shfl_up_sync(unsigned mask, cuda::cdouble var, int delta) {
+        cuda::cdouble res = { __shfl_up_sync(mask, var.x, delta), 
+                              __shfl_up_sync(mask, var.y, delta)};
+        return res;
     }
 
-    //single-threaded binary search for key in list of values
-    //used to find a thread's key position inside warp sized list in shared memory
-    //TODO: template parameter bool? find first/last
-    template<typename Tk, bool find_first_index>
-    __device__  int findpos(const Tk &key, const Tk const *warpKeys, int n) {
-        if(find_first_index) {
-            int min=0, max=n-1, mid;
-            while(min <= max) {
-                mid = min + ((max - min) / 2);
-                if(warpKeys[mid] < key) {
-                    min = mid + 1;
-                } else {
-                    max = mid - 1;
-                }
+
+    // Reduces keys across block boundaries
+    template<typename Tk, typename To, af_op_t op>
+    __global__ void final_boundary_reduce(int *reduced_block_sizes, Param<Tk> keys, Param<To> vals, const int n) {
+        const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+        Binary<To, op> reduce;
+
+        if(tid == ((blockIdx.x + 1) * blockDim.x) - 1 && blockIdx.x < gridDim.x - 1) {
+            Tk k0 = keys.ptr[tid];
+            Tk k1 = keys.ptr[tid + 1];
+            if(k0 == k1) {
+                To v0 = vals.ptr[tid];
+                To v1 = vals.ptr[tid + 1];
+                vals.ptr[tid + 1] = reduce(v0, v1);
+                reduced_block_sizes[blockIdx.x] = blockDim.x - 1;
+            } else {
+                reduced_block_sizes[blockIdx.x] = blockDim.x;
             }
-            return min;
-        } else {
-            int min=0, max=n-1, mid;
-            while(min <= max) {
-                mid = min + ((max - min) / 2);
-                if(warpKeys[mid] <= key) {
-                    min = mid + 1;
-                } else {
-                    max = mid - 1;
-                }
-            }
-            return max+1;
+        }
+
+        //if last block, set block size to difference between n and block boundary
+        if(threadIdx.x == 0 && blockIdx.x == gridDim.x - 1) {
+            reduced_block_sizes[blockIdx.x] = n - (blockIdx.x * blockDim.x);
         }
     }
 
-    //intermediate kernel used to test if further reductions are necessary
-    //assumes sorted keys as input
-    //assumes zeroed output flag before call
+    // Tests if data needs further reduction, including across block boundaries
     template<typename Tk>
-    __global__ void testReduction(int *needs_updates, const Tk *sorted_keys, const int n) {
-        //TODO: set to 0 in kernel instead? removing memset dependency
+    __global__ void test_needs_reduction(int *needs_another_reduction, int *needs_block_boundary_reduced, CParam<Tk> keys_in, const int n) {
         const int tid = blockIdx.x * blockDim.x + threadIdx.x;
         Tk k;
-        if(tid < n)
-            k = sorted_keys[tid];
 
-        int update_key = (k == __shfl_down_sync(0xFFFFFFFF, k , 1)) && (tid < n-1) && ((tid%32) < 31);
+        if(tid < n) {
+            k = keys_in.ptr[tid];
+        }
 
+        int update_key = (k == __shfl_down_sync(0xFFFFFFFF, k , 1)) && (tid < (n-1)) && ((threadIdx.x % 32) < 31);
         int remaining_updates = __any_sync(0xFFFFFFFF, update_key);
-        //needs updates will be set if any duplicate keys remain
-        //TODO: atomics in shared before global?
-        if(tid < n)
-            atomicOr(needs_updates, remaining_updates);
+
+        __syncthreads();
+
+        //TODO: single per warp? change to assignment rather than atomicOr
+        if(remaining_updates)
+            atomicOr(needs_another_reduction, remaining_updates);
+
+        //check across warp boundaries
+        if((tid + 1) < n) {
+            k = keys_in.ptr[tid+1];
+        }
+
+        update_key        = (k == __shfl_down_sync(0xFFFFFFFF, k , 1)) && ((tid+1) < (n-1)) && ((threadIdx.x % 32) < 31);
+        remaining_updates = __any_sync(0xFFFFFFFF, update_key);
+
+        //TODO: single per warp? change to assignment rather than atomicOr
+        if(remaining_updates)
+            atomicOr(needs_another_reduction, remaining_updates);
+
+        //last thread in each block checks if any inter-block keys need further reduction
+        if(tid == ((blockIdx.x + 1) * blockDim.x) - 1 && blockIdx.x < gridDim.x - 1) {
+            int k0 = keys_in.ptr[tid];
+            int k1 = keys_in.ptr[tid + 1];
+            if(k0 == k1) {
+                atomicOr(needs_block_boundary_reduced, 1);
+            }
+        }
+    }
+
+    // Compacts "incomplete" block-sized chunks of data in global memory
+    template<typename Tk, typename To>
+    __global__ void compact(int* reduced_block_sizes, Param<Tk> keys_out, Param<To> vals_out, CParam<Tk> keys_in, CParam<To> vals_in) {
+        const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+        Tk k;
+        To v;
+
+        // reduced_block_sizes should have inclusive sum of block sizes
+        int nwrite   = (blockIdx.x == 0) ? reduced_block_sizes[0] : reduced_block_sizes[blockIdx.x] - reduced_block_sizes[blockIdx.x - 1];
+        int writeloc = (blockIdx.x == 0) ? 0 : reduced_block_sizes[blockIdx.x - 1];
+
+        k = keys_in.ptr[tid];
+        v = vals_in.ptr[tid];
+
+        if(threadIdx.x < nwrite) {
+            keys_out.ptr[writeloc + threadIdx.x] = k;
+            vals_out.ptr[writeloc + threadIdx.x] = v;
+        }
     }
 
     const static int maxResPerWarp = 32; //assume dim 0, no NAN values
 
-    //TODO change kernel params to match arrayfire api
-    //TODO handle nans
-    //TODO handle types
-    //TODO handle reduction operator
+    // Reduces each block by key
     template<typename Ti, typename Tk, typename To, af_op_t op, uint DIMX>
     __global__
-    static void reduce_first_by_key_kernel(int *n_reduced,
-                                           Param<Tk>  reduced_keys,
-                                           Param<To>  reduced_vals,
-                                           CParam<Tk> keys,
-                                           CParam<Ti> vals,
-                                           int n, bool change_nan, To nanval) {
+    static void reduce_blocks_by_key(int *reduced_block_sizes,
+                                     Param<Tk>  reduced_keys,
+                                     Param<To>  reduced_vals,
+                                     CParam<Tk> keys,
+                                     CParam<Ti> vals,
+                                     int n, bool change_nan, To nanval) {
 
-        /*
-        const uint tidx = threadIdx.x;
-        const uint tidy = threadIdx.y;
-        const uint tid  = tidy * blockDim.x + tidx;
+        const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+        const int laneid = tid % 32;
 
-        const uint zid = blockIdx.x / blocks_x;
-        const uint blockIdx_x = blockIdx.x - (blocks_x) * zid;
-        const uint xid = blockIdx_x * blockDim.x * repeat + tidx;
+        const int nWarps = DIMX / 32;
+
+        //
+        // Allocate and initialize shared memory
+
+        __shared__ int warpReduceSizes[nWarps]; //number of reduced elements in each warp
+
+        __shared__ Tk  warpReduceKeys[nWarps][maxResPerWarp]; //reduced key segments for each warp
+        __shared__ To  warpReduceVals[nWarps][maxResPerWarp]; //reduced values for each warp corresponding to each key segment
+
+        // space to hold left/right-most keys of each reduced warp to check if reduction should happen accros boundaries
+        __shared__ Tk  warpReduceLeftBoundaryKeys[nWarps];
+        __shared__ Tk  warpReduceRightBoundaryKeys[nWarps];
+
+        // space to hold left/right-most values of each reduced warp to check if reduction should happen accros boundaries
+        __shared__ To  warpReduceLeftBoundaryVals[nWarps];
+        __shared__ To  warpReduceRightBoundaryVals[nWarps];
+
+        // space to compact and finalize all reductions within block
+        __shared__ Tk  warpReduceKeysSmemFinal[nWarps * maxResPerWarp];
+        __shared__ To  warpReduceValsSmemFinal[nWarps * maxResPerWarp];
+
+        //
+        // will hold final number of reduced elements in block
+        __shared__ int reducedBlockSize;
+
+        if(threadIdx.x == 0) {
+            reducedBlockSize = 0;
+        }
+        __syncthreads();
+
 
         Binary<To, op> reduce;
         Transform<Ti, To, op> transform;
 
-        __shared__ To s_val[THREADS_PER_BLOCK];
-
-        const uint wid = (blockIdx.y + blockIdx.z * gridDim.y) / blocks_y;
-        const uint blockIdx_y = (blockIdx.y + blockIdx.z * gridDim.y) - (blocks_y) * wid;
-        const uint yid = blockIdx_y * blockDim.y + tidy;
-
-        const Ti * const iptr = in.ptr + (wid *  in.strides[3] + zid *  in.strides[2] + yid *  in.strides[1]);
-
-        if (yid >= in.dims[1] ||
-            zid >= in.dims[2] ||
-            wid >= in.dims[3]) return;
-
-
-        int lim = min((int)(xid + repeat * DIMX), in.dims[0]);
-
-        To out_val = reduce.init();
-        for (int id = xid; id < lim; id += DIMX) {
-            To in_val = transform(iptr[id]);
-            if (change_nan) in_val = !IS_NAN(in_val) ? in_val : nanval;
-            out_val = reduce(in_val, out_val);
-        }
-
-        s_val[tid] = out_val;
-
-        */
-        const int tid = blockIdx.x * blockDim.x + threadIdx.x;
-        const int laneid = tid % 32;
-
-        //allocate and initialize shared memory
-        const int nWarps = DIMX / 32;
-
-        //printf("%d ", maxResPerWarp * nWarps);
-        __shared__ int warpReduceSizes[nWarps];
-        __shared__ int warpReduceFinalLocation[nWarps][maxResPerWarp];
-
-        __shared__ Tk  warpReduceKeys[nWarps][maxResPerWarp];
-        __shared__ Ti  warpReduceVals[nWarps][maxResPerWarp];
-
-        __shared__ Tk  warpReduceKeysSmemFinal[nWarps * maxResPerWarp];
-        __shared__ Ti  warpReduceValsSmemFinal[nWarps * maxResPerWarp];
-
-        __shared__ int nReducedInSmem;
-        __shared__ int reducedBlockSize;
-        __shared__ int blockReductionsTotal;
-
-        if(threadIdx.x == 0) {
-            nReducedInSmem = 0;
-            blockReductionsTotal = 0;
-            reducedBlockSize = 0;
-        }
-
-        //load keys and values to threads
+        // load keys and values to threads
         Tk k;
-        Ti v;
+        To v;
         if(tid < n) {
-           k = keys.ptr[tid];
-           v = vals.ptr[tid];
-        } else {
-           k = scalar<Tk>(INFINITY);
-           v = scalar<Ti>(INFINITY);
-        }
-/*
-
-        //__syncwarp();
-
-        //test that warp needs to be sorted
-        //should speedup cases where input doesn't contain many different keys or keys are already sorted
-        char in_order = (k <= __shfl_down_sync(0xFFFFFFFF, k , 1));
-        if(!__all_sync(0xFFFFFFFF, in_order)) {
-            //sort each warp according to key
-            //TODO: handle cases with non-complete warp
-            //use shfl_sync mask?
-            //2
-            kv_swap(k, v, 0x01, bfe(laneid, 1) ^ bfe(laneid, 0));
-            //4
-            kv_swap(k, v, 0x02, bfe(laneid, 2) ^ bfe(laneid, 1));
-            kv_swap(k, v, 0x01, bfe(laneid, 2) ^ bfe(laneid, 0));
-            //8
-            kv_swap(k, v, 0x04, bfe(laneid, 3) ^ bfe(laneid, 2));
-            kv_swap(k, v, 0x02, bfe(laneid, 3) ^ bfe(laneid, 1));
-            kv_swap(k, v, 0x01, bfe(laneid, 3) ^ bfe(laneid, 0));
-            //16
-            kv_swap(k, v, 0x08, bfe(laneid, 4) ^ bfe(laneid, 3));
-            kv_swap(k, v, 0x04, bfe(laneid, 4) ^ bfe(laneid, 2));
-            kv_swap(k, v, 0x02, bfe(laneid, 4) ^ bfe(laneid, 1));
-            kv_swap(k, v, 0x01, bfe(laneid, 4) ^ bfe(laneid, 0));
-            //32
-            kv_swap(k, v, 0x10, bfe(laneid, 4));
-            kv_swap(k, v, 0x08, bfe(laneid, 3));
-            kv_swap(k, v, 0x04, bfe(laneid, 2));
-            kv_swap(k, v, 0x02, bfe(laneid, 1));
-            kv_swap(k, v, 0x01, bfe(laneid, 0));
+            k = keys.ptr[tid];
+            v = transform(vals.ptr[tid]);
+            if (change_nan) v = !IS_NAN(v) ? v : nanval;
         }
 
-        //float s = v;
-        //special case of single key per warp
-        char all_eq = (k == __shfl_down_sync(0xFFFFFFFF, k , 1));
-        if(__all_sync(0xFFFFFFFF, all_eq)) {
-            v = v + shfl_down_sync(FULL_MASK, v , 1);
-            v = v + shfl_down_sync(FULL_MASK, v , 2);
-            v = v + shfl_down_sync(FULL_MASK, v , 4);
-            v = v + shfl_down_sync(FULL_MASK, v , 8);
-            v = v + shfl_down_sync(FULL_MASK, v , 16);
+        Tk eq_check = (k != shfl_up_sync(0xFFFFFFFF, k , 1));
+        // mark threads containing unique keys
+        char unique_flag = (eq_check || (laneid == 0)) && (tid < n);
+
+        // scan unique flags to enumerate unique keys
+        char unique_id = unique_flag;
+        #pragma unroll
+        for(int offset=1; offset<32; offset <<= 1) {
+            char y = shfl_up_sync(0xFFFFFFFF, unique_id, offset);
+            if(laneid >= offset)
+                unique_id += y;
+        }
+
+        //
+        // Reduce each warp by key
+        char all_eq = (k == shfl_down_sync(0xFFFFFFFF, k , 1));
+        if(__all_sync(0xFFFFFFFF, all_eq)) { // check special case of single key per warp
+            v = reduce(v, shfl_down_sync(FULL_MASK, v , 1));
+            v = reduce(v, shfl_down_sync(FULL_MASK, v , 2));
+            v = reduce(v, shfl_down_sync(FULL_MASK, v , 4));
+            v = reduce(v, shfl_down_sync(FULL_MASK, v , 8));
+            v = reduce(v, shfl_down_sync(FULL_MASK, v , 16));
         } else {
             //preform reduction for each of the unique keys
-            int update_key = (k == __shfl_down_sync(0xFFFFFFFF, k , 1)) && (laneid < 31);
-            unsigned shflmask = __ballot_sync(0xFFFFFFFF, update_key);
-            shflmask |= (shflmask << 1);
-            Ti uval = shfl_down_sync(shflmask, v , 1); //primitive version for now
-            v = update_key ?  (v + uval) : v;
-            //__syncwarp();
+            int eq_check = (unique_id == shfl_down_sync(0xFFFFFFFF, unique_id , 1));
+            int update_key =  eq_check && (laneid < 31) && ((tid + 1) < n); //checks if this thread should perform a reduction
+            unsigned shflmask = __ballot_sync(0xFFFFFFFF, update_key); //obtains mask of all threads that should be reduced
+            shflmask |= (shflmask << 1); //shifts mask to include source threads that should participate in _shfl
+            To uval = shfl_down_sync(shflmask, v , 1); //shfls data from neighboring threads
+            v = reduce(v, (update_key ?  uval : Binary<To, op>::init())); //update if thread requires it
 
-            update_key = (k == __shfl_down_sync(0xFFFFFFFF, k , 2)) && (laneid < 30);
+            eq_check = (unique_id == shfl_down_sync(0xFFFFFFFF, unique_id , 2));
+            update_key = eq_check && (laneid < 30) && update_key && ((tid + 2) < n);
             shflmask = __ballot_sync(0xFFFFFFFF, update_key);
             shflmask |= (shflmask << 2);
             uval = shfl_down_sync(shflmask, v , 2);
-            v = update_key ?  (v + uval) : v;
-            //__syncwarp();
+            v = reduce(v, (update_key ?  uval : Binary<To, op>::init()));
 
-            update_key = (k == __shfl_down_sync(0xFFFFFFFF, k , 4)) && (laneid < 28);
+            eq_check = (unique_id == shfl_down_sync(0xFFFFFFFF, unique_id , 4));
+            update_key = eq_check && (laneid < 28) && update_key && ((tid + 4) < n);
             shflmask = __ballot_sync(0xFFFFFFFF, update_key);
             shflmask |= (shflmask << 4);
             uval = shfl_down_sync(shflmask, v , 4);
-            v = update_key ?  (v + uval) : v;
-            //__syncwarp();
+            v = reduce(v, (update_key ?  uval : Binary<To, op>::init()));
 
-            update_key = (k == __shfl_down_sync(0xFFFFFFFF, k , 8)) && (laneid < 24);
+            eq_check = (unique_id == shfl_down_sync(0xFFFFFFFF, unique_id , 8));
+            update_key = eq_check && (laneid < 24) && update_key && ((tid + 8) < n);
             shflmask = __ballot_sync(0xFFFFFFFF, update_key);
             shflmask |= (shflmask << 8);
             uval = shfl_down_sync(shflmask, v , 8);
-            v = update_key ?  (v + uval) : v;
-            //__syncwarp();
+            v = reduce(v, (update_key ?  uval : Binary<To, op>::init()));
 
-            update_key = (k == __shfl_down_sync(0xFFFFFFFF, k , 16)) && (laneid < 16);
+            eq_check = (unique_id == shfl_down_sync(0xFFFFFFFF, unique_id , 16));
+            update_key = eq_check && (laneid < 16) && update_key && ((tid + 16) < n);
             shflmask = __ballot_sync(0xFFFFFFFF, update_key);
             shflmask |= (shflmask << 16);
             uval = shfl_down_sync(shflmask, v , 16);
-            v = update_key ?  (v + uval) : v;
-            //__syncwarp();
+            v = reduce(v, (update_key ?  uval : Binary<To, op>::init()));
         }
 
-        //__syncthreads();//TMP
-        */
-        /*
 
-        char unique_flag = ((k != __shfl_up_sync(0xFFFFFFFF, k , 1)) || (laneid == 0)) && (tid < n);
-        char unique_id = unique_flag;
         const int warpid = threadIdx.x / 32;
 
-        #pragma unroll
-        for(int offset=1; offset<32; offset <<= 1) {
-            char y = __shfl_up_sync(0xFFFFFFFF, unique_id, offset);
-            if(laneid >= offset)
-                unique_id += y;
-        }
-
-        //if warp is empty, will unique key be correct?
+        //last thread in warp has reduced warp size due to scan^
         if(laneid == 31) {
-            //const int n_unique_keys = __popc(__ballot_sync(0xFFFFFFFF, unique_flag));
             warpReduceSizes[warpid] = unique_id;
         }
 
+        //write left boundary values for each warp
+        if(unique_flag && unique_id == 1) {
+            warpReduceLeftBoundaryKeys[warpid] = k;
+            warpReduceLeftBoundaryVals[warpid] = v;
+        }
+
+        //write right boundary values for each warp
+        if(unique_flag && unique_id == warpReduceSizes[warpid]) {
+            warpReduceRightBoundaryKeys[warpid] = k;
+            warpReduceRightBoundaryVals[warpid] = v;
+        }
+
+        __syncthreads();
+
+        // if rightmost thread, check next warp's kv,
+        // invalidate self and change warpReduceSizes since first thread of next warp will update same key
+        //TODO: what if extra empty warps???
+        if(unique_flag && unique_id == warpReduceSizes[warpid] && warpid < nWarps - 1) {
+            int tid_next_warp = (blockIdx.x * blockDim.x + (warpid + 1) * 32);
+            // check within data range
+            if( tid_next_warp < n &&  k == warpReduceLeftBoundaryKeys[warpid + 1]) {
+                //disable writing from warps that need carry but aren't terminal
+                if(warpReduceSizes[warpid] > 1 || warpid > 0) {
+                    unique_flag = 0;
+                }
+            }
+        }
+        __syncthreads();
+
+        // if leftmost thread, reduce carryover from previous warp(s) if needed
+        if(unique_flag && unique_id == 1 && warpid > 0) {
+            int test_wid = warpid - 1;
+            while(test_wid >= 0 && k == warpReduceRightBoundaryKeys[test_wid]) {
+                v = reduce(v, warpReduceRightBoundaryVals[test_wid]);
+                --warpReduceSizes[test_wid];
+                if(warpReduceSizes[test_wid] > 1)
+                    break;
+
+                --test_wid;
+            }
+        }
 
         if(unique_flag) {
             warpReduceKeys[warpid][unique_id-1] = k;
@@ -462,168 +332,59 @@ namespace kernel
 
         __syncthreads();
 
-        //at this point, we have nWarps sorted lists in shared memory with each list's size located in the warpReduceSizes[] array
-        //each thread should perform a binary search over each of the nWarps sorted lists to find its position in the final merged list
-
-        int finalSMemPos = laneid;
-        #pragma unroll
-        for(int w=0; w<nWarps; ++w) {
-            if(w != warpid) {
-                if(warpid < w)
-                    finalSMemPos += findpos<Tk, true>(warpReduceKeys[warpid][laneid], warpReduceKeys[w], warpReduceSizes[w]);
-                else
-                    finalSMemPos += findpos<Tk, false>(warpReduceKeys[warpid][laneid], warpReduceKeys[w], warpReduceSizes[w]);
-            }
-        }
-
-        //from this point onwards, single warp should handle more than a single list, however
-        //at the moment do primitive operation
-        //multi-list per warp will require load balancing structure
-
-        //only write unique keys from each warp
-        if(laneid < warpReduceSizes[warpid] && tid < n) {
-            warpReduceKeysSmemFinal[finalSMemPos] = warpReduceKeys[warpid][laneid];
-            warpReduceValsSmemFinal[finalSMemPos] = warpReduceVals[warpid][laneid];
-        }
-
-        if(threadIdx.x == 0) {
-            #pragma unroll
-            for(int w=0; w<nWarps; ++w) {
-                nReducedInSmem += warpReduceSizes[w];
-            }
-        }
-
-        __syncthreads();
-        //re-load keys and values to threads from first pass reduced shared memory
-        if (threadIdx.x < nReducedInSmem) {
-           k = warpReduceKeysSmemFinal[threadIdx.x];
-           v = warpReduceValsSmemFinal[threadIdx.x];
-        } else {
-           k = scalar<Tk>(INFINITY);
-           v = scalar<Ti>(INFINITY);
-        }
-
-        if(warpid * 32 > nReducedInSmem)
-            return; //retire warp early
-        //__syncwarp();
-
-        //run second pass of reduction, should completely reduce shared memory (1024/32/32)
-        //special case of single key per warp
-        all_eq = (k == __shfl_down_sync(0xFFFFFFFF, k , 1));
-        if(__all_sync(0xFFFFFFFF, all_eq)) {
-            v += __shfl_down_sync(FULL_MASK, v , 1);
-            v += __shfl_down_sync(FULL_MASK, v , 2);
-            v += __shfl_down_sync(FULL_MASK, v , 4);
-            v += __shfl_down_sync(FULL_MASK, v , 8);
-            v += __shfl_down_sync(FULL_MASK, v , 16);
-        } else {
-            //perform reduction for each of the unique keys
-            int update_key = (k == __shfl_down_sync(0xFFFFFFFF, k , 1)) && (laneid < 31);
-            unsigned shflmask = __ballot_sync(0xFFFFFFFF, update_key);
-            shflmask |= (shflmask << 1);
-            float uval = __shfl_down_sync(shflmask, v , 1); //primitive version for now
-            v += update_key ?  uval : scalar<Ti>(0);
-            //__syncwarp();
-
-            update_key = (k == __shfl_down_sync(0xFFFFFFFF, k , 2)) && (laneid < 30);
-            shflmask = __ballot_sync(0xFFFFFFFF, update_key);
-            shflmask |= (shflmask << 2);
-            uval = __shfl_down_sync(shflmask, v , 2);
-            v += update_key ?  uval : scalar<Ti>(0);
-            //__syncwarp();
-
-            update_key = (k == __shfl_down_sync(0xFFFFFFFF, k , 4)) && (laneid < 28);
-            shflmask = __ballot_sync(0xFFFFFFFF, update_key);
-            shflmask |= (shflmask << 4);
-            uval = __shfl_down_sync(shflmask, v , 4);
-            v += update_key ?  uval : scalar<Ti>(0);
-            //__syncwarp();
-
-            update_key = (k == __shfl_down_sync(0xFFFFFFFF, k , 8)) && (laneid < 24);
-            shflmask = __ballot_sync(0xFFFFFFFF, update_key);
-            shflmask |= (shflmask << 8);
-            uval = __shfl_down_sync(shflmask, v , 8);
-            v += update_key ?  uval : scalar<Ti>(0);
-            //__syncwarp();
-
-            update_key = (k == __shfl_down_sync(0xFFFFFFFF, k , 16)) && (laneid < 16);
-            shflmask = __ballot_sync(0xFFFFFFFF, update_key);
-            shflmask |= (shflmask << 16);
-            uval = __shfl_down_sync(shflmask, v , 16);
-            v += update_key ?  uval : scalar<Ti>(0);
-            //__syncwarp();
-        }
-
-        unique_flag = ((k != __shfl_up_sync(0xFFFFFFFF, k , 1)) || (laneid == 0)) && (threadIdx.x < nReducedInSmem);
-        //unique_flag = ((k != __shfl_up_sync(0xFFFFFFFF, k , 1)) || (laneid == 0));
-        unique_id = unique_flag;
-
-        #pragma unroll
-        for(int offset=1; offset<32; offset <<= 1) {
-            char y = __shfl_up_sync(0xFFFFFFFF, unique_id, offset);
-            if(laneid >= offset)
-                unique_id += y;
-        }
-
-        if(laneid == 31) {
-            warpReduceSizes[warpid] = unique_id;
-        }
-
-        if(unique_flag) {
-            warpReduceKeys[warpid][unique_id-1] = k;
-            warpReduceVals[warpid][unique_id-1] = v;
-        }
-        __syncthreads();
-
+        // at this point, we have nWarps lists in shared memory with each list's size located in the warpReduceSizes[] array
+        // perform warp-scan to determine each warp's write location
         int warpSzScan = 0;
         if(warpid == 0 && laneid < nWarps) {
             warpSzScan = warpReduceSizes[laneid];
             int activemask = 0xFFFFFFFF >> (32 - nWarps);
             #pragma unroll
-            for(int offset=1; offset<32; offset <<= 1) {
+            for(int offset=1; offset < 32; offset <<= 1) {
                 char y = __shfl_up_sync(activemask, warpSzScan, offset);
                 if(laneid >= offset)
                     warpSzScan += y;
             }
-            //warpReduceSizes[laneid] = warpSzScan;
-            if(laneid == 0) //todo: correct condition?
+            warpReduceSizes[laneid] = warpSzScan;
+            //final thread has final reduced size of block
+            if(laneid == nWarps-1)
                 reducedBlockSize = warpSzScan;
         }
         __syncthreads();
 
-        //int reducedBlockSize = warpReduceSizes[nWarps - 1];
-        //printf("bkredsz %d \n", reducedBlockSize);
-
+        // write reduced block size to global memory
         if(threadIdx.x == 0) {
-            blockReductionsTotal = atomicAdd(n_reduced, reducedBlockSize);
+            reduced_block_sizes[blockIdx.x] = reducedBlockSize;
         }
 
-        int warpOffset = warpid > 0 ? warpReduceSizes[warpid - 1] : 0;
 
-        if(laneid < warpReduceSizes[warpid] && threadIdx.x < nReducedInSmem && tid < n) {
-            int warpOffset = warpid > 0 ? warpReduceSizes[warpid - 1] : 0;
-            reduced_keys.ptr[blockReductionsTotal + warpOffset + laneid] = scalar<Tk>(warpReduceKeys[warpid][laneid]);
-            reduced_vals.ptr[blockReductionsTotal + warpOffset + laneid] = scalar<To>(warpReduceVals[warpid][laneid]);
+        // compact reduced keys and values before writing to global memory
+        if(warpid > 0) {
+            int wsz = warpReduceSizes[warpid] - warpReduceSizes[warpid - 1];
+            if(laneid < wsz) {
+                int warpOffset = warpReduceSizes[warpid - 1];
+                warpReduceKeysSmemFinal[warpOffset + laneid] = warpReduceKeys[warpid][laneid];
+                warpReduceValsSmemFinal[warpOffset + laneid] = warpReduceVals[warpid][laneid];
+            }
+        } else {
+            int wsz = warpReduceSizes[warpid];
+            if(laneid < wsz) {
+                warpReduceKeysSmemFinal[laneid] = warpReduceKeys[0][laneid];
+                warpReduceValsSmemFinal[laneid] = warpReduceVals[0][laneid];
+            }
         }
-        */
+        __syncthreads();
+
+        //write reduced keys/values per-block
+        if(threadIdx.x < reducedBlockSize) {
+            reduced_keys.ptr[(blockIdx.x * blockDim.x) + threadIdx.x] = warpReduceKeysSmemFinal[threadIdx.x];
+            reduced_vals.ptr[(blockIdx.x * blockDim.x) + threadIdx.x] = warpReduceValsSmemFinal[threadIdx.x];
+        }
+
     }
 
     template<typename Ti, typename Tk, typename To, af_op_t op, int DIMX>
-    int reduce_first_by_key_launcher(Param<Tk> keys_out, Param<To> vals_out, CParam<Tk> keys, CParam<Ti> vals, bool change_nan, double nanval)
-    {
-        auto n_reduced       = memAlloc<int>(1);
-        CUDA_CHECK(cudaMemset(n_reduced.get(), 0, sizeof(int)));
+    int reduce_first_by_key_launcher(Param<Tk> keys_out, Param<To> vals_out, CParam<Tk> keys, CParam<Ti> vals, bool change_nan, double nanval) {
 
-        int nelems = keys.dims[0];
-        const int numBlocks = divup(nelems, DIMX);
-        printf("using %d blocks, each with %d threads to perform initial block-level reduction\n", numBlocks, DIMX);
-
-        CUDA_LAUNCH((reduce_first_by_key_kernel<Ti, Tk, To, op, DIMX>), numBlocks, DIMX, n_reduced.get(), keys_out, vals_out, keys, vals, nelems, change_nan, scalar<To>(nanval));
-        POST_LAUNCH_CHECK();
-
-        int n_reduced_after_initial;
-        CUDA_CHECK(cudaMemcpy(&n_reduced_after_initial, n_reduced.get(), sizeof(int), cudaMemcpyDeviceToHost));
-        return n_reduced_after_initial;
     }
 
     template<typename Ti, typename Tk, typename To, af_op_t op>
