@@ -20,8 +20,8 @@ void final_boundary_reduce(__global int *reduced_block_sizes,
     const uint gid = get_global_id(0);
 
     if(gid == ((bid + 1) * get_local_size(0)) - 1 && bid < get_num_groups(0) - 1) {
-        Tk k0 = keys.ptr[gid];
-        Tk k1 = keys.ptr[gid + 1];
+        Tk k0 = oKeys[gid];
+        Tk k1 = oKeys[gid + 1];
         if(k0 == k1) {
             To v0 = oVals[gid];
             To v1 = oVals[gid + 1];
@@ -33,7 +33,7 @@ void final_boundary_reduce(__global int *reduced_block_sizes,
     }
 
     //if last block, set block size to difference between n and block boundary
-    if(gid == 0 && bid = gridDim.x - 1) {
+    if(lid == 0 && bid == get_num_groups(0) - 1) {
         reduced_block_sizes[bid] = n - (bid * get_local_size(0));
     }
 }

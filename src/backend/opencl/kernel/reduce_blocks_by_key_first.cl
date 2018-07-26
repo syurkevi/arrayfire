@@ -80,11 +80,11 @@ void reduce_blocks_by_key_first(__global int *reduced_block_sizes,
     keys[lid] = k;
     vals[lid] = v;
 
-    //out_val = binOp(in_val, out_val);
     reduced_keys[lid] = k;
+    barrier(CLK_LOCAL_MEM_FENCE);
 
     // mark threads containing unique keys
-    int eq_check = (lid < (DIMX - 1)) ? (k != reduced_keys[lid + 1]) : 0;
+    int eq_check = (lid > 0) ? (k != reduced_keys[lid - 1]) : 0;
     char unique_flag = (eq_check || (lid == 0)) && (gid < n);
     unique_flags[lid] = unique_flag;
 
@@ -96,7 +96,7 @@ void reduce_blocks_by_key_first(__global int *reduced_block_sizes,
         reducedBlockSize = unique_id;
 
     for (int off = 1; off < DIMX; off *= 2) {
-        if(lid + off < DIMX) {
+        if(lid + off < DIMX && lid + off < n) {
             int test_unique_id = unique_ids[lid + off];
             if(unique_id == test_unique_id) {
                 v = binOp(v, vals[lid + off]);
@@ -107,8 +107,8 @@ void reduce_blocks_by_key_first(__global int *reduced_block_sizes,
     }
 
     if(unique_flag) {
-        reduced_keys[unique_id] = k;
-        reduced_vals[unique_id] = v;
+        reduced_keys[unique_id-1] = k;
+        reduced_vals[unique_id-1] = v;
     }
     barrier(CLK_LOCAL_MEM_FENCE);
 

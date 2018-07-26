@@ -157,6 +157,7 @@ namespace kernel
 
             std::ostringstream options;
             options << " -D To=" << dtype_traits<To>::getName()
+                    << " -D Ti=" << dtype_traits<To>::getName()
                     << " -D Tk=" << dtype_traits<Tk>::getName()
                     << " -D T=To"
                     << " -D DIMX=" << threads_x
@@ -306,23 +307,21 @@ namespace kernel
     }
 
     template<typename Ti, typename Tk, typename To, af_op_t op >
-    int reduce_by_key_first(Param   keys_out, Param vals_out,
+    int reduce_by_key_first(Array<Tk> &keys_out, Array<To> &vals_out,
                             const Param keys, const Param vals,
                             bool change_nan, double nanval)
     {
         dim4 idims = dim4(keys.info.dims[0], keys.info.dims[1], keys.info.dims[2], keys.info.dims[3]);
         dim4 odims = dim4(vals.info.dims[0], vals.info.dims[1], vals.info.dims[2], vals.info.dims[3]);
 
-        Array<Tk> t_reduced_keys = createEmptyArray<Tk>(odims);
-        Array<To> t_reduced_vals = createEmptyArray<To>(odims);
+        auto reduced_keys   = createEmptyArray<Tk>(odims);
+        auto reduced_vals   = createEmptyArray<To>(odims);
+        auto t_reduced_keys = createEmptyArray<Tk>(odims);
+        auto t_reduced_vals = createEmptyArray<To>(odims);
 
         //flags determining more reduction is necessary
         auto needs_another_reduction        = memAlloc<int>(1);
         auto needs_block_boundary_reduction = memAlloc<int>(1);
-
-        ////reset flags
-        getQueue().enqueueFillBuffer<int>(*needs_another_reduction.get(), 0, 0, sizeof(int));
-        getQueue().enqueueFillBuffer<int>(*needs_block_boundary_reduction.get(), 0, 0, sizeof(int));
 
         int nelems = idims[0];
 
@@ -331,49 +330,29 @@ namespace kernel
 
         auto reduced_block_sizes = memAlloc<int>(numBlocks);
 
-        launch_reduce_blocks_by_key<Ti, Tk, To, op>(reduced_block_sizes.get(),
-                                                    keys_out, vals_out,
-                                                    keys, vals,
-                                                    change_nan, nanval, nelems, numThreads);
-
         compute::command_queue c_queue(getQueue()());
         compute::buffer val_buf((*reduced_block_sizes.get())());
 
-        compute::inclusive_scan(compute::make_buffer_iterator<int>(val_buf),
-                                compute::make_buffer_iterator<int>(val_buf, numBlocks),
-                                compute::make_buffer_iterator<int>(val_buf), c_queue);
-
-        launch_compact<Tk, To>(reduced_block_sizes.get(),
-                               t_reduced_keys, t_reduced_vals,
-                               keys_out, vals_out,
-                               numBlocks, numThreads);
-
-        int n_reduced_host;
-        getQueue().enqueueReadBuffer(*reduced_block_sizes.get(), true, (numBlocks - 1) * sizeof(int), sizeof(int), &n_reduced_host);
-        printf("reduced_block_sizes %d\n", n_reduced_host);
-
-        numBlocks = divup(n_reduced_host, numThreads);
-
-        launch_test_needs_reduction<Tk>(*needs_another_reduction.get(), *needs_block_boundary_reduction.get(),
-                                        t_reduced_keys, n_reduced_host, numBlocks, numThreads);
-
+        int n_reduced_host = nelems;
         int needs_another_reduction_host;
-        getQueue().enqueueReadBuffer(*needs_another_reduction.get(), true, 0, sizeof(int), &needs_another_reduction_host);
 
         int needs_block_boundary_reduction_host;
-        getQueue().enqueueReadBuffer(*needs_block_boundary_reduction.get(), true, 0, sizeof(int), &needs_block_boundary_reduction_host);
-
-        printf("needs reduction?%d needs bbred?%d\n", needs_another_reduction_host, needs_block_boundary_reduction_host);
-        //TODO: single do while
-        while(needs_another_reduction_host || needs_block_boundary_reduction_host) {
-            needs_block_boundary_reduction_host = 0;
-            needs_another_reduction_host = 0;
+        bool first_pass = true;
+        do {
             numBlocks = divup(n_reduced_host, numThreads);
 
-            launch_reduce_blocks_by_key<To, Tk, To, op>(reduced_block_sizes.get(),
-                                                        keys_out, vals_out,
-                                                        t_reduced_keys, t_reduced_vals,
-                                                        change_nan, nanval, n_reduced_host, numThreads);
+            if(first_pass) {
+                launch_reduce_blocks_by_key<Ti, Tk, To, op>(reduced_block_sizes.get(),
+                                                            reduced_keys, reduced_vals,
+                                                            keys, vals,
+                                                            change_nan, nanval, nelems, numThreads);
+                first_pass = false;
+            } else {
+                launch_reduce_blocks_by_key<To, Tk, To, op>(reduced_block_sizes.get(),
+                                                            reduced_keys, reduced_vals,
+                                                            t_reduced_keys, t_reduced_vals,
+                                                            change_nan, nanval, n_reduced_host, numThreads);
+            }
 
             compute::inclusive_scan(compute::make_buffer_iterator<int>(val_buf),
                                     compute::make_buffer_iterator<int>(val_buf, numBlocks),
@@ -381,11 +360,10 @@ namespace kernel
 
             launch_compact<Tk, To>(reduced_block_sizes.get(),
                                    t_reduced_keys, t_reduced_vals,
-                                   keys_out, vals_out,
+                                   reduced_keys, reduced_vals,
                                    numBlocks, numThreads);
 
             getQueue().enqueueReadBuffer(*reduced_block_sizes.get(), true, (numBlocks - 1) * sizeof(int), sizeof(int), &n_reduced_host);
-            printf("reduced_block_sizes %d\n", n_reduced_host);
 
             //reset flags
             getQueue().enqueueFillBuffer<int>(*needs_another_reduction.get(), 0, 0, sizeof(int));
@@ -399,7 +377,7 @@ namespace kernel
             getQueue().enqueueReadBuffer(*needs_another_reduction.get(), true, 0, sizeof(int), &needs_another_reduction_host);
             getQueue().enqueueReadBuffer(*needs_block_boundary_reduction.get(), true, 0, sizeof(int), &needs_block_boundary_reduction_host);
 
-            if(needs_block_boundary_reduction_host) {
+            if(needs_block_boundary_reduction_host && !needs_another_reduction_host) {
                 launch_final_boundary_reduce<Tk, To, op>(reduced_block_sizes.get(),
                                                          t_reduced_keys, t_reduced_vals,
                                                          n_reduced_host, numBlocks, numThreads);
@@ -411,14 +389,17 @@ namespace kernel
                 getQueue().enqueueReadBuffer(*reduced_block_sizes.get(), true, (numBlocks - 1) * sizeof(int), sizeof(int), &n_reduced_host);
 
                 launch_compact<Tk, To>(reduced_block_sizes.get(),
+                                       reduced_keys, reduced_vals,
                                        t_reduced_keys, t_reduced_vals,
-                                       keys_out, vals_out,
                                        numBlocks, numThreads);
 
-                //std::swap(t_reduced_keys.getData(), keys_out.data);
-                //std::swap(t_reduced_vals.getData(), vals_out.data);
-            }
-        }
+                std::swap(t_reduced_keys, reduced_keys);
+                std::swap(t_reduced_vals, reduced_vals);
+                }
+        } while(needs_another_reduction_host || needs_block_boundary_reduction_host);
+
+        keys_out = t_reduced_keys;
+        vals_out = t_reduced_vals;
 
         return n_reduced_host;
     }
@@ -433,8 +414,8 @@ namespace kernel
             dim4 odims = vals.dims();
 
             //allocate space for output arrays
-            Array<Tk> reduced_keys = createEmptyArray<Tk>(odims);
-            Array<To> reduced_vals = createEmptyArray<To>(odims);
+            Array<Tk> reduced_keys = createEmptyArray<Tk>(dim4());
+            Array<To> reduced_vals = createEmptyArray<To>(dim4());
 
             int n_reduced = reduce_by_key_first<Ti, Tk, To, op>(reduced_keys, reduced_vals, keys, vals, change_nan, nanval);
 

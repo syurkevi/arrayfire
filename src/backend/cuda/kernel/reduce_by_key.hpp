@@ -392,22 +392,12 @@ namespace kernel
                                 const uint blocks_x, const uint blocks_y, const uint threads_x,
                                 bool change_nan, double nanval)
     {
-        /*
-        //test if further reduction necessary
-        CUDA(cudaMemset(needs_reduction, 0, sizeof(int)));
-        numBlocks = divup(n_reduced_after_initial, numThreads);
-        testReduction<<<numBlocks, numThreads>>>(needs_reduction, db_keys.Current(), n_reduced_after_initial);
-        int another_reduction;
-        CUDA(cudaMemcpy(&another_reduction, needs_reduction, sizeof(int), cudaMemcpyDeviceToHost));
-        */
     }
 
 
     template<typename Ti, typename Tk, typename To, af_op_t op>
     void reduce_first_by_key(Param<Tk> keys_out, Param<To> vals_out, CParam<Tk> keys, CParam<Ti> vals, bool change_nan, double nanval)
     {
-        printf("calling reduce_first_by_key\n");
-        //printf("nelems to reduce: %d\n", nelems);
     }
 
     template<typename Ti, typename Tk, typename To, af_op_t op, int dim>

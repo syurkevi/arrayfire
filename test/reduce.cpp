@@ -309,41 +309,423 @@ CPP_REDUCE_TESTS(anyTrue, any_true, float, unsigned char);
 CPP_REDUCE_TESTS(allTrue, all_true, float, unsigned char);
 CPP_REDUCE_TESTS(count, count, float, unsigned);
 
-TEST(Reduce, sumReduceByKey)
-{
-    const static int testSz = 8;
-    //todo: should teduce by key return unique key array as well?
-    const int   testKeys[testSz] = { 0, 2, 2, 9, 5, 5, 5, 8 };
-    const float testVals[testSz] = { 0, 7, 1, 6, 2, 5, 3, 4 };
+//
+// Reduce By Key tests
+//
 
-    af::array keys(testSz, testKeys);
-    af::array vals(testSz, testVals);
+// ReduceByKey helper methods
+//TODO: move to test data
+std::tuple<af::array, af::array> prepKeyValuePairs_10000Test() {
+    af::array keys, vals;
+    vals = af::constant(1, 1000000);
+    keys = af::constant(0, 1000000);
+    //vals = af::constant(1, 3);
+    //keys = af::constant(0, 3);
+    return std::make_tuple(keys, vals);
+}
 
-    af::array reduced_keys;
-    af::array reduced_vals;
+std::tuple<af::array, af::array> prepKeyValuePairs_10000_2Test() {
+    af::array keys, vals;
+    vals = af::constant(1, 1000000);
+    //keys = af::constant(0, 100000);
+    //vals = af::constant(1, 3);
+    //keys = af::constant(0, 3);
+    //keys = af::flat(af::range(af::dim4(2, 100000/2), 1, s32));
+    keys = af::flat(af::range(af::dim4(1000000/2, 2), 1, s32));
+    return std::make_tuple(keys, vals);
+}
 
-    sumByKey(reduced_keys, reduced_vals, vals, keys, 0, 0);
-    af_print(reduced_keys);
+std::tuple<af::array, af::array> prepKeyValuePairs_10Random(const int n) {
+    af::array keys, vals;
+    vals = af::randn(n);
+    keys = af::flat(af::range(af::dim4(n/10, 10), -1, s32));
 
-    const float gold_reduce[testSz] = { 0, 8, 6, 10, 4 };
-    float *h_a = reduced_vals.host<float>();
+    //shufle keys
+    int len = keys.dims(0);
+    af::array tmp = af::randu(len, 1);
+    af::array val, idx;
+    af::sort(val, idx, tmp);
+    keys = keys(idx);
+    //assert(keys.dims(0) == vals.dims(0));
+    return std::make_tuple(keys.as(s32), vals);
+}
+
+std::tuple<af::array, af::array> prepKeyValuePairs_10Contiguous(const int n) {
+    af::array keys, vals;
+    vals = af::randn(n);
+    keys = af::flat(af::range(af::dim4(10, n/10), 1, s32));
+    return std::make_tuple(keys, vals);
+}
+
+std::tuple<af::array, af::array> prepKeyValuePairs_500Random(const int n) {
+    af::array keys, vals;
+    vals = af::randn(n);
+    keys = af::flat(af::range(af::dim4(n/500, 500), -1, s32));
+
+    //shufle keys
+    int len = keys.dims(0);
+    af::array tmp = af::randu(len, 1);
+    af::array val, idx;
+    af::sort(val, idx, tmp);
+    keys = keys(idx);
+    return std::make_tuple(keys.as(s32), vals);
+}
+
+std::tuple<af::array, af::array> prepKeyValuePairs_500Contiguous(const int n) {
+    af::array keys, vals;
+    vals = af::randn(n);
+    keys = af::flat(af::range(af::dim4(500, n/500), 1, s32));
+    return std::make_tuple(keys, vals);
+}
+
+std::tuple<af::array, af::array> getTest0_KeyVals() {
+    const int testSz = 8;
+    const int   h_keys[testSz] = { 0, 2, 2, 9, 5, 5, 5, 8 };
+    const float h_vals[testSz] = { 0, 7, 1, 6, 2, 5, 3, 4 };
+    af::array keys(testSz, h_keys);
+    af::array vals(testSz, h_vals);
+
+    return std::make_tuple(keys, vals);
+}
+
+std::tuple<af::array, af::array> getTest0_Gold() {
+    const int resSz = 5;
+    const int   h_keys[resSz] = { 0, 2, 9,  5, 8 };
+    const float h_vals[resSz] = { 0, 8, 6, 10, 4 };
+    af::array keys(resSz, h_keys);
+    af::array vals(resSz, h_vals);
+
+    return std::make_tuple(keys, vals);
+}
+
+std::tuple<af::array, af::array> getTest1_KeyVals() {
+    const int testSz = 64;
+    const int   h_keys[testSz] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    const float h_vals[testSz] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+    af::array keys(testSz, h_keys);
+    af::array vals(testSz, h_vals);
+
+    return std::make_tuple(keys, vals);
+}
+
+std::tuple<af::array, af::array> getTest1_Gold() {
+    const int resSz = 1;
+    const int   h_keys[resSz] = {  0 };
+    const float h_vals[resSz] = { 64 };
+    af::array keys(resSz, h_keys);
+    af::array vals(resSz, h_vals);
+
+    return std::make_tuple(keys, vals);
+}
+
+std::tuple<af::array, af::array> getTest2_KeyVals() {
+    const int testSz = 64;
+    const int   h_keys[testSz] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2,  2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2};
+    const float h_vals[testSz] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+    af::array keys(testSz, h_keys);
+    af::array vals(testSz, h_vals);
+
+    return std::make_tuple(keys, vals);
+}
+
+std::tuple<af::array, af::array> getTest2_Gold() {
+    const int resSz = 32;
+    const int   h_keys[resSz] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2,};
+    const float h_vals[resSz] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 33};
+    af::array keys(resSz, h_keys);
+    af::array vals(resSz, h_vals);
+
+    return std::make_tuple(keys, vals);
+}
+
+std::tuple<af::array, af::array> getTest3_KeyVals() {
+    const int testSz = 256;
+    const int   h_keys[testSz] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2,  2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, \
+2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, \
+2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, \
+2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 };
+    const float h_vals[testSz] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, \
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,\
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,\
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+    af::array keys(testSz, h_keys);
+    af::array vals(testSz, h_vals);
+
+    return std::make_tuple(keys, vals);
+}
+
+std::tuple<af::array, af::array> getTest3_Gold() {
+    const int resSz = 32;
+    const int   h_keys[resSz] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2};
+    const float h_vals[resSz] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 225};
+    af::array keys(resSz, h_keys);
+    af::array vals(resSz, h_vals);
+
+    return std::make_tuple(keys, vals);
+}
+
+std::tuple<af::array, af::array> getTest4_KeyVals() {
+    const int testSz = 32;
+    const int   h_keys[testSz] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    const float h_vals[testSz] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+    af::array keys(testSz, h_keys);
+    af::array vals(testSz, h_vals);
+
+    return std::make_tuple(keys, vals);
+}
+
+std::tuple<af::array, af::array> getTest4_Gold() {
+    const int resSz = 1;
+    const int   h_keys[resSz] = { 0 };
+    const float h_vals[resSz] = { 32 };
+    af::array keys(resSz, h_keys);
+    af::array vals(resSz, h_vals);
+
+    return std::make_tuple(keys, vals);
+}
+
+std::tuple<af::array, af::array> getTest5_KeyVals() {
+    const int testSz = 32;
+    const int   h_keys[testSz] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31};
+    const float h_vals[testSz] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+    af::array keys(testSz, h_keys);
+    af::array vals(testSz, h_vals);
+
+    return std::make_tuple(keys, vals);
+}
+
+std::tuple<af::array, af::array> getTest5_Gold() {
+    const int resSz = 32;
+    const int   h_keys[resSz] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31};
+    const float h_vals[resSz] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+    af::array keys(resSz, h_keys);
+    af::array vals(resSz, h_vals);
+
+    return std::make_tuple(keys, vals);
+}
+
+std::tuple<af::array, af::array> getTest6_KeyVals() {
+    const int testSz = 128;
+    const int   h_keys[testSz] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    const float h_vals[testSz] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, \
+ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+
+    af::array keys(testSz, h_keys);
+    af::array vals(testSz, h_vals);
+
+    return std::make_tuple(keys, vals);
+}
+
+std::tuple<af::array, af::array> getTest6_Gold() {
+    const int resSz = 1;
+    const int   h_keys[resSz] = {   0 };
+    const float h_vals[resSz] = { 128 };
+    af::array keys(resSz, h_keys);
+    af::array vals(resSz, h_vals);
+
+    return std::make_tuple(keys, vals);
+}
 
 
-    for (int i = 0; i < testSz; i++) {
-        cout << ", " << h_a[i];
-    }
-    cout << endl;
+// ReduceByKey tests
+TEST(ReduceByKey, ReduceByKeySimple) {
+    af::array keys, vals;
+    std::tie(keys,vals) = getTest0_KeyVals();
 
-    for (int i = 0; i < testSz; i++) {
-        ASSERT_EQ(gold_reduce[i], h_a[i]);
-    }
+    af::array keyResGold, valsReducedGold;
+    std::tie(keyResGold, valsReducedGold) = getTest0_Gold();
+
+    af::array keyRes, valsReduced;
+    sumByKey(keyRes, valsReduced, keys, vals, 0, 0);
+
+    ASSERT_TRUE(af::allTrue<bool>(keyResGold == keyRes));
+    ASSERT_TRUE(af::allTrue<bool>(valsReducedGold == valsReduced));
+}
+
+TEST(ReduceByKey, FullwarpSingelval) {
+    af::array keys, vals;
+    std::tie(keys,vals) = getTest4_KeyVals();
+
+    af::array keyResGold, valsReducedGold;
+    std::tie(keyResGold, valsReducedGold) = getTest4_Gold();
+
+    af::array keyRes, valsReduced;
+    sumByKey(keyRes, valsReduced, keys, vals, 0, 0);
+
+    ASSERT_TRUE(af::allTrue<bool>(keyResGold == keyRes));
+    ASSERT_TRUE(af::allTrue<bool>(valsReducedGold == valsReduced));
+}
+
+TEST(ReduceByKey, FullwarpUniquevals) {
+    af::array keys, vals;
+    std::tie(keys,vals) = getTest5_KeyVals();
+
+    af::array keyResGold, valsReducedGold;
+    std::tie(keyResGold, valsReducedGold) = getTest5_Gold();
+
+    af::array keyRes, valsReduced;
+    sumByKey(keyRes, valsReduced, keys, vals, 0, 0);
+
+    ASSERT_TRUE(af::allTrue<bool>(keyResGold == keyRes));
+    ASSERT_TRUE(af::allTrue<bool>(valsReducedGold == valsReduced));
+}
+
+TEST(ReduceByKey, WarpszReduceFull) {
+    af::array keys, vals;
+    std::tie(keys,vals) = getTest1_KeyVals();
+
+    af::array keyResGold, valsReducedGold;
+    std::tie(keyResGold, valsReducedGold) = getTest1_Gold();
+
+    af::array keyRes, valsReduced;
+    sumByKey(keyRes, valsReduced, keys, vals, 0, 0);
+
+    ASSERT_TRUE(af::allTrue<bool>(keyResGold == keyRes));
+    ASSERT_TRUE(af::allTrue<bool>(valsReducedGold == valsReduced));
+}
+
+TEST(ReduceByKey, WarpszReduceFullMultipleWarpsSinglevals) {
+    af::array keys, vals;
+    std::tie(keys,vals) = getTest6_KeyVals();
+
+    af::array keyResGold, valsReducedGold;
+    std::tie(keyResGold, valsReducedGold) = getTest6_Gold();
+
+    af::array keyRes, valsReduced;
+    sumByKey(keyRes, valsReduced, keys, vals, 0, 0);
+
+    ASSERT_TRUE(af::allTrue<bool>(keyResGold == keyRes));
+    ASSERT_TRUE(af::allTrue<bool>(valsReducedGold == valsReduced));
+}
+
+TEST(ReduceByKey, WarpszReduceBoundary) {
+    af::array keys, vals;
+    std::tie(keys,vals) = getTest2_KeyVals();
+
+    af::array keyResGold, valsReducedGold;
+    std::tie(keyResGold, valsReducedGold) = getTest2_Gold();
+
+    af::array keyRes, valsReduced;
+    sumByKey(keyRes, valsReduced, keys, vals, 0, 0);
+
+    ASSERT_TRUE(af::allTrue<bool>(keyResGold == keyRes));
+    ASSERT_TRUE(af::allTrue<bool>(valsReducedGold == valsReduced));
+}
+
+TEST(ReduceByKey, BlockSizeReduce) {
+    af::array keys, vals;
+    std::tie(keys,vals) = getTest3_KeyVals();
+
+    af::array keyResGold, valsReducedGold;
+    std::tie(keyResGold, valsReducedGold) = getTest3_Gold();
+
+    af::array keyRes, valsReduced;
+    sumByKey(keyRes, valsReduced, keys, vals, 0, 0);
+
+    ASSERT_TRUE(af::allTrue<bool>(keyResGold == keyRes));
+    ASSERT_TRUE(af::allTrue<bool>(valsReducedGold == valsReduced));
 
 }
 
-TEST(Reduce, productReduceByKey)
+TEST(ReduceByKey, MultiBlockReduceSingleval) {
+    af::array keys = af::constant(0, 1024 * 1024, s32);
+    af::array vals = af::constant(1, 1024 * 1024, f32);
+
+    af::array keyResGold = af::constant(0, 1);
+    af::array valsReducedGold = af::constant(1024 * 1024, 1, f32);
+
+    af::array keyRes, valsReduced;
+    sumByKey(keyRes, valsReduced, keys, vals);
+
+    ASSERT_TRUE(af::allTrue<bool>(keyResGold == keyRes));
+    ASSERT_TRUE(af::allTrue<bool>((valsReducedGold - valsReduced) < 0.0001));
+}
+
+
+void reduce_by_key_test(std::string test_fn) {
+    vector<dim4> numDims;
+    vector<vector<float> > data;
+    vector<vector<float> > tests;
+    readTests<float,float,float> (test_fn, numDims, data, tests);
+
+    for(int t=0; t<numDims.size()/2; ++t) {
+        dim4 kdim = numDims[t*2];
+        dim4 vdim = numDims[t*2 + 1];
+
+        vector<int> in_keys(data[t*2].begin(), data[t*2].end());
+        vector<float> in_vals(data[t*2 + 1].begin(), data[t*2 + 1].end());
+
+        af_array inKeys   = 0;
+        af_array inVals   = 0;
+        af_array outKeys  = 0;
+        af_array outVals  = 0;
+        ASSERT_EQ(AF_SUCCESS, af_create_array(&inKeys, &in_keys.front(), kdim.ndims(), kdim.get(), (af_dtype) af::dtype_traits<int>::af_type));
+        ASSERT_EQ(AF_SUCCESS, af_create_array(&inVals, &in_vals.front(), vdim.ndims(), vdim.get(), (af_dtype) af::dtype_traits<float>::af_type));
+
+        vector<int>   currGoldKeys(tests[t*2].begin(), tests[t*2].end());
+        vector<float> currGoldVals(tests[t*2 + 1].begin(), tests[t*2 + 1].end());
+
+        // Run sum
+        ASSERT_EQ(AF_SUCCESS, af_sum_by_key(&outKeys, &outVals, inKeys, inVals, 0));
+
+        dim_t ok0, ok1, ok2, ok3;
+        dim_t ov0, ov1, ov2, ov3;
+        af_get_dims(&ok0, &ok1, &ok2, &ok3, outKeys);
+        af_get_dims(&ov0, &ov1, &ov2, &ov3, outVals);
+
+        // Get result
+        vector<int>   outKeysVec(ok0 * ok1 * ok2 * ok3);
+        vector<float> outValsVec(ov0 * ov1 * ov2 * ov3);
+
+        ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)&outKeysVec.front(), outKeys));
+        ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)&outValsVec.front(), outVals));
+
+        size_t nElems = currGoldKeys.size();
+        if(std::equal(currGoldKeys.begin(), currGoldKeys.end(), outKeysVec.begin()) == false)
+        {
+            for (size_t elIter = 0; elIter < nElems; ++elIter) {
+
+                EXPECT_NEAR(currGoldKeys[elIter], outKeysVec[elIter], 1e-4) << "at: " << elIter
+                                                                << endl;
+                EXPECT_NEAR(currGoldVals[elIter], outValsVec[elIter], 1e-4) << "at: " << elIter
+                                                                << endl;
+            }
+            for(int i = 0; i < (int)nElems; i++) {
+                cout << currGoldKeys[i] << ":" << currGoldVals[i] << ", ";
+            }
+
+            for(int i = 0; i < (int)nElems; i++) {
+                cout << outKeysVec[i] << ":" << outValsVec[i] << ", ";
+            }
+            FAIL();
+        }
+
+        ASSERT_EQ(AF_SUCCESS, af_release_array(outKeys));
+        ASSERT_EQ(AF_SUCCESS, af_release_array(outVals));
+        ASSERT_EQ(AF_SUCCESS, af_release_array(inKeys));
+        ASSERT_EQ(AF_SUCCESS, af_release_array(inVals));
+    }
+}
+TEST(ReduceByKey, MultiBlockReduceContig10) {
+    reduce_by_key_test(string(TEST_DIR"/reduce/test_contig10_by_key.test"));
+}
+
+TEST(ReduceByKey, MultiBlockReduceRandom10) {
+    reduce_by_key_test(string(TEST_DIR"/reduce/test_random10_by_key.test"));
+}
+
+TEST(ReduceByKey, MultiBlockReduceContig500) {
+    reduce_by_key_test(string(TEST_DIR"/reduce/test_contig500_by_key.test"));
+}
+
+TEST(ReduceByKey, MultiBlockReduceByKeyRandom500) {
+    reduce_by_key_test(string(TEST_DIR"/reduce/test_random500_by_key.test"));
+}
+
+TEST(ReduceByKey, productReduceByKey)
 {
     const static int testSz = 8;
-    //todo: should teduce by key return unique key array as well?
     const int   testKeys[testSz] = { 0, 2, 2, 9, 5, 5, 5, 8 };
     const float testVals[testSz] = { 0, 7, 1, 6, 2, 5, 3, 4 };
 
@@ -351,28 +733,21 @@ TEST(Reduce, productReduceByKey)
     af::array vals(testSz, testVals);
 
     af::array reduced_keys, reduced_vals;
-    productByKey(reduced_keys, reduced_vals, vals, keys, 0, 1);
-    af_print(reduced_keys);
+    productByKey(reduced_keys, reduced_vals, keys, vals, 0, 1);
 
-    const float gold_reduce[testSz] = { 0, 7, 6, 30, 4 };
+    const int goldSz = 5;
+    const float gold_reduce[goldSz] = { 0, 7, 6, 30, 4 };
     float *h_a = reduced_vals.host<float>();
 
-
-    for (int i = 0; i < testSz; i++) {
-        cout << ", " << h_a[i];
-    }
-    cout << endl;
-
-    for (int i = 0; i < testSz; i++) {
+    for (int i = 0; i < goldSz; i++) {
         ASSERT_EQ(gold_reduce[i], h_a[i]);
     }
 
 }
 
-TEST(Reduce, minReduceByKey)
+TEST(ReduceByKey, minReduceByKey)
 {
     const static int testSz = 8;
-    //todo: should teduce by key return unique key array as well?
     const int   testKeys[testSz] = { 0, 2, 2, 9, 5, 5, 5, 8 };
     const float testVals[testSz] = { 0, 7, 1, 6, 2, 5, 3, 4 };
 
@@ -380,28 +755,21 @@ TEST(Reduce, minReduceByKey)
     af::array vals(testSz, testVals);
 
     af::array reduced_keys, reduced_vals;
-    minByKey(reduced_keys, reduced_vals, vals, keys);
-    af_print(reduced_keys);
+    minByKey(reduced_keys, reduced_vals, keys, vals);
 
-    const float gold_reduce[testSz] = { 0, 1, 6, 2, 4 };
+    const int goldSz = 5;
+    const float gold_reduce[goldSz] = { 0, 1, 6, 2, 4 };
     float *h_a = reduced_vals.host<float>();
 
-
-    for (int i = 0; i < testSz; i++) {
-        cout << ", " << h_a[i];
-    }
-    cout << endl;
-
-    for (int i = 0; i < testSz; i++) {
+    for (int i = 0; i < goldSz; i++) {
         ASSERT_EQ(gold_reduce[i], h_a[i]);
     }
 
 }
 
-TEST(Reduce, maxReduceByKey)
+TEST(ReduceByKey, maxReduceByKey)
 {
     const static int testSz = 8;
-    //todo: should teduce by key return unique key array as well?
     const int   testKeys[testSz] = { 0, 2, 2, 9, 5, 5, 5, 8 };
     const float testVals[testSz] = { 0, 7, 1, 6, 2, 5, 3, 4 };
 
@@ -409,28 +777,21 @@ TEST(Reduce, maxReduceByKey)
     af::array vals(testSz, testVals);
 
     af::array reduced_keys, reduced_vals;
-    maxByKey(reduced_keys, reduced_vals, vals, keys);
-    af_print(reduced_keys);
+    maxByKey(reduced_keys, reduced_vals, keys, vals);
 
-    const float gold_reduce[testSz] = { 0, 7, 6, 5, 4 };
+    const int goldSz = 5;
+    const float gold_reduce[goldSz] = { 0, 7, 6, 5, 4 };
     float *h_a = reduced_vals.host<float>();
 
-
-    for (int i = 0; i < testSz; i++) {
-        cout << ", " << h_a[i];
-    }
-    cout << endl;
-
-    for (int i = 0; i < testSz; i++) {
+    for (int i = 0; i < goldSz; i++) {
         ASSERT_EQ(gold_reduce[i], h_a[i]);
     }
 
 }
 
-TEST(Reduce, allTrueReduceByKey)
+TEST(ReduceByKey, allTrueReduceByKey)
 {
     const static int testSz = 8;
-    //todo: should teduce by key return unique key array as well?
     const int   testKeys[testSz] = { 0, 2, 2, 9, 5, 5, 5, 8 };
     const float testVals[testSz] = { 0, 1, 1, 1, 0, 1, 1, 1 };
 
@@ -438,57 +799,44 @@ TEST(Reduce, allTrueReduceByKey)
     af::array vals(testSz, testVals);
 
     af::array reduced_keys, reduced_vals;
-    minByKey(reduced_keys, reduced_vals, keys, vals);
-    af_print(reduced_keys);
+    allTrueByKey(reduced_keys, reduced_vals, keys, vals);
 
-    const float gold_reduce[testSz] = { 0, 1, 1, 0, 1 };
-    float *h_a = reduced_vals.host<float>();
+    const int goldSz = 5;
+    const int gold_reduce[goldSz] = { 0, 1, 1, 0, 1 };
+    char *h_a = reduced_vals.host<char>();
 
-
-    for (int i = 0; i < testSz; i++) {
-        cout << ", " << h_a[i];
-    }
-    cout << endl;
-
-    for (int i = 0; i < testSz; i++) {
+    for (int i = 0; i < goldSz; i++) {
         ASSERT_EQ(gold_reduce[i], h_a[i]);
     }
 
 }
 
-TEST(Reduce, anyTrueReduceByKey)
+TEST(ReduceByKey, anyTrueReduceByKey)
 {
     const static int testSz = 8;
-    //todo: should teduce by key return unique key array as well?
-    const int   testKeys[testSz] = { 0, 2, 2, 9, 5, 5, 5, 8 };
-    const float testVals[testSz] = { 0, 1, 1, 1, 0, 1, 1, 1 };
+    const int   testKeys[testSz] = { 0, 2, 2, 9, 5, 5, 8, 8 };
+    const float testVals[testSz] = { 0, 1, 1, 1, 0, 1, 0, 0 };
 
     af::array keys(testSz, testKeys);
     af::array vals(testSz, testVals);
 
     af::array reduced_keys, reduced_vals;
-    minByKey(reduced_keys, reduced_vals, keys, vals);
-    af_print(reduced_keys);
+    anyTrueByKey(reduced_keys, reduced_vals, keys, vals);
 
-    const float gold_reduce[testSz] = { 0, 1, 1, 1, 1 };
-    float *h_a = reduced_vals.host<float>();
+    const int goldSz = 5;
+    const int gold_reduce[goldSz] = { 0, 1, 1, 1, 0 };
+    char *h_a = reduced_vals.host<char>();
 
 
-    for (int i = 0; i < testSz; i++) {
-        cout << ", " << h_a[i];
-    }
-    cout << endl;
-
-    for (int i = 0; i < testSz; i++) {
+    for (int i = 0; i < goldSz; i++) {
         ASSERT_EQ(gold_reduce[i], h_a[i]);
     }
 
 }
 
-TEST(Reduce, countReduceByKey)
+TEST(ReduceByKey, countReduceByKey)
 {
     const static int testSz = 8;
-    //todo: should teduce by key return unique key array as well?
     const int   testKeys[testSz] = { 0, 2, 2, 9, 5, 5, 5, 5 };
     const float testVals[testSz] = { 0, 1, 1, 1, 0, 1, 1, 1 };
 
@@ -496,68 +844,21 @@ TEST(Reduce, countReduceByKey)
     af::array vals(testSz, testVals);
 
     af::array reduced_keys, reduced_vals;
-    minByKey(reduced_keys, reduced_vals, keys, vals);
-    af_print(reduced_keys);
+    countByKey(reduced_keys, reduced_vals, keys, vals);
 
-    const float gold_reduce[testSz] = { 0, 2, 1, 3 };
-    float *h_a = reduced_vals.host<float>();
+    const int goldSz = 4;
+    const int gold_reduce[goldSz] = { 0, 2, 1, 3 };
+    unsigned *h_a = reduced_vals.host<unsigned>();
 
-
-    for (int i = 0; i < testSz; i++) {
-        cout << ", " << h_a[i];
-    }
-    cout << endl;
-
-    for (int i = 0; i < testSz; i++) {
+    for (int i = 0; i < goldSz; i++) {
         ASSERT_EQ(gold_reduce[i], h_a[i]);
     }
 
 }
 
-TEST(Reduce, ReduceByKeyNDims)
-{
-    const static int testDim0 = 4;
-    const static int testDim1 = 4;
-    //todo: should teduce by key return unique key array as well?
-    const int   testKeys[testDim0 * testDim1] = { 0, 2, 2, 1,
-                                                  1, 2, 1, 1,
-                                                  2, 0, 0, 2,
-                                                  0, 1, 0, 0 };
-
-    const float testVals[testDim0 * testDim1] = { 1, 2, 3, 4,
-                                                  5, 6, 7, 8,
-                                                  8, 7, 6, 5,
-                                                  4, 3, 2, 1 };
-
-    af::array keys(testDim0, testDim1, testKeys);
-    af::array vals(testDim0, testDim1, testVals);
-
-    af::array reduced_keys, reduced_vals;
-    sumByKey(reduced_keys, reduced_vals, vals, keys, 1, 0);
-    //cout << "n-dim reduceByKey" << endl;
-    //af_print(reduced);
-
-    //TODO: make sure reduced values conceptually correct
-    const float gold_reduce[testDim0 * 3] = { 5, 7, 8, 1,
-                                              5, 3, 7, 12,
-                                              8, 8, 3, 5 };
-
-    float *h_a = reduced_vals.host<float>();
-
-    for (int i = 0; i < testDim0 * testDim1; i++) {
-        cout << ", " << h_a[i];
-    }
-    cout << endl;
-
-    for (int i = 0; i < testDim0 * testDim1; i++) {
-        ASSERT_EQ(gold_reduce[i], h_a[i]);
-    }
-}
-
-TEST(Reduce, ReduceByKeyNans)
+TEST(ReduceByKey, ReduceByKeyNans)
 {
     const static int testSz = 8;
-    //todo: should teduce by key return unique key array as well?
     const int   testKeys[testSz] = { 0, 2, 2, 9, 5, 5, 5, 8 };
     const float testVals[testSz] = { 0, 7, NAN, 6, 2, 5, 3, 4 };
 
@@ -565,19 +866,13 @@ TEST(Reduce, ReduceByKeyNans)
     af::array vals(testSz, testVals);
 
     af::array reduced_keys, reduced_vals;
-    productByKey(reduced_keys, reduced_vals, vals, keys, 0, 1);
-    //af_print(reduced);
+    productByKey(reduced_keys, reduced_vals, keys, vals, 0, 1);
 
-    const float gold_reduce[testSz] = { 0, 7, 6, 30, 4 };
+    const int goldSz = 5;
+    const float gold_reduce[goldSz] = { 0, 7, 6, 30, 4 };
     float *h_a = reduced_vals.host<float>();
 
-
-    for (int i = 0; i < testSz; i++) {
-        cout << ", " << h_a[i];
-    }
-    cout << endl;
-
-    for (int i = 0; i < testSz; i++) {
+    for (int i = 0; i < goldSz; i++) {
         ASSERT_EQ(gold_reduce[i], h_a[i]);
     }
 }
@@ -1000,21 +1295,4 @@ TEST(Reduce, AllSmallIndexed)
     array a = af::range(dim4(len, 2));
     array b = a(seq(len/2), span);
     ASSERT_EQ(max<float>(b), len/2-1);
-}
-
-TEST(Reduce, Test_Sum_By_Key_Global)
-{
-    int num = 10000;
-    af::array a = af::round(2 * af::randu(num, 1));
-
-    float res = af::sum<float>(a);
-    float *h_a = a.host<float>();
-    float gold = 0;
-
-    for (int i = 0; i < num; i++) {
-        gold += h_a[i];
-    }
-
-    ASSERT_EQ(gold, res);
-    delete[] h_a;
 }
