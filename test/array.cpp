@@ -21,7 +21,8 @@ class Array : public ::testing::Test
 
 };
 
-typedef ::testing::Types<float, double, af::cfloat, af::cdouble, char, unsigned char, int, uint, intl, uintl, short, ushort> TestTypes;
+typedef ::testing::Types<float, double, cfloat, cdouble, char, unsigned char, int, uint, intl, uintl, short, ushort> TestTypes;
+
 TYPED_TEST_CASE(Array, TestTypes);
 
 TEST(Array, ConstructorDefault)
@@ -29,9 +30,6 @@ TEST(Array, ConstructorDefault)
     array a;
     EXPECT_EQ(0u,    a.numdims());
     EXPECT_EQ(dim_t(0),    a.dims(0));
-    EXPECT_EQ(dim_t(0),    a.dims(1));
-    EXPECT_EQ(dim_t(0),    a.dims(2));
-    EXPECT_EQ(dim_t(0),    a.dims(3));
     EXPECT_EQ(dim_t(0),    a.elements());
     EXPECT_EQ(f32,  a.type());
     EXPECT_EQ(0u,    a.bytes());
@@ -54,7 +52,7 @@ TYPED_TEST(Array, ConstructorEmptyDim4)
 {
     if (noDoubleTests<TypeParam>()) return;
 
-    dtype type = (dtype)af::dtype_traits<TypeParam>::af_type;
+    dtype type = (dtype)dtype_traits<TypeParam>::af_type;
     dim4 dims(3, 3, 3, 3);
     array a(dims, type);
     EXPECT_EQ(4u,    a.numdims());
@@ -70,7 +68,7 @@ TYPED_TEST(Array, ConstructorEmpty1D)
 {
     if (noDoubleTests<TypeParam>()) return;
 
-    dtype type = (dtype)af::dtype_traits<TypeParam>::af_type;
+    dtype type = (dtype)dtype_traits<TypeParam>::af_type;
     array a(2, type);
     EXPECT_EQ(1u,    a.numdims());
     EXPECT_EQ(dim_t(2),    a.dims(0));
@@ -85,7 +83,7 @@ TYPED_TEST(Array, ConstructorEmpty2D)
 {
     if (noDoubleTests<TypeParam>()) return;
 
-    dtype type = (dtype)af::dtype_traits<TypeParam>::af_type;
+    dtype type = (dtype)dtype_traits<TypeParam>::af_type;
     array a(2, 2, type);
     EXPECT_EQ(2u,    a.numdims());
     EXPECT_EQ(dim_t(2),    a.dims(0));
@@ -100,7 +98,7 @@ TYPED_TEST(Array, ConstructorEmpty3D)
 {
     if (noDoubleTests<TypeParam>()) return;
 
-    dtype type = (dtype)af::dtype_traits<TypeParam>::af_type;
+    dtype type = (dtype)dtype_traits<TypeParam>::af_type;
     array a(2, 2, 2, type);
     EXPECT_EQ(3u,    a.numdims());
     EXPECT_EQ(dim_t(2),    a.dims(0));
@@ -115,7 +113,7 @@ TYPED_TEST(Array, ConstructorEmpty4D)
 {
     if (noDoubleTests<TypeParam>()) return;
 
-    dtype type = (dtype)af::dtype_traits<TypeParam>::af_type;
+    dtype type = (dtype)dtype_traits<TypeParam>::af_type;
     array a(2, 2, 2, 2, type);
     EXPECT_EQ(4u,    a.numdims());
     EXPECT_EQ(dim_t(2),    a.dims(0));
@@ -130,7 +128,7 @@ TYPED_TEST(Array, ConstructorHostPointer1D)
 {
     if (noDoubleTests<TypeParam>()) return;
 
-    dtype type = (dtype)af::dtype_traits<TypeParam>::af_type;
+    dtype type = (dtype)dtype_traits<TypeParam>::af_type;
     size_t nelems = 10;
     vector<TypeParam> data(nelems, 4);
     array a(nelems, &data.front(), afHost);
@@ -151,7 +149,7 @@ TYPED_TEST(Array, ConstructorHostPointer2D)
 {
     if (noDoubleTests<TypeParam>()) return;
 
-    dtype type = (dtype)af::dtype_traits<TypeParam>::af_type;
+    dtype type = (dtype)dtype_traits<TypeParam>::af_type;
     size_t ndims    = 2;
     size_t dim_size = 10;
     size_t nelems   = dim_size * dim_size;
@@ -174,7 +172,7 @@ TYPED_TEST(Array, ConstructorHostPointer3D)
 {
     if (noDoubleTests<TypeParam>()) return;
 
-    dtype type = (dtype)af::dtype_traits<TypeParam>::af_type;
+    dtype type = (dtype)dtype_traits<TypeParam>::af_type;
     size_t ndims    = 3;
     size_t dim_size = 10;
     size_t nelems   = dim_size * dim_size * dim_size;
@@ -197,7 +195,7 @@ TYPED_TEST(Array, ConstructorHostPointer4D)
 {
     if (noDoubleTests<TypeParam>()) return;
 
-    dtype type = (dtype)af::dtype_traits<TypeParam>::af_type;
+    dtype type = (dtype)dtype_traits<TypeParam>::af_type;
     size_t ndims    = 4;
     size_t dim_size = 10;
     size_t nelems   = dim_size * dim_size * dim_size * dim_size;
@@ -220,7 +218,7 @@ TYPED_TEST(Array, TypeAttributes)
 {
     if (noDoubleTests<TypeParam>()) return;
 
-    dtype type = (dtype)af::dtype_traits<TypeParam>::af_type;
+    dtype type = (dtype)dtype_traits<TypeParam>::af_type;
     array one(10, type);
     switch(type) {
         case f32:
@@ -398,17 +396,22 @@ TEST(Array, ShapeAttributes)
 TEST(Array, ISSUE_951)
 {
 // This works
-    //const af::array a(100, 100);
-    //af::array b = a.cols(0, 20);
+    //const array a(100, 100);
+    //array b = a.cols(0, 20);
     //b = b.rows(10, 20);
 
 // This works
-    //af::array a(100, 100);
-    //af::array b = a.cols(0, 20).rows(10, 20);
+    //array a(100, 100);
+    //array b = a.cols(0, 20).rows(10, 20);
 
 // This fails with linking error
-    const af::array a = randu(100, 100);
-    af::array b = a.cols(0, 20).rows(10, 20);
+    const array a = randu(100, 100);
+    array b = a.cols(0, 20).rows(10, 20);
+}
+
+TEST(Array, CreateHandleInvalidNullDimsPointer) {
+    af_array out = 0;
+    EXPECT_EQ(AF_ERR_ARG, af_create_handle(&out, 1, NULL, f32));
 }
 
 
@@ -487,9 +490,9 @@ TEST(DeviceId, Different)
     }
 
     setDevice(id1);
-    af::deviceGC();
+    deviceGC();
     setDevice(id0);
-    af::deviceGC();
+    deviceGC();
 }
 
 TEST(Device, empty)
@@ -502,4 +505,25 @@ TEST(Device, JIT)
 {
     array a = constant(1, 5, 5);
     ASSERT_EQ(a.device<float>() != NULL, 1);
+}
+
+TYPED_TEST(Array, Scalar)
+{
+    if (noDoubleTests<TypeParam>()) return;
+
+    dtype type = (dtype)dtype_traits<TypeParam>::af_type;
+    array a = randu(dim4(1), type);
+
+    vector<TypeParam> gold(a.elements());
+
+    a.host((void*)gold.data());
+
+    EXPECT_EQ(true, gold[0]==a.scalar<TypeParam>());
+}
+
+TEST(Array, ScalarTypeMismatch)
+{
+    array a = constant(1.0, dim4(1), f32);
+
+    EXPECT_THROW(a.scalar<int>(), exception);
 }

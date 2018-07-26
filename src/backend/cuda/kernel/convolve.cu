@@ -8,7 +8,7 @@
  ********************************************************/
 
 #include <backend.hpp>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <Param.hpp>
 #include <debug_cuda.hpp>
 #include <math.hpp>
@@ -54,8 +54,10 @@ void convolve1(Param<T> out, CParam<T> signal, int fLen,
     const int padding = fLen-1;
     const int shrdLen = blockDim.x + 2*padding;
     const unsigned b1 = blockIdx.x/nBBS0;   /* [0 {1} 2 3] */
-    const unsigned b3 = blockIdx.y/nBBS1;   /* [0 1 2 {3}] */
-    const unsigned b2 = blockIdx.y-nBBS1*b3;/* [0 1 {2} 3] */
+    const unsigned b3 = (blockIdx.y + blockIdx.z * gridDim.y) / nBBS1;   /* [0 1 2 {3}] */
+    const unsigned b2 = (blockIdx.y + blockIdx.z * gridDim.y) - nBBS1*b3;/* [0 1 {2} 3] */
+    if(b2 >= out.dims[2] || b3 >= out.dims[3])
+        return;
 
     T *dst = (T *)out.ptr + (b1 * out.strides[1] +  /* activated with batched input signal */
                              o1 * out.strides[1] +  /* activated with batched input filter */
@@ -109,8 +111,8 @@ void convolve2(Param<T> out, CParam<T> signal, int nBBS0,
     const int shrdLen0 = THREADS_X + padding0;
     const int shrdLen1 = THREADS_Y + padding1;
 
-    unsigned b0  = blockIdx.x/nBBS0;
-    unsigned b1  = blockIdx.y/nBBS1;
+    unsigned b0  = blockIdx.x / nBBS0;
+    unsigned b1  = (blockIdx.y + blockIdx.z * gridDim.y) / nBBS1;
     T *dst = (T *)out.ptr + (b0 * out.strides[2] + /* activated with batched input signal */
                              o2 * out.strides[2] + /* activated with batched input filter */
                              b1 * out.strides[3] + /* activated with batched input signal */
@@ -126,7 +128,10 @@ void convolve2(Param<T> out, CParam<T> signal, int nBBS0,
     int lx  = threadIdx.x;
     int ly  = threadIdx.y;
     int gx  = THREADS_X * (blockIdx.x-b0*nBBS0) + lx;
-    int gy  = THREADS_Y * (blockIdx.y-b1*nBBS1) + ly;
+    int gy  = THREADS_Y * ((blockIdx.y + blockIdx.z * gridDim.y) -b1*nBBS1) + ly;
+
+    if(b1 >= out.dims[3])
+        return;
 
     int s0 = signal.strides[0];
     int s1 = signal.strides[1];
@@ -273,17 +278,22 @@ void prepareKernelArgs(conv_kparam_t &params, dim_t oDims[], dim_t fDims[], int 
         batchDims[i] = (params.launchMoreBlocks ? 1 : oDims[i]);
     }
 
+    const int maxBlocksY   = cuda::getDeviceProp(cuda::getActiveDeviceId()).maxGridSize[1];
     if (baseDim==1) {
         params.mThreads    = dim3(THREADS, 1);
         params.mBlk_x      = divup(oDims[0], params.mThreads.x);
         params.mBlk_y      = batchDims[2];
         params.mBlocks     = dim3(params.mBlk_x * batchDims[1], params.mBlk_y * batchDims[3]);
         params.mSharedSize = (params.mThreads.x+2*(fDims[0]-1)) * sizeof(T);
+        params.mBlocks.z = divup(params.mBlocks.y, maxBlocksY);
+        params.mBlocks.y = divup(params.mBlocks.y, params.mBlocks.z);
     } else if (baseDim==2) {
         params.mThreads    = dim3(THREADS_X, THREADS_Y);
         params.mBlk_x      = divup(oDims[0], params.mThreads.x);
         params.mBlk_y      = divup(oDims[1], params.mThreads.y);
         params.mBlocks     = dim3(params.mBlk_x * batchDims[2], params.mBlk_y * batchDims[3]);
+        params.mBlocks.z = divup(params.mBlocks.y, maxBlocksY);
+        params.mBlocks.y = divup(params.mBlocks.y, params.mBlocks.z);
     } else if (baseDim==3) {
         params.mThreads    = dim3(CUBE_X, CUBE_Y, CUBE_Z);
         params.mBlk_x      = divup(oDims[0], params.mThreads.x);
@@ -293,6 +303,9 @@ void prepareKernelArgs(conv_kparam_t &params, dim_t oDims[], dim_t fDims[], int 
         params.mSharedSize = (params.mThreads.x+2*(fDims[0]-1)) *
                              (params.mThreads.y+2*(fDims[1]-1)) *
                              (params.mThreads.z+2*(fDims[2]-1)) * sizeof(T);
+        //todo: fold into x dimension according to old style
+        params.mBlocks.z = divup(params.mBlocks.y, maxBlocksY);
+        params.mBlocks.y = divup(params.mBlocks.y, params.mBlocks.z);
     }
 }
 
@@ -314,7 +327,13 @@ void conv2Helper(const conv_kparam_t &p, Param<T> out, CParam<T> sig, int f1)
         case  3: conv2Helper<T, aT, expand, f0,  3>(p, out, sig); break;
         case  4: conv2Helper<T, aT, expand, f0,  4>(p, out, sig); break;
         case  5: conv2Helper<T, aT, expand, f0,  5>(p, out, sig); break;
-        default: CUDA_NOT_SUPPORTED();
+        default:
+            {
+                char errMessage[256];
+                snprintf(errMessage, sizeof(errMessage),
+                        "\nCUDA Convolution doesn't support %dx%d kernel\n", f0, f1);
+                CUDA_NOT_SUPPORTED(errMessage);
+            };
     }
 }
 
@@ -328,25 +347,37 @@ void conv2Helper(const conv_kparam_t &p, Param<T> out, CParam<T> sig, int f0, in
         case  4: conv2Helper<T, aT, expand,  4>(p, out, sig, f1); break;
         case  5: conv2Helper<T, aT, expand,  5>(p, out, sig, f1); break;
         default: {
-                     if (f0==f1) {
-                         switch(f1) {
-                             case  6: conv2Helper<T, aT, expand,  6,  6>(p, out, sig); break;
-                             case  7: conv2Helper<T, aT, expand,  7,  7>(p, out, sig); break;
-                             case  8: conv2Helper<T, aT, expand,  8,  8>(p, out, sig); break;
-                             case  9: conv2Helper<T, aT, expand,  9,  9>(p, out, sig); break;
-                             case 10: conv2Helper<T, aT, expand, 10, 10>(p, out, sig); break;
-                             case 11: conv2Helper<T, aT, expand, 11, 11>(p, out, sig); break;
-                             case 12: conv2Helper<T, aT, expand, 12, 12>(p, out, sig); break;
-                             case 13: conv2Helper<T, aT, expand, 13, 13>(p, out, sig); break;
-                             case 14: conv2Helper<T, aT, expand, 14, 14>(p, out, sig); break;
-                             case 15: conv2Helper<T, aT, expand, 15, 15>(p, out, sig); break;
-                             case 16: conv2Helper<T, aT, expand, 16, 16>(p, out, sig); break;
-                             case 17: conv2Helper<T, aT, expand, 17, 17>(p, out, sig); break;
-                             default: CUDA_NOT_SUPPORTED();
-                         }
-                     } else
-                         CUDA_NOT_SUPPORTED();
-                 } break;
+            if (f0==f1) {
+                switch(f1) {
+                    case  6: conv2Helper<T, aT, expand,  6,  6>(p, out, sig); break;
+                    case  7: conv2Helper<T, aT, expand,  7,  7>(p, out, sig); break;
+                    case  8: conv2Helper<T, aT, expand,  8,  8>(p, out, sig); break;
+                    case  9: conv2Helper<T, aT, expand,  9,  9>(p, out, sig); break;
+                    case 10: conv2Helper<T, aT, expand, 10, 10>(p, out, sig); break;
+                    case 11: conv2Helper<T, aT, expand, 11, 11>(p, out, sig); break;
+                    case 12: conv2Helper<T, aT, expand, 12, 12>(p, out, sig); break;
+                    case 13: conv2Helper<T, aT, expand, 13, 13>(p, out, sig); break;
+                    case 14: conv2Helper<T, aT, expand, 14, 14>(p, out, sig); break;
+                    case 15: conv2Helper<T, aT, expand, 15, 15>(p, out, sig); break;
+                    case 16: conv2Helper<T, aT, expand, 16, 16>(p, out, sig); break;
+                    case 17: conv2Helper<T, aT, expand, 17, 17>(p, out, sig); break;
+                    default:
+                      {
+                          char errMessage[256];
+                          snprintf(errMessage, sizeof(errMessage),
+                                  "\nCUDA 2D convolution doesn't support %dx%d kernel\n", f0, f1);
+                          CUDA_NOT_SUPPORTED(errMessage);
+                      };
+                }
+            } else {
+              {
+                  char errMessage[256];
+                  snprintf(errMessage, sizeof(errMessage),
+                          "\nCUDA 2D convolution doesn't support rectangular kernels\n");
+                  CUDA_NOT_SUPPORTED(errMessage);
+              };
+            }
+          } break;
     }
 }
 
@@ -372,7 +403,7 @@ void convolve_1d(conv_kparam_t &p, Param<T> out, CParam<T> sig, CParam<aT> filt)
                                               filt.ptr+(f1Off+f2Off+f3Off),
                                               filterLen*sizeof(aT),
                                               0, cudaMemcpyDeviceToDevice,
-                                              cuda::getStream(cuda::getActiveDeviceId())));
+                                              cuda::getActiveStream()));
 
                 p.o[0] = (p.outHasNoOffset ? 0 : b1);
                 p.o[1] = (p.outHasNoOffset ? 0 : b2);
@@ -410,7 +441,7 @@ void convolve_2d(conv_kparam_t &p, Param<T> out, CParam<T> sig, CParam<aT> filt)
                                           filt.ptr+(f2Off+f3Off),
                                           filterLen*sizeof(aT),
                                           0, cudaMemcpyDeviceToDevice,
-                                          cuda::getStream(cuda::getActiveDeviceId())));
+                                          cuda::getActiveStream()));
 
             p.o[1] = (p.outHasNoOffset ? 0 : b2);
             p.o[2] = (p.outHasNoOffset ? 0 : b3);
@@ -438,7 +469,7 @@ void convolve_3d(conv_kparam_t &p, Param<T> out, CParam<T> sig, CParam<aT> filt)
                     filt.ptr+f3Off,
                     filterLen*sizeof(aT),
                     0, cudaMemcpyDeviceToDevice,
-                    cuda::getStream(cuda::getActiveDeviceId())));
+                    cuda::getActiveStream()));
 
         p.o[2] = (p.outHasNoOffset ? 0 : b3);
         p.s[2] = (p.inHasNoOffset ? 0 : b3);
@@ -463,7 +494,13 @@ void convolve_nd(Param<T> out, CParam<T> signal, CParam<aT> filt, AF_BATCH_KIND 
         case 3: if ((filt.dims[0]*filt.dims[1]*filt.dims[2]) > (MCFL3 * MCFL3 * MCFL3)) callKernel = false; break;
     }
 
-    if (!callKernel) { CUDA_NOT_SUPPORTED(); }
+    if (!callKernel) {
+        char errMessage[256];
+        snprintf(errMessage, sizeof(errMessage),
+                 "\nCUDA N Dimensional Convolution doesn't support %lldx%lldx%lld kernel\n",
+                 filt.dims[0], filt.dims[1], filt.dims[2]);
+        CUDA_NOT_SUPPORTED(errMessage);
+    }
 
     conv_kparam_t param;
     for (int i=0; i<3; ++i) {

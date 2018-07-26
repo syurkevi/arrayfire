@@ -9,10 +9,10 @@
 
 #include <af/data.h>
 #include <af/blas.h>
-#include <err_common.hpp>
+#include <common/err_common.hpp>
 #include <handle.hpp>
 #include <backend.hpp>
-#include <ArrayInfo.hpp>
+#include <common/ArrayInfo.hpp>
 #include <reorder.hpp>
 #include <transpose.hpp>
 
@@ -31,6 +31,9 @@ static inline af_array reorder(const af_array in, const af::dim4 &rdims0)
     }
     const dim4 idims = In.dims();
     const dim4 istrides = In.strides();
+
+    // Ensure all JIT nodes are evaled
+    In.eval();
 
     af_array out;
     if (rdims[0] == 0 &&

@@ -11,10 +11,10 @@
 #include <af/defines.h>
 #include <af/vision.h>
 #include <af/random.h>
-#include <err_common.hpp>
+#include <common/err_common.hpp>
 #include <handle.hpp>
 #include <backend.hpp>
-#include <ArrayInfo.hpp>
+#include <common/ArrayInfo.hpp>
 #include <homography.hpp>
 
 using af::dim4;
@@ -37,6 +37,7 @@ static inline void homography(af_array &H, int &inliers,
                             getArray<float>(x_dst), getArray<float>(y_dst),
                             getArray<float>(initial),
                             htype, inlier_thr, iterations);
+    AF_CHECK(af_release_array(initial));
 
     H = getHandle<T>(bestH);
 }
@@ -71,7 +72,7 @@ af_err af_homography(af_array *H, int *inliers,
         ARG_ASSERT(1, (xsdims[0] > 0));
         ARG_ASSERT(2, (ysdims[0] == xsdims[0]));
         ARG_ASSERT(3, (xddims[0] > 0));
-        ARG_ASSERT(4, (yddims[0] == yddims[0]));
+        ARG_ASSERT(4, (yddims[0] == xddims[0]));
 
         ARG_ASSERT(5, (inlier_thr >= 0.1f));
         ARG_ASSERT(6, (iterations > 0));

@@ -1,5 +1,5 @@
 /*******************************************************
- * Copyright (c) 2015, ArrayFire
+ * Copyright (c) 2018, ArrayFire
  * All rights reserved.
  *
  * This file is distributed under 3-clause BSD license.
@@ -7,9 +7,10 @@
  * http://arrayfire.com/licenses/BSD-3-Clause
  ********************************************************/
 
+#include "symbol_manager.hpp"
 #include <af/array.h>
 #include <af/image.h>
-#include "symbol_manager.hpp"
+#include <af/defines.h>
 
 af_err af_gradient(af_array *dx, af_array *dy, const af_array in)
 {
@@ -262,4 +263,28 @@ af_err af_canny(af_array* out, const af_array in, const af_canny_threshold ct,
 {
     CHECK_ARRAYS(in);
     return CALL(out, in, ct, t1, t2, sw, isf);
+}
+
+af_err af_anisotropic_diffusion(af_array* out, const af_array in, const float dt,
+                                const float K, const unsigned iterations,
+                                const af_flux_function fftype,
+                                const af_diffusion_eq eq)
+{
+    CHECK_ARRAYS(in);
+    return CALL(out, in, dt, K, iterations, fftype, eq);
+}
+
+af_err af_iterative_deconv(af_array* out, const af_array in, const af_array ker,
+                           const unsigned iterations, const float relax_factor,
+                           const af_iterative_deconv_algo algo)
+{
+    CHECK_ARRAYS(in, ker);
+    return CALL(out, in, ker, iterations, relax_factor, algo);
+}
+
+af_err af_inverse_deconv(af_array* out, const af_array in, const af_array psf,
+                         const float gamma,const af_inverse_deconv_algo algo)
+{
+    CHECK_ARRAYS(in, psf);
+    return CALL(out, in, psf, gamma, algo);
 }

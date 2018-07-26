@@ -15,8 +15,11 @@
 #include <vector>
 #include <testHelpers.hpp>
 
+using std::endl;
 using std::string;
 using std::vector;
+using af::dim4;
+using af::dtype_traits;
 
 template<typename T>
 class Sobel : public ::testing::Test
@@ -45,42 +48,40 @@ void testSobelDerivatives(string pTestFile)
 {
     if (noDoubleTests<Ti>()) return;
 
-    vector<af::dim4>  numDims;
+    vector<dim4>  numDims;
     vector<vector<Ti> >      in;
     vector<vector<To> >   tests;
 
     readTests<Ti,To,int>(pTestFile, numDims, in, tests);
 
-    af::dim4 dims    = numDims[0];
+    dim4 dims    = numDims[0];
     af_array dxArray = 0;
     af_array dyArray = 0;
     af_array inArray = 0;
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&inArray, &(in[0].front()),
-                dims.ndims(), dims.get(), (af_dtype)af::dtype_traits<Ti>::af_type));
+                dims.ndims(), dims.get(), (af_dtype)dtype_traits<Ti>::af_type));
 
     ASSERT_EQ(AF_SUCCESS, af_sobel_operator(&dxArray, &dyArray, inArray, 3));
 
-    To *dxData = new To[dims.elements()];
-    To *dyData = new To[dims.elements()];
+    vector<To> dxData(dims.elements());
+    vector<To> dyData(dims.elements());
 
-    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)dxData, dxArray));
-    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)dyData, dyArray));
+    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)dxData.data(), dxArray));
+    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)dyData.data(), dyArray));
 
     vector<To> currDXGoldBar = tests[0];
     vector<To> currDYGoldBar = tests[1];
     size_t nElems = currDXGoldBar.size();
     for (size_t elIter=0; elIter<nElems; ++elIter) {
-        ASSERT_EQ(currDXGoldBar[elIter], dxData[elIter])<< "at: " << elIter<< std::endl;
+        ASSERT_EQ(currDXGoldBar[elIter], dxData[elIter])<< "at: " << elIter<< endl;
     }
     nElems = currDYGoldBar.size();
     for (size_t elIter=0; elIter<nElems; ++elIter) {
-        ASSERT_EQ(currDYGoldBar[elIter], dyData[elIter])<< "at: " << elIter<< std::endl;
+        ASSERT_EQ(currDYGoldBar[elIter], dyData[elIter])<< "at: " << elIter<< endl;
     }
 
     // cleanup
-    delete[] dxData;
-    delete[] dyData;
     ASSERT_EQ(AF_SUCCESS, af_release_array(inArray));
     ASSERT_EQ(AF_SUCCESS, af_release_array(dxArray));
     ASSERT_EQ(AF_SUCCESS, af_release_array(dyArray));

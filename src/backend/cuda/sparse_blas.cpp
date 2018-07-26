@@ -8,20 +8,18 @@
  ********************************************************/
 
 #include <sparse_blas.hpp>
-#include <cusparseManager.hpp>
 #include <cuda_runtime.h>
 #include <platform.hpp>
 
 #include <stdexcept>
 #include <string>
-#include <err_common.hpp>
+#include <common/err_common.hpp>
 #include <math.hpp>
 #include <complex.hpp>
 
 namespace cuda
 {
 
-using cusparse::getHandle;
 using namespace std;
 
 cusparseOperation_t
@@ -157,7 +155,7 @@ Array<T> matmul(const common::SparseArray<T> lhs, const Array<T> rhs,
     // and not OP(A) (gemm wants row/col of OP(A)).
     if(rDims[rColDim] == 1) {
         CUSPARSE_CHECK(csrmv_func<T>()(
-                       getHandle(),
+                       sparseHandle(),
                        lOpts,
                        lDims[0], lDims[1], lhs.getNNZ(),
                        &alpha,
@@ -168,7 +166,7 @@ Array<T> matmul(const common::SparseArray<T> lhs, const Array<T> rhs,
                        out.get()));
     } else {
         CUSPARSE_CHECK(csrmm_func<T>()(
-                       getHandle(),
+                       sparseHandle(),
                        lOpts,
                        lDims[0], rDims[rColDim], lDims[1], lhs.getNNZ(),
                        &alpha,

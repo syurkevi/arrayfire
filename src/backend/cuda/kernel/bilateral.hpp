@@ -8,7 +8,7 @@
  ********************************************************/
 
 #include <backend.hpp>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <Param.hpp>
 #include <debug_cuda.hpp>
 #include <math.hpp>
@@ -27,12 +27,6 @@ inline __device__
 int lIdx(int x, int y, int stride1, int stride0)
 {
     return (y*stride1 + x*stride0);
-}
-
-inline __device__
-int clamp(int f, int a, int b)
-{
-    return max(a, min(f, b));
 }
 
 template<typename inType, typename outType>
@@ -140,7 +134,10 @@ void bilateral(Param<outType> out, CParam<inType> in, float s_sigma, float c_sig
 
     size_t MAX_SHRD_SIZE = cuda::getDeviceProp(cuda::getActiveDeviceId()).sharedMemPerBlock;
     if (total_shrd_size > MAX_SHRD_SIZE) {
-        CUDA_NOT_SUPPORTED();
+        char errMessage[256];
+        snprintf(errMessage, sizeof(errMessage),
+                 "\nCUDA Bilateral filter doesn't support %f spatial sigma\n", s_sigma);
+        CUDA_NOT_SUPPORTED(errMessage);
     }
 
     CUDA_LAUNCH_SMEM((bilateralKernel<inType, outType>), blocks, threads, total_shrd_size,

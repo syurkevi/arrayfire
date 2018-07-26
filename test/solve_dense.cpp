@@ -7,196 +7,180 @@
  * http://arrayfire.com/licenses/BSD-3-Clause
  ********************************************************/
 
+// NOTE: Tests are known to fail on OSX when utilizing the CPU and OpenCL
+// backends for sizes larger than 128x128 or more. You can read more about it on
+// issue https://github.com/arrayfire/arrayfire/issues/1617
+
 #include <gtest/gtest.h>
-#include <arrayfire.h>
-#include <af/dim4.hpp>
-#include <af/defines.h>
-#include <af/traits.hpp>
-#include <vector>
-#include <iostream>
-#include <complex>
-#include <string>
 #include <testHelpers.hpp>
-
-using std::vector;
-using std::string;
-using std::cout;
-using std::endl;
-using std::abs;
-using af::cfloat;
-using af::cdouble;
-
-///////////////////////////////// CPP ////////////////////////////////////
-//
+#include "solve_common.hpp"
+#include <thread>
 
 template<typename T>
-void solveTester(const int m, const int n, const int k, double eps)
+class Solve : public ::testing::Test
 {
-    af::deviceGC();
 
-    if (noDoubleTests<T>()) return;
-    if (noLAPACKTests()) return;
+};
 
-#if 1
-    af::array A  = cpu_randu<T>(af::dim4(m, n));
-    af::array X0 = cpu_randu<T>(af::dim4(n, k));
-#else
-    af::array A  = af::randu(m, n, (af::dtype)af::dtype_traits<T>::af_type);
-    af::array X0 = af::randu(n, k, (af::dtype)af::dtype_traits<T>::af_type);
-#endif
-    af::array B0 = af::matmul(A, X0);
+typedef ::testing::Types<float, cfloat, double, cdouble> TestTypes;
+TYPED_TEST_CASE(Solve, TestTypes);
 
-    //! [ex_solve]
-    af::array X1 = af::solve(A, B0);
-    //! [ex_solve]
+template<typename T>
+double eps();
 
-    //! [ex_solve_recon]
-    af::array B1 = af::matmul(A, X1);
-    //! [ex_solve_recon]
-
-    ASSERT_NEAR(0, af::sum<double>(af::abs(real(B0 - B1))) / (m * k), eps);
-    ASSERT_NEAR(0, af::sum<double>(af::abs(imag(B0 - B1))) / (m * k), eps);
+template<>
+double eps<float>() {
+    return 0.01f;
 }
 
-template<typename T>
-void solveLUTester(const int n, const int k, double eps)
-{
-    af::deviceGC();
-
-    if (noDoubleTests<T>()) return;
-    if (noLAPACKTests()) return;
-
-#if 1
-    af::array A  = cpu_randu<T>(af::dim4(n, n));
-    af::array X0 = cpu_randu<T>(af::dim4(n, k));
-#else
-    af::array A  = af::randu(n, n, (af::dtype)af::dtype_traits<T>::af_type);
-    af::array X0 = af::randu(n, k, (af::dtype)af::dtype_traits<T>::af_type);
-#endif
-    af::array B0 = af::matmul(A, X0);
-
-    //! [ex_solve_lu]
-    af::array A_lu, pivot;
-    af::lu(A_lu, pivot, A);
-    af::array X1 = af::solveLU(A_lu, pivot, B0);
-    //! [ex_solve_lu]
-
-    af::array B1 = af::matmul(A, X1);
-
-    ASSERT_NEAR(0, af::sum<double>(af::abs(real(B0 - B1))) / (n * k), eps);
-    ASSERT_NEAR(0, af::sum<double>(af::abs(imag(B0 - B1))) / (n * k), eps);
+template<>
+double eps<double>() {
+    return 1e-5;
 }
 
-template<typename T>
-void solveTriangleTester(const int n, const int k, bool is_upper, double eps)
+template<>
+double eps<cfloat>() {
+    return 0.01f;
+}
+
+template<>
+double eps<cdouble>() {
+    return 1e-5;
+}
+
+TYPED_TEST(Solve, Square) {
+    solveTester<TypeParam>(100, 100, 10, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, SquareMultipleOfTwo) {
+    solveTester<TypeParam>(96, 96, 16, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, SquareLarge) {
+    solveTester<TypeParam>(1000, 1000, 10, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, SquareMultipleOfTwoLarge) {
+    solveTester<TypeParam>(2048, 2048, 32, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, LeastSquaresUnderDetermined) {
+    solveTester<TypeParam>(80, 100, 20, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, LeastSquaresUnderDeterminedMultipleOfTwo) {
+    solveTester<TypeParam>(96, 128, 40, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, LeastSquaresUnderDeterminedLarge) {
+    solveTester<TypeParam>(800, 1000, 200, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, LeastSquaresUnderDeterminedMultipleOfTwoLarge) {
+    solveTester<TypeParam>(1536, 2048, 400, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, LeastSquaresOverDetermined) {
+    solveTester<TypeParam>(80, 60, 20, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, LeastSquaresOverDeterminedMultipleOfTwo) {
+    solveTester<TypeParam>(96, 64, 1, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, LeastSquaresOverDeterminedLarge) {
+    solveTester<TypeParam>(800, 600, 64, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, LeastSquaresOverDeterminedMultipleOfTwoLarge) {
+    solveTester<TypeParam>(1536, 1024, 1, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, LU) {
+    solveLUTester<TypeParam>(100, 10, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, LUMultipleOfTwo) {
+    solveLUTester<TypeParam>(96, 64, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, LULarge) {
+    solveLUTester<TypeParam>(1000, 100, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, LUMultipleOfTwoLarge) {
+    solveLUTester<TypeParam>(2048, 512, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, TriangleUpper) {
+    solveTriangleTester<TypeParam>(100, 10, true, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, TriangleUpperMultipleOfTwo) {
+    solveTriangleTester<TypeParam>(96, 64, true, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, TriangleUpperLarge) {
+    solveTriangleTester<TypeParam>(1000, 100, true, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, TriangleUpperMultipleOfTwoLarge) {
+    solveTriangleTester<TypeParam>(2048, 512, true, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, TriangleLower) {
+    solveTriangleTester<TypeParam>(100, 10, false, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, TriangleLowerMultipleOfTwo) {
+    solveTriangleTester<TypeParam>(96, 64, false, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, TriangleLowerLarge) {
+    solveTriangleTester<TypeParam>(1000, 100, false, eps<TypeParam>());
+}
+
+TYPED_TEST(Solve, TriangleLowerMultipleOfTwoLarge) {
+    solveTriangleTester<TypeParam>(2048, 512, false, eps<TypeParam>());
+}
+
+#if !defined(AF_OPENCL)
+int nextTargetDeviceId()
 {
-    af::deviceGC();
+  static int nextId = 0;
+  return nextId++;
+}
 
-    if (noDoubleTests<T>()) return;
-    if (noLAPACKTests()) return;
+#define SOLVE_LU_TESTS_THREADING(T, eps)                                                                          \
+    tests.emplace_back(solveLUTester<T>, 1000, 100, eps, nextTargetDeviceId()%numDevices);              \
+    tests.emplace_back(solveTriangleTester<T>, 1000, 100, true, eps, nextTargetDeviceId()%numDevices);  \
+    tests.emplace_back(solveTriangleTester<T>, 1000, 100, false, eps, nextTargetDeviceId()%numDevices); \
+    tests.emplace_back(solveTester<T>, 1000, 1000, 100, eps, nextTargetDeviceId()%numDevices);          \
+    tests.emplace_back(solveTester<T>, 800, 1000, 200, eps, nextTargetDeviceId()%numDevices);           \
+    tests.emplace_back(solveTester<T>, 800, 600, 64, eps, nextTargetDeviceId()%numDevices);             \
 
-#if 1
-    af::array A  = cpu_randu<T>(af::dim4(n, n));
-    af::array X0 = cpu_randu<T>(af::dim4(n, k));
-#else
-    af::array A  = af::randu(n, n, (af::dtype)af::dtype_traits<T>::af_type);
-    af::array X0 = af::randu(n, k, (af::dtype)af::dtype_traits<T>::af_type);
-#endif
+TEST(Solve, Threading)
+{
+    cleanSlate(); // Clean up everything done so far
 
-    af::array L, U, pivot;
-    af::lu(L, U, pivot, A);
+    vector<std::thread> tests;
 
-    af::array AT = is_upper ? U : L;
-    af::array B0 = af::matmul(AT, X0);
-    af::array X1;
+    int numDevices = 0;
+    ASSERT_EQ(AF_SUCCESS, af_get_device_count(&numDevices));
+    ASSERT_EQ(true, numDevices>0);
 
-    if (is_upper) {
-        //! [ex_solve_upper]
-        af::array X = af::solve(AT, B0, AF_MAT_UPPER);
-        //! [ex_solve_upper]
-
-        X1 = X;
-    } else {
-        //! [ex_solve_lower]
-        af::array X = af::solve(AT, B0, AF_MAT_LOWER);
-        //! [ex_solve_lower]
-
-        X1 = X;
+    SOLVE_LU_TESTS_THREADING(float, 0.01);
+    SOLVE_LU_TESTS_THREADING(cfloat, 0.01);
+    if (noDoubleTests<double>()) {
+        SOLVE_LU_TESTS_THREADING(double, 1E-5);
+        SOLVE_LU_TESTS_THREADING(cdouble, 1E-5);
     }
 
-    af::array B1 = af::matmul(AT, X1);
-
-    ASSERT_NEAR(0, af::sum<double>(af::abs(real(B0 - B1))) / (n * k), eps);
-    ASSERT_NEAR(0, af::sum<double>(af::abs(imag(B0 - B1))) / (n * k), eps);
+    for (size_t testId=0; testId<tests.size(); ++testId)
+        if (tests[testId].joinable())
+            tests[testId].join();
 }
 
-#define SOLVE_LU_TESTS(T, eps)                          \
-    TEST(SOLVE_LU, T##Reg)                              \
-    {                                                   \
-        solveLUTester<T>(1000, 100, eps);               \
-    }                                                   \
-    TEST(SOLVE_LU, T##RegMultiple)                      \
-    {                                                   \
-        solveLUTester<T>(2048, 512, eps);               \
-    }                                                   \
-
-
-#define SOLVE_TRIANGLE_TESTS(T, eps)                    \
-    TEST(SOLVE_Upper, T##Reg)                           \
-    {                                                   \
-        solveTriangleTester<T>(1000, 100, true, eps);   \
-    }                                                   \
-    TEST(SOLVE_Upper, T##RegMultiple)                   \
-    {                                                   \
-        solveTriangleTester<T>(2048, 512, true, eps);   \
-    }                                                   \
-    TEST(SOLVE_Lower, T##Reg)                           \
-    {                                                   \
-        solveTriangleTester<T>(1000, 100, false, eps);  \
-    }                                                   \
-    TEST(SOLVE_Lower, T##RegMultiple)                   \
-    {                                                   \
-        solveTriangleTester<T>(2048, 512, false, eps);  \
-    }                                                   \
-
-#define SOLVE_GENERAL_TESTS(T, eps)                     \
-    TEST(SOLVE, T##Square)                              \
-    {                                                   \
-        solveTester<T>(1000, 1000, 100, eps);           \
-    }                                                   \
-    TEST(SOLVE, T##SquareMultiple)                      \
-    {                                                   \
-        solveTester<T>(2048, 2048, 512, eps);           \
-    }                                                   \
-
-#define SOLVE_LEASTSQ_TESTS(T, eps)                     \
-    TEST(SOLVE, T##RectUnder)                           \
-    {                                                   \
-        solveTester<T>(800, 1000, 200, eps);            \
-    }                                                   \
-    TEST(SOLVE, T##RectUnderMultiple)                   \
-    {                                                   \
-        solveTester<T>(1536, 2048, 400, eps);           \
-    }                                                   \
-    TEST(SOLVE, T##RectOver)                            \
-    {                                                   \
-        solveTester<T>(800, 600, 64, eps);              \
-    }                                                   \
-    TEST(SOLVE, T##RectOverMultiple)                    \
-    {                                                   \
-        solveTester<T>(1536, 1024, 1, eps);             \
-    }                                                   \
-
-#define SOLVE_TESTS(T, eps)                             \
-    SOLVE_GENERAL_TESTS(T, eps)                         \
-    SOLVE_LEASTSQ_TESTS(T, eps)                         \
-    SOLVE_LU_TESTS(T, eps)                              \
-    SOLVE_TRIANGLE_TESTS(T, eps)                        \
-
-
-SOLVE_TESTS(float, 0.01)
-SOLVE_TESTS(double, 1E-5)
-SOLVE_TESTS(cfloat, 0.01)
-SOLVE_TESTS(cdouble, 1E-5)
-
+#undef SOLVE_LU_TESTS_THREADING
+#endif
 #undef SOLVE_TESTS

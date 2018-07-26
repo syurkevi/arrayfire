@@ -10,7 +10,7 @@
 #pragma once
 #include <platform.hpp>
 #include <af/dim4.hpp>
-#include <ArrayInfo.hpp>
+#include <common/ArrayInfo.hpp>
 #include <traits.hpp>
 #include <backend.hpp>
 #include <types.hpp>
@@ -33,45 +33,54 @@ namespace opencl
     void evalNodes(Param &out, JIT::Node *node);
     void evalNodes(std::vector<Param> &outputs, std::vector<JIT::Node *> nodes);
 
-    // Creates a new Array object on the heap and returns a reference to it.
+    /// Creates a new Array object on the heap and returns a reference to it.
     template<typename T>
     Array<T> createNodeArray(const af::dim4 &size, JIT::Node_ptr node);
 
-    // Creates a new Array object on the heap and returns a reference to it.
+    /// Creates a new Array object on the heap and returns a reference to it.
     template<typename T>
     Array<T> createValueArray(const af::dim4 &size, const T& value);
 
-    // Creates a new Array object on the heap and returns a reference to it.
+    /// Creates a new Array object on the heap and returns a reference to it.
     template<typename T>
     Array<T> createHostDataArray(const af::dim4 &size, const T * const data);
 
     template<typename T>
-    Array<T> createDeviceDataArray(const af::dim4 &size, const void *data);
+    Array<T> createDeviceDataArray(const af::dim4 &size, const void *data, bool copy = false);
 
-    // Copies data to an existing Array object from a host pointer
+    /// Copies data to an existing Array object from a host pointer
     template<typename T>
     void writeHostDataArray(Array<T> &arr, const T * const data, const size_t bytes);
 
-    // Copies data to an existing Array object from a device pointer
+    /// Copies data to an existing Array object from a device pointer
     template<typename T>
     void writeDeviceDataArray(Array<T> &arr, const void * const data, const size_t bytes);
 
-    // Create an Array object and do not assign any values to it
+    /// Create an Array object and do not assign any values to it.
+    /// \NOTE: This object should not be used to initalize an array. Use
+    ///       createEmptyArray instead
     template<typename T> Array<T> *initArray();
 
+    /// Creates an empty array of a given size. No data is initialized
+    ///
+    /// \param[in] size The dimension of the output array
     template<typename T>
     Array<T> createEmptyArray(const af::dim4 &size);
 
-    // Create an Array object from Param
+    /// Create an Array object from Param object.
+    ///
+    /// \param[in] in    The Param array that is created.
+    /// \param[in] owner If true, the new Array<T> object is the owner of the data. If false
+    ///                  the Array<T> will not delete the object on destruction
     template<typename T>
-    Array<T> createParamArray(Param &tmp);
+    Array<T> createParamArray(Param &tmp, bool owner);
 
     template<typename T>
     Array<T> createSubArray(const Array<T>& parent,
                             const std::vector<af_seq> &index,
                             bool copy=true);
 
-    // Creates a new Array object on the heap and returns a reference to it.
+    /// Creates a new Array object on the heap and returns a reference to it.
     template<typename T>
     void destroyArray(Array<T> *A);
 
@@ -108,7 +117,7 @@ namespace opencl
         Array(af::dim4 dims);
 
         Array(const Array<T>& parnt, const dim4 &dims, const dim_t &offset, const dim4 &stride);
-        Array(Param &tmp);
+        Array(Param &tmp, bool owner);
         explicit Array(af::dim4 dims, JIT::Node_ptr n);
         explicit Array(af::dim4 dims, const T * const in_data);
         explicit Array(af::dim4 dims, cl_mem mem, size_t offset, bool copy);
@@ -204,15 +213,17 @@ namespace opencl
             return data_dims;
         }
 
-        void setDataDims(const dim4 &new_dims)
-        {
-            modDims(new_dims);
-            data_dims = new_dims;
-        }
+        void setDataDims(const dim4 &new_dims);
 
         size_t getAllocatedBytes() const
         {
-            return data_dims.elements() * sizeof(T);
+            if (!isReady()) return 0;
+            size_t bytes = memoryManager().allocated(data.get());
+            // External device poitner
+            if (bytes == 0 && data.get()) {
+                return data_dims.elements() * sizeof(T);
+            }
+            return  bytes;
         }
 
         operator Param() const
@@ -221,7 +232,7 @@ namespace opencl
                            {strides()[0], strides()[1], strides()[2], strides()[3]},
                            getOffset()};
 
-            Param out = {(cl::Buffer *)this->get(), info};
+            Param out{(cl::Buffer *)this->get(), info};
             return out;
         }
 
@@ -264,11 +275,11 @@ namespace opencl
 
         friend Array<T> createValueArray<T>(const af::dim4 &size, const T& value);
         friend Array<T> createHostDataArray<T>(const af::dim4 &size, const T * const data);
-        friend Array<T> createDeviceDataArray<T>(const af::dim4 &size, const void *data);
+        friend Array<T> createDeviceDataArray<T>(const af::dim4 &size, const void *data, bool copy);
 
         friend Array<T> *initArray<T>();
         friend Array<T> createEmptyArray<T>(const af::dim4 &size);
-        friend Array<T> createParamArray<T>(Param &tmp);
+        friend Array<T> createParamArray<T>(Param &tmp, bool owner);
         friend Array<T> createNodeArray<T>(const af::dim4 &dims, JIT::Node_ptr node);
 
         friend Array<T> createSubArray<T>(const Array<T>& parent,

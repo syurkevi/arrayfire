@@ -7,19 +7,20 @@
  * http://arrayfire.com/licenses/BSD-3-Clause
  ********************************************************/
 
-#include <type_traits>
 #include <Array.hpp>
+#include <common/ArrayInfo.hpp>
 #include <copy.hpp>
-#include <cstring>
-#include <algorithm>
-#include <complex>
-#include <vector>
-#include <cassert>
 #include <err_cpu.hpp>
-#include <math.hpp>
+#include <kernel/copy.hpp>
 #include <platform.hpp>
 #include <queue.hpp>
-#include <kernel/copy.hpp>
+#include <types.hpp>
+
+#include <af/defines.h>
+#include <af/dim4.hpp>
+
+#include <cstdio>
+#include <cstring>
 
 namespace cpu
 {
@@ -28,6 +29,7 @@ template<typename T>
 void copyData(T *to, const Array<T> &from)
 {
     from.eval();
+    // Ensure all operations on 'from' are complete before copying data to host.
     getQueue().sync();
     if(from.isLinear()) {
         // FIXME: Check for errors / exceptions
@@ -107,7 +109,10 @@ INSTANTIATE_COPY_ARRAY_COMPLEX(cdouble)
 #define SPECILIAZE_UNUSED_COPYARRAY(SRC_T, DST_T) \
     template<> void copyArray<SRC_T, DST_T>(Array<DST_T> &out, Array<SRC_T> const &in) \
     {\
-        CPU_NOT_SUPPORTED();\
+        char errMessage[1024];                                              \
+        snprintf(errMessage, sizeof(errMessage),                            \
+                "CPU copyArray<"#SRC_T","#DST_T"> is not supported\n");    \
+        CPU_NOT_SUPPORTED(errMessage);                                      \
     }
 
 SPECILIAZE_UNUSED_COPYARRAY(cfloat , double)
@@ -131,4 +136,27 @@ SPECILIAZE_UNUSED_COPYARRAY(cdouble, uintl)
 SPECILIAZE_UNUSED_COPYARRAY(cdouble, short)
 SPECILIAZE_UNUSED_COPYARRAY(cdouble, ushort)
 
+template<typename T>
+T getScalar(const Array<T> &in)
+{
+    in.eval();
+    getQueue().sync();
+    return in.get()[0];
+}
+
+#define INSTANTIATE_GETSCALAR(T) \
+    template T getScalar(const Array<T> &in);
+
+INSTANTIATE_GETSCALAR(float  )
+INSTANTIATE_GETSCALAR(double )
+INSTANTIATE_GETSCALAR(cfloat )
+INSTANTIATE_GETSCALAR(cdouble)
+INSTANTIATE_GETSCALAR(int    )
+INSTANTIATE_GETSCALAR(uint   )
+INSTANTIATE_GETSCALAR(uchar  )
+INSTANTIATE_GETSCALAR(char   )
+INSTANTIATE_GETSCALAR(intl   )
+INSTANTIATE_GETSCALAR(uintl  )
+INSTANTIATE_GETSCALAR(short  )
+INSTANTIATE_GETSCALAR(ushort )
 }

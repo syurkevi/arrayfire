@@ -47,6 +47,9 @@ static void fast_demo(bool console)
         img_color(seq(y-draw_len, y+draw_len), x, 2) = 0.f;
     }
 
+    freeHost(h_x);
+    freeHost(h_y);
+
     printf("Features found: %lu\n", feat.getNumFeatures());
 
     if (!console) {
@@ -69,11 +72,11 @@ int main(int argc, char** argv)
     try {
         af::setDevice(device);
         af::info();
-        std::cout << "** ArrayFire FAST Feature Detector Demo **" << std::endl << std::endl;
+        printf("** ArrayFire FAST Feature Detector Demo **\n\n");
         fast_demo(console);
 
     } catch (af::exception& ae) {
-        std::cerr << ae.what() << std::endl;
+        fprintf(stderr, "%s\n", ae.what());
         throw;
     }
 

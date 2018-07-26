@@ -10,7 +10,7 @@
 #include <complex>
 #include <af/dim4.hpp>
 #include <af/algorithm.h>
-#include <err_common.hpp>
+#include <common/err_common.hpp>
 #include <handle.hpp>
 #include <ops.hpp>
 #include <where.hpp>
@@ -33,8 +33,7 @@ af_err af_where(af_array *idx, const af_array in)
         af_dtype type = i_info.getType();
 
         if(i_info.ndims() == 0) {
-            dim_t my_dims[] = {0, 0, 0, 0};
-            return af_create_handle(idx, AF_MAX_DIMS, my_dims, u32);
+            return af_create_handle(idx, 0, nullptr, u32);
         }
 
         af_array res;

@@ -34,23 +34,23 @@ unsigned harris(Array<float> &x_out, Array<float> &y_out, Array<float> &resp_out
     dim4 idims = in.dims();
 
     // Window filter
-    convAccT* h_filter = memAlloc<convAccT>(filter_len);
+    auto h_filter = memAlloc<convAccT>(filter_len);
     // Decide between rectangular or circular filter
     if (sigma < 0.5f) {
         for (unsigned i = 0; i < filter_len; i++)
             h_filter[i] = (T)1.f / (filter_len);
     } else {
-        gaussian1D<convAccT>(h_filter, (int)filter_len, sigma);
+      gaussian1D<convAccT>(h_filter.get(), (int)filter_len, sigma);
     }
-    Array<convAccT> filter = createDeviceDataArray<convAccT>(dim4(filter_len), (const void*)h_filter);
-
+    Array<convAccT> filter = createDeviceDataArray<convAccT>(dim4(filter_len),
+                                                             (const void*)h_filter.release());
     unsigned border_len = filter_len / 2 + 1;
 
     Array<T> ix = createEmptyArray<T>(idims);
     Array<T> iy = createEmptyArray<T>(idims);
 
     // Compute first order derivatives
-    getQueue().enqueue(gradient<T>, iy, ix, in);
+    gradient<T>(iy, ix, in);
 
     Array<T> ixx = createEmptyArray<T>(idims);
     Array<T> ixy = createEmptyArray<T>(idims);
@@ -83,9 +83,8 @@ unsigned harris(Array<float> &x_out, Array<float> &y_out, Array<float> &resp_out
     kernel::non_maximal<T>(xCorners, yCorners, respCorners, &corners_found,
                    idims[0], idims[1], responses, min_r, border_len, corner_lim);
 
-    const unsigned corners_out = (max_corners > 0) ?
-                                 min(corners_found, max_corners) :
-                                 min(corners_found, corner_lim);
+    const unsigned corners_out = min(corners_found,
+                                    (max_corners > 0) ? max_corners : corner_lim);
     if (corners_out == 0)
         return 0;
 
@@ -109,9 +108,9 @@ unsigned harris(Array<float> &x_out, Array<float> &y_out, Array<float> &resp_out
         y_out = createEmptyArray<float>(dim4(corners_out));
         resp_out = createEmptyArray<float>(dim4(corners_out));
 
-        auto copyFunc = [=](Array<float> x_out, Array<float> y_out,
-                            Array<float> outResponses, const Array<float> x_crnrs,
-                            const Array<float> y_crnrs, const Array<float> inResponses,
+        auto copyFunc = [=](Param<float> x_out, Param<float> y_out,
+                            Param<float> outResponses, CParam<float> x_crnrs,
+                            CParam<float> y_crnrs, CParam<float> inResponses,
                             const unsigned corners_out) {
             memcpy(x_out.get(), x_crnrs.get(), corners_out * sizeof(float));
             memcpy(y_out.get(), y_crnrs.get(), corners_out * sizeof(float));

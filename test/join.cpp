@@ -21,10 +21,15 @@
 
 using std::vector;
 using std::string;
-using std::cout;
 using std::endl;
+using af::array;
 using af::cfloat;
 using af::cdouble;
+using af::dim4;
+using af::dtype_traits;
+using af::join;
+using af::randu;
+using af::sum;
 
 template<typename T>
 class Join : public ::testing::Test
@@ -50,13 +55,13 @@ void joinTest(string pTestFile, const unsigned dim, const unsigned in0, const un
 {
     if (noDoubleTests<T>()) return;
 
-    vector<af::dim4> numDims;
+    vector<dim4> numDims;
     vector<vector<T> > in;
     vector<vector<T> > tests;
     readTests<T, T, int>(pTestFile,numDims,in,tests);
 
-    af::dim4 i0dims = numDims[in0];
-    af::dim4 i1dims = numDims[in1];
+    dim4 i0dims = numDims[in0];
+    dim4 i1dims = numDims[in1];
 
     af_array in0Array = 0;
     af_array in1Array = 0;
@@ -64,19 +69,19 @@ void joinTest(string pTestFile, const unsigned dim, const unsigned in0, const un
     af_array tempArray = 0;
 
     if (isSubRef) {
-        ASSERT_EQ(AF_SUCCESS, af_create_array(&tempArray, &(in[in0].front()), i0dims.ndims(), i0dims.get(), (af_dtype) af::dtype_traits<T>::af_type));
+        ASSERT_EQ(AF_SUCCESS, af_create_array(&tempArray, &(in[in0].front()), i0dims.ndims(), i0dims.get(), (af_dtype) dtype_traits<T>::af_type));
 
         ASSERT_EQ(AF_SUCCESS, af_index(&in0Array, tempArray, seqv->size(), &seqv->front()));
     } else {
-        ASSERT_EQ(AF_SUCCESS, af_create_array(&in0Array, &(in[in0].front()), i0dims.ndims(), i0dims.get(), (af_dtype) af::dtype_traits<T>::af_type));
+        ASSERT_EQ(AF_SUCCESS, af_create_array(&in0Array, &(in[in0].front()), i0dims.ndims(), i0dims.get(), (af_dtype) dtype_traits<T>::af_type));
     }
 
     if (isSubRef) {
-        ASSERT_EQ(AF_SUCCESS, af_create_array(&tempArray, &(in[in1].front()), i1dims.ndims(), i1dims.get(), (af_dtype) af::dtype_traits<T>::af_type));
+        ASSERT_EQ(AF_SUCCESS, af_create_array(&tempArray, &(in[in1].front()), i1dims.ndims(), i1dims.get(), (af_dtype) dtype_traits<T>::af_type));
 
         ASSERT_EQ(AF_SUCCESS, af_index(&in1Array, tempArray, seqv->size(), &seqv->front()));
     } else {
-        ASSERT_EQ(AF_SUCCESS, af_create_array(&in1Array, &(in[in1].front()), i1dims.ndims(), i1dims.get(), (af_dtype) af::dtype_traits<T>::af_type));
+        ASSERT_EQ(AF_SUCCESS, af_create_array(&in1Array, &(in[in1].front()), i1dims.ndims(), i1dims.get(), (af_dtype) dtype_traits<T>::af_type));
     }
 
     ASSERT_EQ(AF_SUCCESS, af_join(&outArray, dim, in0Array, in1Array));
@@ -88,7 +93,7 @@ void joinTest(string pTestFile, const unsigned dim, const unsigned in0, const un
     // Compare result
     size_t nElems = tests[resultIdx].size();
     for (size_t elIter = 0; elIter < nElems; ++elIter) {
-        ASSERT_EQ(tests[resultIdx][elIter], outData[elIter]) << "at: " << elIter << std::endl;
+        ASSERT_EQ(tests[resultIdx][elIter], outData[elIter]) << "at: " << elIter << endl;
     }
 
     // Delete
@@ -114,6 +119,35 @@ void joinTest(string pTestFile, const unsigned dim, const unsigned in0, const un
     JOIN_INIT(JoinSmall1, join_small, 1, 0, 2, 1);
     JOIN_INIT(JoinSmall2, join_small, 2, 0, 3, 2);
 
+TEST(Join, JoinLargeDim)
+{
+    using af::constant;
+    using af::deviceGC;
+    using af::span;
+
+    //const int nx = 32;
+    const int nx = 1;
+    const int ny = 4 * 1024 * 1024;
+    const int nw = 4 * 1024 * 1024;
+
+    deviceGC();
+    {
+        array in = randu(nx, ny, u8);
+        array joined = join(0, in, in);
+        dim4 in_dims = in.dims();
+        dim4 joined_dims = joined.dims();
+
+        ASSERT_EQ(2*in_dims[0], joined_dims[0]);
+        ASSERT_EQ(0.f, sum<float>((joined(0, span) - joined(1, span)).as(f32)));
+
+        array in2 = constant(1, (dim_t)nx, (dim_t)ny, (dim_t)2, (dim_t)nw, u8);
+        joined = join(3, in, in);
+        in_dims = in.dims();
+        joined_dims = joined.dims();
+        ASSERT_EQ(2*in_dims[3], joined_dims[3]);
+    }
+}
+
 ///////////////////////////////// CPP ////////////////////////////////////
 //
 TEST(Join, CPP)
@@ -123,18 +157,18 @@ TEST(Join, CPP)
     const unsigned resultIdx = 2;
     const unsigned dim = 2;
 
-    vector<af::dim4> numDims;
+    vector<dim4> numDims;
     vector<vector<float> > in;
     vector<vector<float> > tests;
     readTests<float, float, int>(string(TEST_DIR"/join/join_big.test"),numDims,in,tests);
 
-    af::dim4 i0dims = numDims[0];
-    af::dim4 i1dims = numDims[3];
+    dim4 i0dims = numDims[0];
+    dim4 i1dims = numDims[3];
 
-    af::array input0(i0dims, &(in[0].front()));
-    af::array input1(i1dims, &(in[3].front()));
+    array input0(i0dims, &(in[0].front()));
+    array input1(i1dims, &(in[3].front()));
 
-    af::array output = af::join(dim, input0, input1);
+    array output = join(dim, input0, input1);
 
     // Get result
     float* outData = new float[tests[resultIdx].size()];
@@ -143,7 +177,7 @@ TEST(Join, CPP)
     // Compare result
     size_t nElems = tests[resultIdx].size();
     for (size_t elIter = 0; elIter < nElems; ++elIter) {
-        ASSERT_EQ(tests[resultIdx][elIter], outData[elIter]) << "at: " << elIter << std::endl;
+        ASSERT_EQ(tests[resultIdx][elIter], outData[elIter]) << "at: " << elIter << endl;
     }
 
     // Delete
@@ -154,29 +188,27 @@ TEST(JoinMany0, CPP)
 {
     if (noDoubleTests<float>()) return;
 
-    af::array a0 = af::randu(10, 5);
-    af::array a1 = af::randu(20, 5);
-    af::array a2 = af::randu(5, 5);
+    array a0 = randu(10, 5);
+    array a1 = randu(20, 5);
+    array a2 = randu(5, 5);
 
-    af::array output = af::join(0, a0, a1, a2);
-    af::array gold = af::join(0, a0, af::join(0, a1, a2));
+    array output = join(0, a0, a1, a2);
+    array gold = join(0, a0, join(0, a1, a2));
 
-
-    ASSERT_EQ(af::sum<float>(output - gold), 0);
+    ASSERT_EQ(sum<float>(output - gold), 0);
 }
 
 TEST(JoinMany1, CPP)
 {
     if (noDoubleTests<float>()) return;
 
-    af::array a0 = af::randu(20, 200);
-    af::array a1 = af::randu(20, 400);
-    af::array a2 = af::randu(20, 10);
-    af::array a3 = af::randu(20, 100);
+    array a0 = randu(20, 200);
+    array a1 = randu(20, 400);
+    array a2 = randu(20, 10);
+    array a3 = randu(20, 100);
 
     int dim = 1;
-    af::array output = af::join(dim, a0, a1, a2, a3);
-    af::array gold = af::join(dim, a0, af::join(dim, a1, af::join(dim, a2, a3)));
-
-    ASSERT_EQ(af::sum<float>(output - gold), 0);
+    array output = join(dim, a0, a1, a2, a3);
+    array gold = join(dim, a0, join(dim, a1, join(dim, a2, a3)));
+    ASSERT_EQ(sum<float>(output - gold), 0);
 }

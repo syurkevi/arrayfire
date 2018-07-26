@@ -254,7 +254,12 @@ typedef enum {
     ///
     /// Out of bound values are symmetric over the edge
     ///
-    AF_PAD_SYM
+    AF_PAD_SYM,
+
+    ///
+    /// Out of bound values are clamped to the edge
+    ///
+    AF_PAD_CLAMP_TO_EDGE,
 } af_border_type;
 
 typedef enum {
@@ -424,12 +429,16 @@ typedef enum {
 ////////////////////////////////////////////////////////////////////////////////
 typedef enum {
     AF_COLORMAP_DEFAULT = 0,    ///< Default grayscale map
-    AF_COLORMAP_SPECTRUM= 1,    ///< Spectrum map
-    AF_COLORMAP_COLORS  = 2,    ///< Colors
+    AF_COLORMAP_SPECTRUM= 1,    ///< Spectrum map (390nm-830nm, in sRGB colorspace)
+    AF_COLORMAP_COLORS  = 2,    ///< Colors, aka. Rainbow
     AF_COLORMAP_RED     = 3,    ///< Red hue map
     AF_COLORMAP_MOOD    = 4,    ///< Mood map
     AF_COLORMAP_HEAT    = 5,    ///< Heat map
-    AF_COLORMAP_BLUE    = 6     ///< Blue hue map
+    AF_COLORMAP_BLUE    = 6,    ///< Blue hue map
+    AF_COLORMAP_INFERNO = 7,    ///< Perceptually uniform shades of black-red-yellow
+    AF_COLORMAP_MAGMA   = 8,    ///< Perceptually uniform shades of black-red-white
+    AF_COLORMAP_PLASMA  = 9,    ///< Perceptually uniform shades of blue-red-yellow
+    AF_COLORMAP_VIRIDIS = 10    ///< Perceptually uniform shades of blue-green-yellow
 } af_colormap;
 
 #if AF_API_VERSION >= 32
@@ -448,8 +457,8 @@ typedef enum {
 
 #if AF_API_VERSION >= 35
 typedef enum {
-    AF_MANUAL_THRESHOLD    = 0, ///< User has to define canny thresholds manually
-    AF_AUTO_OTSU_THRESHOLD = 1, ///< Determine canny algorithm thresholds using Otsu algorithm
+    AF_CANNY_THRESHOLD_MANUAL    = 0, ///< User has to define canny thresholds manually
+    AF_CANNY_THRESHOLD_AUTO_OTSU = 1, ///< Determine canny algorithm thresholds using Otsu algorithm
 } af_canny_threshold;
 #endif
 
@@ -460,6 +469,37 @@ typedef enum {
     AF_STORAGE_CSC       = 2,   ///< Storage type is CSC
     AF_STORAGE_COO       = 3,   ///< Storage type is COO
 } af_storage;
+#endif
+
+#if AF_API_VERSION >= 36
+typedef enum {
+    AF_FLUX_QUADRATIC   = 1,    ///< Quadratic flux function
+    AF_FLUX_EXPONENTIAL = 2,    ///< Exponential flux function
+    AF_FLUX_DEFAULT     = 0     ///< Default flux function is exponential
+} af_flux_function;
+
+typedef enum {
+    AF_DIFFUSION_GRAD = 1,      ///< Gradient diffusion equation
+    AF_DIFFUSION_MCDE = 2,      ///< Modified curvature diffusion equation
+    AF_DIFFUSION_DEFAULT = 0    ///< Default option is same as AF_DIFFUSION_GRAD
+} af_diffusion_eq;
+
+typedef enum {
+    AF_TOPK_MIN     = 1,  ///< Top k min values
+    AF_TOPK_MAX     = 2,  ///< Top k max values
+    AF_TOPK_DEFAULT = 0   ///< Default option (max)
+} af_topk_function;
+
+typedef enum {
+    AF_ITERATIVE_DECONV_LANDWEBER       = 1,        ///< Landweber Deconvolution
+    AF_ITERATIVE_DECONV_RICHARDSONLUCY  = 2,        ///< Richardson-Lucy Deconvolution
+    AF_ITERATIVE_DECONV_DEFAULT         = 0,        ///< Default is Landweber deconvolution
+} af_iterative_deconv_algo;
+
+typedef enum {
+    AF_INVERSE_DECONV_TIKHONOV       = 1,        ///< Tikhonov Inverse deconvolution
+    AF_INVERSE_DECONV_DEFAULT        = 0,        ///< Default is Tikhonov deconvolution
+} af_inverse_deconv_algo;
 #endif
 
 #ifdef __cplusplus
@@ -505,6 +545,13 @@ namespace af
 #endif
 #if AF_API_VERSION >= 35
     typedef af_canny_threshold cannyThreshold;
+#endif
+#if AF_API_VERSION >= 36
+    typedef af_flux_function fluxFunction;
+    typedef af_diffusion_eq diffusionEq;
+    typedef af_topk_function topkFunction;
+    typedef af_iterative_deconv_algo iterativeDeconvAlgo;
+    typedef af_inverse_deconv_algo inverseDeconvAlgo;
 #endif
 }
 

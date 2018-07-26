@@ -8,9 +8,11 @@
  ********************************************************/
 
 #pragma once
+#include <mutex>
 #include <stdio.h>
-#include <err_common.hpp>
+#include <common/err_common.hpp>
 #include <clblast.h>
+#include <mutex>
 
 static const char * _clblastGetResultString(clblast::StatusCode st)
 {
@@ -67,6 +69,9 @@ static const char * _clblastGetResultString(clblast::StatusCode st)
     case clblast::StatusCode::kInsufficientMemoryY:        return "Vector Y's OpenCL buffer is too small";
 
     // Custom additional status codes for CLBlast
+    case clblast::StatusCode::kInvalidBatchCount:          return "The batch count needs to be positive";
+    case clblast::StatusCode::kInvalidOverrideKernel:      return "Trying to override parameters for an invalid kernel";
+    case clblast::StatusCode::kMissingOverrideParameter:   return "Missing override parameter(s) for the target kernel";
     case clblast::StatusCode::kInvalidLocalMemUsage:       return "Not enough local memory available on this device";
     case clblast::StatusCode::kNoHalfPrecision:            return "Half precision (16-bits) not supported by the device";
     case clblast::StatusCode::kNoDoublePrecision:          return "Double precision (64-bits) not supported by the device";
@@ -80,8 +85,12 @@ static const char * _clblastGetResultString(clblast::StatusCode st)
     return "Unknown error";
 }
 
+static std::recursive_mutex gCLBlastMutex;
+
 #define CLBLAST_CHECK(fn) do {                              \
+        gCLBlastMutex.lock();                               \
         clblast::StatusCode _clblast_st = fn;               \
+        gCLBlastMutex.unlock();                             \
         if (_clblast_st != clblast::StatusCode::kSuccess) { \
             char clblast_st_msg[1024];                      \
             snprintf(clblast_st_msg,                        \

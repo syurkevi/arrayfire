@@ -8,9 +8,9 @@
  ********************************************************/
 
 #include <qr.hpp>
-#include <err_common.hpp>
+#include <common/err_common.hpp>
 
-#if defined(WITH_CPU_LINEAR_ALGEBRA)
+#if defined(WITH_LINEAR_ALGEBRA)
 #include <af/dim4.hpp>
 #include <handle.hpp>
 #include <cassert>
@@ -79,8 +79,8 @@ void qr(Array<T> &q, Array<T> &r, Array<T> &t, const Array<T> &in)
 
     triangle<T, true, false>(r, q);
 
-    auto func = [=] (Array<T> q, Array<T> t, int M, int N) {
-        gqr_func<T>()(AF_LAPACK_COL_MAJOR, M, M, min(M, N), q.get(), q.strides()[1], t.get());
+    auto func = [=] (Param<T> q, Param<T> t, int M, int N) {
+        gqr_func<T>()(AF_LAPACK_COL_MAJOR, M, M, min(M, N), q.get(), q.strides(1), t.get());
     };
     q.resetDims(dim4(M, M));
     getQueue().enqueue(func, q, t, M, N);
@@ -96,8 +96,8 @@ Array<T> qr_inplace(Array<T> &in)
     int N      = iDims[1];
     Array<T> t = createEmptyArray<T>(af::dim4(min(M, N), 1, 1, 1));
 
-    auto func = [=] (Array<T> in, Array<T> t, int M, int N) {
-        geqrf_func<T>()(AF_LAPACK_COL_MAJOR, M, N, in.get(), in.strides()[1], t.get());
+    auto func = [=] (Param<T> in, Param<T> t, int M, int N) {
+        geqrf_func<T>()(AF_LAPACK_COL_MAJOR, M, N, in.get(), in.strides(1), t.get());
     };
     getQueue().enqueue(func, in, t, M, N);
 
@@ -106,7 +106,7 @@ Array<T> qr_inplace(Array<T> &in)
 
 }
 
-#else
+#else  // WITH_LINEAR_ALGEBRA
 
 namespace cpu
 {
@@ -125,7 +125,7 @@ Array<T> qr_inplace(Array<T> &in)
 
 }
 
-#endif
+#endif  // WITH_LINEAR_ALGEBRA
 
 namespace cpu
 {

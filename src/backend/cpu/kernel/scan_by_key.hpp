@@ -8,7 +8,7 @@
  ********************************************************/
 
 #pragma once
-#include <Array.hpp>
+#include <Param.hpp>
 
 namespace cpu
 {
@@ -21,9 +21,9 @@ struct scan_dim_by_key
     bool inclusive_scan;
     scan_dim_by_key(bool inclusiveSanKey) : inclusive_scan(inclusiveSanKey) {}
 
-    void operator()(Array<To> out, dim_t outOffset,
-                    const Array<Tk> key, dim_t keyOffset,
-                    const Array<Ti> in, dim_t inOffset,
+    void operator()(Param<To> out, dim_t outOffset,
+                    CParam<Tk> key, dim_t keyOffset,
+                    CParam<Ti> in, dim_t inOffset,
                     const int dim) const
     {
         const dim4 odims    = out.dims();
@@ -34,10 +34,9 @@ struct scan_dim_by_key
         const int D1 = D - 1;
         for (dim_t i = 0; i < odims[D1]; i++) {
             scan_dim_by_key<op, Ti, Tk, To, D1> func(inclusive_scan);
-            getQueue().enqueue(func,
-                    out, outOffset + i * ostrides[D1],
-                    key, keyOffset + i * kstrides[D1],
-                    in, inOffset + i * istrides[D1], dim);
+            func(out, outOffset + i * ostrides[D1], key,
+                 keyOffset + i * kstrides[D1], in, inOffset + i * istrides[D1],
+                 dim);
             if (D1 == dim) break;
         }
     }
@@ -49,9 +48,9 @@ struct scan_dim_by_key<op, Ti, Tk, To, 0>
     bool inclusive_scan;
     scan_dim_by_key(bool inclusiveSanKey) : inclusive_scan(inclusiveSanKey) {}
 
-    void operator()(Array<To> output, dim_t outOffset,
-                    const Array<Tk> keyinput, dim_t keyOffset,
-                    const Array<Ti> input, dim_t inOffset,
+    void operator()(Param<To> output, dim_t outOffset,
+                    CParam<Tk> keyinput, dim_t keyOffset,
+                    CParam<Ti> input, dim_t inOffset,
                     const int dim) const
     {
         const Ti* in  = input.get()    + inOffset;
@@ -71,18 +70,18 @@ struct scan_dim_by_key<op, Ti, Tk, To, 0>
         // FIXME: Change the name to something better
         Binary<To, op> scan;
 
-        To out_val = scan.init();
+        To out_val = Binary<To, op>::init();
         Tk key_val = key[0];
 
         dim_t k = !inclusive_scan;
         if (!inclusive_scan) {
-            out[0] = scan.init();
+            out[0] = Binary<To, op>::init();
         }
 
         for (dim_t i = 0; i < idims[dim] - (!inclusive_scan); i++, k++) {
             To in_val = transform(in[i * istride]);
             if (key[k * kstride] != key_val) {
-                out_val = !inclusive_scan? scan.init() : in_val;
+                out_val = !inclusive_scan? Binary<To, op>::init() : in_val;
                 key_val = key[k * kstride];
             } else {
                 out_val = scan(in_val, out_val);

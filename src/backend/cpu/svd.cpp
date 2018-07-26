@@ -9,10 +9,10 @@
 
 #include <Array.hpp>
 #include <svd.hpp>
-#include <err_common.hpp>
+#include <common/err_common.hpp>
 #include <err_cpu.hpp>
 
-#if defined(WITH_CPU_LINEAR_ALGEBRA)
+#if defined(WITH_LINEAR_ALGEBRA)
 #include <lapack_helper.hpp>
 #include <copy.hpp>
 #include <platform.hpp>
@@ -73,18 +73,18 @@ void svdInPlace(Array<Tr> &s, Array<T> &u, Array<T> &vt, Array<T> &in)
     vt.eval();
     in.eval();
 
-    auto func = [=] (Array<Tr> s, Array<T> u, Array<T> vt, Array<T> in) {
+    auto func = [=] (Param<Tr> s, Param<T> u, Param<T> vt, Param<T> in) {
         dim4 iDims = in.dims();
         int M = iDims[0];
         int N = iDims[1];
 
 #if defined(USE_MKL) || defined(__APPLE__)
-        svd_func<T, Tr>()(AF_LAPACK_COL_MAJOR, 'A', M, N, in.get(), in.strides()[1],
-                s.get(), u.get(), u.strides()[1], vt.get(), vt.strides()[1]);
+        svd_func<T, Tr>()(AF_LAPACK_COL_MAJOR, 'A', M, N, in.get(), in.strides(1),
+                s.get(), u.get(), u.strides(1), vt.get(), vt.strides(1));
 #else
         std::vector<Tr> superb(std::min(M, N));
-        svd_func<T, Tr>()(AF_LAPACK_COL_MAJOR, 'A', 'A', M, N, in.get(), in.strides()[1],
-                s.get(), u.get(), u.strides()[1], vt.get(), vt.strides()[1], &superb[0]);
+        svd_func<T, Tr>()(AF_LAPACK_COL_MAJOR, 'A', 'A', M, N, in.get(), in.strides(1),
+                s.get(), u.get(), u.strides(1), vt.get(), vt.strides(1), &superb[0]);
 #endif
     };
     getQueue().enqueue(func, s, u, vt, in);
@@ -99,7 +99,7 @@ void svd(Array<Tr> &s, Array<T> &u, Array<T> &vt, const Array<T> &in)
 
 }
 
-#else
+#else  // WITH_LINEAR_ALGEBRA
 
 namespace cpu
 {
@@ -118,7 +118,7 @@ void svdInPlace(Array<Tr> &s, Array<T> &u, Array<T> &vt, Array<T> &in)
 
 }
 
-#endif
+#endif  // WITH_LINEAR_ALGEBRA
 
 namespace cpu
 {

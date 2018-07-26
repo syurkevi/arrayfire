@@ -17,7 +17,7 @@
 #include <string>
 #include <mutex>
 #include <map>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <Param.hpp>
 #include <debug_opencl.hpp>
 #include <cache.hpp>
@@ -50,10 +50,9 @@ namespace opencl
                 std::to_string(REPEAT);
 
             int device = getActiveDeviceId();
-            auto idx = kernelCaches[device].find(ref_name);
-            kc_entry_t entry;
+            kc_entry_t entry = kernelCache(device, ref_name);
 
-            if (idx == kernelCaches[device].end()) {
+            if (entry.prog==0 && entry.ker==0) {
                 std::ostringstream options;
                 options << " -D T="        << dtype_traits<T>::getName()
                         << " -D reps="     << REPEAT
@@ -68,8 +67,8 @@ namespace opencl
                 buildProgram(prog, coo2dense_cl, coo2dense_cl_len, options.str());
                 entry.prog   = new Program(prog);
                 entry.ker = new Kernel(*entry.prog, "coo2dense_kernel");
-            } else {
-                entry = idx->second;
+
+                addKernelToCache(device, ref_name, entry);
             };
 
             auto coo2denseOp = KernelFunctor<Buffer, const KParam,
@@ -106,10 +105,9 @@ namespace opencl
                 std::to_string(threads);
 
             int device = getActiveDeviceId();
-            auto idx = kernelCaches[device].find(ref_name);
-            kc_entry_t entry;
+            kc_entry_t entry = kernelCache(device, ref_name);
 
-            if (idx == kernelCaches[device].end()) {
+            if (entry.prog==0 && entry.ker==0) {
 
                 std::ostringstream options;
                 options << " -D T=" << dtype_traits<T>::getName();
@@ -127,8 +125,8 @@ namespace opencl
                 buildProgram(prog, 1, ker_strs, ker_lens, options.str());
                 entry.prog = new Program(prog);
                 entry.ker  = new Kernel(*entry.prog, "csr2dense");
-            } else {
-                entry = idx->second;
+
+                addKernelToCache(device, ref_name, entry);
             }
 
             NDRange local(threads, 1);
@@ -151,43 +149,19 @@ namespace opencl
             int num_rows = dense.info.dims[0];
             int num_cols = dense.info.dims[1];
             int dense_elements = num_rows * num_cols;
-            Param sd1, rd1, sd0;
+
             // sd1 contains output of scan along dim 1 of dense
-            sd1.data = bufferAlloc(dense_elements * sizeof(int));
+            Array<int> sd1 = createEmptyArray<int>(dim4(num_rows, num_cols));
             // rd1 contains output of nonzero count along dim 1 along dense
-            rd1.data = bufferAlloc(num_rows * sizeof(int));
-            // sd0 contains output of exclusive scan rd1
-            sd0 = rowIdx;
-
-            sd1.info.offset = 0;
-            rd1.info.offset = 0;
-
-            sd1.info.dims[0] = num_rows;
-            rd1.info.dims[0] = num_rows;
-
-            sd1.info.dims[1] = num_cols;
-            rd1.info.dims[1] = 1;
-
-            sd1.info.dims[2] = 1;
-            rd1.info.dims[2] = 1;
-
-            sd1.info.dims[3] = 1;
-            rd1.info.dims[3] = 1;
-
-            sd1.info.strides[0] = 1;
-            rd1.info.strides[0] = 1;
-            for (int i = 1; i < 4; i++) {
-                sd1.info.strides[i] = sd1.info.dims[i - 1] * sd1.info.strides[i - 1];
-                rd1.info.strides[i] = rd1.info.dims[i - 1] * rd1.info.strides[i - 1];
-            }
+            Array<int> rd1 = createEmptyArray<int>(num_rows);
 
             scan_dim<T, int, af_notzero_t, true>(sd1, dense, 1);
             reduce_dim<T, int, af_notzero_t>(rd1, dense, 0, 0, 1);
-            scan_first<int, int, af_add_t, false>(sd0, rd1);
+            scan_first<int, int, af_add_t, false>(rowIdx, rd1);
 
             int nnz = values.info.dims[0];
-            getQueue().enqueueWriteBuffer(*sd0.data, CL_TRUE,
-                                          sd0.info.offset + (rowIdx.info.dims[0] - 1) * sizeof(int),
+            getQueue().enqueueWriteBuffer(*rowIdx.data, CL_TRUE,
+                                          rowIdx.info.offset + (rowIdx.info.dims[0] - 1) * sizeof(int),
                                           sizeof(int),
                                           (void *)&nnz);
 
@@ -196,10 +170,9 @@ namespace opencl
                 std::string(dtype_traits<T>::getName());
 
             int device = getActiveDeviceId();
-            auto idx = kernelCaches[device].find(ref_name);
-            kc_entry_t entry;
+            kc_entry_t entry = kernelCache(device, ref_name);
 
-            if (idx == kernelCaches[device].end()) {
+            if (entry.prog==0 && entry.ker==0) {
 
                 std::ostringstream options;
                 options << " -D T=" << dtype_traits<T>::getName();
@@ -222,9 +195,7 @@ namespace opencl
                 entry.prog = new Program(prog);
                 entry.ker  = new Kernel(*entry.prog, "dense2csr_split_kernel");
 
-                kernelCaches[device][ref_name] = entry;
-            } else {
-                entry = idx->second;
+                addKernelToCache(device, ref_name, entry);
             }
 
             NDRange local(THREADS_X, THREADS_Y);
@@ -239,13 +210,10 @@ namespace opencl
             dense2csr_split(EnqueueArgs(getQueue(), global, local),
                             *values.data, *colIdx.data,
                             *dense.data, dense.info,
-                            *sd1.data, sd1.info,
-                            *sd0.data);
+                            *sd1.get(), sd1,
+                            *rowIdx.data);
 
             CL_DEBUG_FINISH(getQueue());
-
-            bufferFree(rd1.data);
-            bufferFree(sd1.data);
         }
 
         template<typename T>
@@ -258,10 +226,9 @@ namespace opencl
                 std::string(dtype_traits<T>::getName());
 
             int device = getActiveDeviceId();
-            auto idx = kernelCaches[device].find(ref_name);
-            kc_entry_t entry;
+            kc_entry_t entry = kernelCache(device, ref_name);
 
-            if (idx == kernelCaches[device].end()) {
+            if (entry.prog==0 && entry.ker==0) {
                 std::ostringstream options;
                 options << " -D T="        << dtype_traits<T>::getName();
 
@@ -274,8 +241,8 @@ namespace opencl
                 buildProgram(prog, csr2coo_cl, csr2coo_cl_len, options.str());
                 entry.prog   = new Program(prog);
                 entry.ker = new Kernel(*entry.prog, "swapIndex_kernel");
-            } else {
-                entry = idx->second;
+
+                addKernelToCache(device, ref_name, entry);
             };
 
             auto swapIndexOp = KernelFunctor<Buffer, Buffer,
@@ -307,10 +274,9 @@ namespace opencl
                 std::string(dtype_traits<T>::getName());
 
             int device = getActiveDeviceId();
-            auto idx = kernelCaches[device].find(ref_name);
-            kc_entry_t entry;
+            kc_entry_t entry = kernelCache(device, ref_name);
 
-            if (idx == kernelCaches[device].end()) {
+            if (entry.prog==0 && entry.ker==0) {
 
                 std::ostringstream options;
                 options << " -D T=" << dtype_traits<T>::getName();
@@ -327,8 +293,8 @@ namespace opencl
                 buildProgram(prog, 1, ker_strs, ker_lens, options.str());
                 entry.prog = new Program(prog);
                 entry.ker  = new Kernel(*entry.prog, "csr2coo");
-            } else {
-                entry = idx->second;
+
+                addKernelToCache(device, ref_name, entry);
             }
 
             cl::Buffer *scratch = bufferAlloc(orowIdx.info.dims[0] * sizeof(int));
@@ -374,10 +340,9 @@ namespace opencl
                 std::string(dtype_traits<T>::getName());
 
             int device = getActiveDeviceId();
-            auto idx = kernelCaches[device].find(ref_name);
-            kc_entry_t entry;
+            kc_entry_t entry = kernelCache(device, ref_name);
 
-            if (idx == kernelCaches[device].end()) {
+            if (entry.prog==0 && entry.ker==0) {
                 std::ostringstream options;
                 options << " -D T="        << dtype_traits<T>::getName();
 
@@ -390,8 +355,8 @@ namespace opencl
                 buildProgram(prog, csr2coo_cl, csr2coo_cl_len, options.str());
                 entry.prog   = new Program(prog);
                 entry.ker = new Kernel(*entry.prog, "csrReduce_kernel");
-            } else {
-                entry = idx->second;
+
+                addKernelToCache(device, ref_name, entry);
             };
 
             auto csrReduceOp = KernelFunctor<Buffer, const Buffer, const int, const int> (*entry.ker);

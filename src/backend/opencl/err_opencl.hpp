@@ -8,15 +8,15 @@
  ********************************************************/
 
 #pragma once
-#include <stdio.h>
+#include <cstdio>
 #include <errorcodes.hpp>
-#include <err_common.hpp>
+#include <common/err_common.hpp>
 #include <platform.hpp>
 #include <types.hpp>
 
-#define OPENCL_NOT_SUPPORTED() do {                     \
+#define OPENCL_NOT_SUPPORTED(message) do {              \
         throw SupportError(__PRETTY_FUNCTION__,         \
-                __AF_FILENAME__, __LINE__, "OpenCL");   \
+                __AF_FILENAME__, __LINE__, message);    \
     } while(0)
 
 namespace opencl

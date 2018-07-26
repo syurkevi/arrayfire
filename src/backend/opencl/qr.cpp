@@ -12,7 +12,7 @@
 #include <blas.hpp>
 #include <copy.hpp>
 
-#if defined(WITH_OPENCL_LINEAR_ALGEBRA)
+#if defined(WITH_LINEAR_ALGEBRA)
 
 #include <magma/magma.h>
 #include <magma/magma_helper.h>
@@ -32,7 +32,6 @@ void qr(Array<T> &q, Array<T> &r, Array<T> &t, const Array<T> &orig)
         return cpu::qr(q, r, t, orig);
     }
 
-    initBlas();
     dim4 iDims = orig.dims();
     int M = iDims[0];
     int N = iDims[1];
@@ -86,7 +85,6 @@ Array<T> qr_inplace(Array<T> &in)
         return cpu::qr_inplace(in);
     }
 
-    initBlas();
     dim4 iDims = in.dims();
     int M = iDims[0];
     int N = iDims[1];
@@ -120,7 +118,7 @@ INSTANTIATE_QR(cdouble)
 
 }
 
-#else
+#else  // WITH_LINEAR_ALGEBRA
 
 namespace opencl
 {
@@ -148,4 +146,4 @@ INSTANTIATE_QR(cdouble)
 
 }
 
-#endif
+#endif  // WITH_LINEAR_ALGEBRA

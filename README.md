@@ -25,13 +25,6 @@ major vendors (Intel, AMD, ARM), GPUs from the prominent manufacturers
 (NVIDIA, AMD, and Qualcomm), as well as a variety of other accelerator devices
 on Windows, Mac, and Linux.
 
-## Build and Test Status
-
-|         | Linux x86_64 | Linux aarch64 | OSX | Windows |
-|:-------:|:------------:|:-------------:|:---:|:-------:|
-| Build   | [![Build Status](http://ci.arrayfire.org/buildStatus/icon?job=arrayfire-linux/build/devel)](http://ci.arrayfire.org/job/arrayfire-linux/job/build/job/devel/) | [![Build Status](http://ci.arrayfire.org/buildStatus/icon?job=arrayfire-tegrax1/build/devel)](http://ci.arrayfire.org/job/arrayfire-tegrax1/job/build/job/devel/) | [![Build Status](http://ci.arrayfire.org/buildStatus/icon?job=arrayfire-osx/build-mkl/devel)](http://ci.arrayfire.org/job/arrayfire-osx/job/build-mkl/job/devel/) | [![Build Status](http://ci.arrayfire.org/buildStatus/icon?job=arrayfire-windows/build/devel)](http://ci.arrayfire.org/job/arrayfire-windows/job/build/job/devel/) |
-| Test    | [![Build Status](http://ci.arrayfire.org/buildStatus/icon?job=arrayfire-linux/test/devel)](http://ci.arrayfire.org/job/arrayfire-linux/job/test/job/devel/) | [![Build Status](http://ci.arrayfire.org/buildStatus/icon?job=arrayfire-tegrax1/test/devel)](http://ci.arrayfire.org/job/arrayfire-tegrax1/job/test/job/devel/) | [![Build Status](http://ci.arrayfire.org/buildStatus/icon?job=arrayfire-osx/test-mkl/devel)](http://ci.arrayfire.org/job/arrayfire-osx/job/test-mkl/job/devel/) | [![Build Status](http://ci.arrayfire.org/buildStatus/icon?job=arrayfire-windows/test/devel)](http://ci.arrayfire.org/job/arrayfire-windows/job/test/job/devel/) |
-
 ## Installation
 
 You can install the ArrayFire library from one of the following ways:
@@ -128,7 +121,8 @@ Wrappers for other languages are a work-in-progress:
   [Java](https://github.com/arrayfire/arrayfire-java),
   [Lua](https://github.com/arrayfire/arrayfire-lua),
   [NodeJS](https://github.com/arrayfire/arrayfire-js),
-  [R](https://github.com/arrayfire/arrayfire-r)
+  [R](https://github.com/arrayfire/arrayfire-r),
+  [Ruby](https://github.com/arrayfire/arrayfire-rb)
 
 __Third-party wrappers__
 
@@ -153,14 +147,9 @@ ArrayFire development is funded by ArrayFire LLC and several third parties,
 please see the list of [acknowledgements](ACKNOWLEDGEMENTS.md) for further
 details.
 
-We would like to thank the [JuliaComputing](https://github.com/JuliaComputing)
-guys as well as [Gabor Mezo](https://github.com/unbornchikken) for their
-diligent work on the [Julia](https://github.com/JuliaComputing/ArrayFire.jl)
-and [NodeJS](https://github.com/arrayfire/arrayfire-js) wrappers,
-respectively.
+## Support and Contact Info
 
-## Support and Contact Info [![Join the chat at https://gitter.im/arrayfire/arrayfire](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/arrayfire/arrayfire?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-
+* [Slack Chat](https://join.slack.com/t/arrayfire-org/shared_invite/MjI4MjIzMDMzMTczLTE1MDI5ODg4NzYtN2QwNGE3ODA5OQ)
 * [Google Groups](https://groups.google.com/forum/#!forum/arrayfire-users)
 * ArrayFire Services:  [Consulting](http://arrayfire.com/consulting/)  |  [Support](http://arrayfire.com/support/)   |  [Training](http://arrayfire.com/training/)
 

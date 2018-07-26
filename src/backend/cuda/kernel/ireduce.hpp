@@ -10,7 +10,7 @@
 #include <ops.hpp>
 #include <backend.hpp>
 #include <Param.hpp>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <math.hpp>
 #include <err_cuda.hpp>
 #include <debug_cuda.hpp>
@@ -22,11 +22,30 @@ namespace cuda
 {
 namespace kernel
 {
+    template<typename T> __host__ __device__
+    static double cabs(const T& in) { return (double)in; }
 
-    template<typename T> __host__ __device__ double cabs(const T in) { return (double)in; }
-    static double __host__ __device__ cabs(const char in) { return (double)(in > 0); }
-    static double __host__ __device__ cabs(const cfloat &in) { return (double)abs(in); }
-    static double __host__ __device__ cabs(const cdouble &in) { return (double)abs(in); }
+    template<> __host__ __device__
+    double cabs<char>(const char& in) { return (double)(in > 0); }
+
+    template<> __host__ __device__
+    double cabs<cfloat>(const cfloat &in) { return (double)abs(in); }
+
+    template<> __host__ __device__
+    double cabs<cdouble>(const cdouble &in) { return (double)abs(in); }
+
+    template<typename T> __host__ __device__
+    static bool is_nan(const T& in) { return in != in; }
+
+    template<> __host__ __device__
+    bool is_nan<cfloat>(const cfloat &in) {
+        return in.x != in.x || in.y != in.y;
+    }
+
+    template<> __host__ __device__
+    bool is_nan<cdouble>(const cdouble &in) {
+        return in.x != in.x || in.y != in.y;
+    }
 
     template<af_op_t op, typename T>
     struct MinMaxOp
@@ -36,13 +55,15 @@ namespace kernel
         __host__ __device__ MinMaxOp(T val, uint idx) :
             m_val(val), m_idx(idx)
         {
+            if (is_nan(val)) {
+                m_val = Binary<T, op>::init();
+            }
         }
 
         __host__ __device__ void operator()(T val, uint idx)
         {
-            if (cabs(val) < cabs(m_val) ||
-                (cabs(val) == cabs(m_val) &&
-                 idx > m_idx)) {
+            if ((cabs(val) < cabs(m_val) ||
+                 (cabs(val) == cabs(m_val) && idx > m_idx))) {
                 m_val = val;
                 m_idx = idx;
             }
@@ -57,13 +78,15 @@ namespace kernel
         __host__ __device__ MinMaxOp(T val, uint idx) :
             m_val(val), m_idx(idx)
         {
+            if (is_nan(val)) {
+                m_val = Binary<T, af_max_t>::init();
+            }
         }
 
         __host__ __device__ void operator()(T val, uint idx)
         {
-            if (cabs(val) > cabs(m_val) ||
-                (cabs(val) == cabs(m_val) &&
-                 idx <= m_idx)) {
+            if ((cabs(val) > cabs(m_val) ||
+                 (cabs(val) == cabs(m_val) && idx <= m_idx))) {
                 m_val = val;
                 m_idx = idx;
             }
@@ -81,9 +104,9 @@ namespace kernel
         const uint tid  = tidy * THREADS_X + tidx;
 
         const uint zid = blockIdx.x / blocks_x;
-        const uint wid = blockIdx.y / blocks_y;
+        const uint wid = (blockIdx.y + blockIdx.z * gridDim.y) / blocks_y;
         const uint blockIdx_x = blockIdx.x - (blocks_x) * zid;
-        const uint blockIdx_y = blockIdx.y - (blocks_y) * wid;
+        const uint blockIdx_y = (blockIdx.y + blockIdx.z * gridDim.y) - (blocks_y) * wid;
         const uint xid = blockIdx_x * blockDim.x + tidx;
         const uint yid = blockIdx_y; // yid  of output. updated for input later.
 
@@ -112,9 +135,7 @@ namespace kernel
             (ids[2] < in.dims[2]) &&
             (ids[3] < in.dims[3]);
 
-        Binary<T, op> ireduce;
-
-        T val = ireduce.init();
+        T val = Binary<T, op>::init();
         uint idx = id_dim_in;
 
         if (is_valid && id_dim_in < in.dims[dim]) {
@@ -194,6 +215,10 @@ namespace kernel
         dim3 blocks(blocks_dim[0] * blocks_dim[2],
                     blocks_dim[1] * blocks_dim[3]);
 
+        const int maxBlocksY = cuda::getDeviceProp(cuda::getActiveDeviceId()).maxGridSize[1];
+        blocks.z = divup(blocks.y, maxBlocksY);
+        blocks.y = divup(blocks.y, blocks.z);
+
         switch (threads_y) {
         case 8:
             CUDA_LAUNCH((ireduce_dim_kernel<T, op, dim, is_first, 8>), blocks, threads,
@@ -225,14 +250,18 @@ namespace kernel
 
         Param<T> tmp = out;
         uint *tlptr = olptr;
+        uptr<T> tmp_alloc;
+        uptr<uint> tlptr_alloc;
 
         if (blocks_dim[dim] > 1) {
             int tmp_elements = 1;
             tmp.dims[dim] = blocks_dim[dim];
 
             for (int k = 0; k < 4; k++) tmp_elements *= tmp.dims[k];
-            tmp.ptr = memAlloc<T>(tmp_elements);
-            tlptr = memAlloc<uint>(tmp_elements);
+            tmp_alloc = memAlloc<T>(tmp_elements);
+            tlptr_alloc = memAlloc<uint>(tmp_elements);
+            tmp.ptr = tmp_alloc.get();
+            tlptr = tlptr_alloc.get();
 
             for (int k = dim + 1; k < 4; k++) tmp.strides[k] *= blocks_dim[dim];
         }
@@ -244,9 +273,6 @@ namespace kernel
 
             ireduce_dim_launcher<T, op, dim, false>(out, olptr, tmp, tlptr,
                                                     threads_y, blocks_dim);
-
-            memFree(tmp.ptr);
-            memFree(tlptr);
         }
 
     }
@@ -278,9 +304,9 @@ namespace kernel
         const uint tid  = tidy * blockDim.x + tidx;
 
         const uint zid = blockIdx.x / blocks_x;
-        const uint wid = blockIdx.y / blocks_y;
+        const uint wid = (blockIdx.y + blockIdx.z * gridDim.y) / blocks_y;
         const uint blockIdx_x = blockIdx.x - (blocks_x) * zid;
-        const uint blockIdx_y = blockIdx.y - (blocks_y) * wid;
+        const uint blockIdx_y = (blockIdx.y + blockIdx.z * gridDim.y) - (blocks_y) * wid;
         const uint xid = blockIdx_x * blockDim.x * repeat + tidx;
         const uint yid = blockIdx_y * blockDim.y + tidy;
 
@@ -299,9 +325,7 @@ namespace kernel
 
         int lim = min((int)(xid + repeat * DIMX), in.dims[0]);
 
-        Binary<T, op> ireduce;
-
-        T val = ireduce.init();
+        T val = Binary<T, op>::init();
         uint idx = xid;
 
         if (xid < lim) {
@@ -369,6 +393,9 @@ namespace kernel
         dim3 threads(threads_x, THREADS_PER_BLOCK / threads_x);
         dim3 blocks(blocks_x * in.dims[2],
                     blocks_y * in.dims[3]);
+        const int maxBlocksY = cuda::getDeviceProp(cuda::getActiveDeviceId()).maxGridSize[1];
+        blocks.z = divup(blocks.y, maxBlocksY);
+        blocks.y = divup(blocks.y, blocks.z);
 
         uint repeat = divup(in.dims[0], (blocks_x * threads_x));
 
@@ -402,16 +429,14 @@ namespace kernel
 
         Param<T> tmp = out;
         uint *tlptr = olptr;
+        uptr<T> tmp_alloc;
+        uptr<uint> tlptr_alloc;
         if (blocks_x > 1) {
-            tmp.ptr = memAlloc<T>(blocks_x *
-                                  in.dims[1] *
-                                  in.dims[2] *
-                                  in.dims[3]);
-
-            tlptr = memAlloc<uint>(blocks_x *
-                                   in.dims[1] *
-                                   in.dims[2] *
-                                   in.dims[3]);
+            auto elements = blocks_x * in.dims[1] * in.dims[2] * in.dims[3];
+            tmp_alloc = memAlloc<T>(elements);
+            tlptr_alloc = memAlloc<uint>(elements);
+            tmp.ptr = tmp_alloc.get();
+            tlptr = tlptr_alloc.get();
 
             tmp.dims[0] = blocks_x;
             for (int k = 1; k < 4; k++) tmp.strides[k] *= blocks_x;
@@ -421,9 +446,6 @@ namespace kernel
 
         if (blocks_x > 1) {
             ireduce_first_launcher<T, op, false>(out, olptr, tmp, tlptr, 1, blocks_y, threads_x);
-
-            memFree(tmp.ptr);
-            memFree(tlptr);
         }
     }
 
@@ -481,22 +503,22 @@ namespace kernel
             int tmp_elements = tmp.strides[3] * tmp.dims[3];
 
             //TODO: Use scoped_ptr
-            tmp.ptr = memAlloc<T>(tmp_elements);
-            tlptr = memAlloc<uint>(tmp_elements);
+            auto tmp_alloc = memAlloc<T>(tmp_elements);
+            auto tlptr_alloc = memAlloc<uint>(tmp_elements);
+            tmp.ptr = tmp_alloc.get();
+            tlptr = tlptr_alloc.get();
             ireduce_first_launcher<T, op, true>(tmp, tlptr, in, NULL, blocks_x, blocks_y, threads_x);
 
-            unique_ptr<T>       h_ptr(new T[tmp_elements]);
-            unique_ptr<uint>    h_lptr(new uint[tmp_elements]);
+            unique_ptr<T[]>       h_ptr(new T[tmp_elements]);
+            unique_ptr<uint[]>    h_lptr(new uint[tmp_elements]);
             T*      h_ptr_raw = h_ptr.get();
             uint*   h_lptr_raw = h_lptr.get();
 
             CUDA_CHECK(cudaMemcpyAsync(h_ptr_raw, tmp.ptr, tmp_elements * sizeof(T),
-                       cudaMemcpyDeviceToHost, cuda::getStream(cuda::getActiveDeviceId())));
+                       cudaMemcpyDeviceToHost, cuda::getActiveStream()));
             CUDA_CHECK(cudaMemcpyAsync(h_lptr_raw, tlptr, tmp_elements * sizeof(uint),
-                       cudaMemcpyDeviceToHost, cuda::getStream(cuda::getActiveDeviceId())));
-            CUDA_CHECK(cudaStreamSynchronize(cuda::getStream(cuda::getActiveDeviceId())));
-            memFree(tmp.ptr);
-            memFree(tlptr);
+                       cudaMemcpyDeviceToHost, cuda::getActiveStream()));
+            CUDA_CHECK(cudaStreamSynchronize(cuda::getActiveStream()));
 
             if (!is_linear) {
                 // Converting n-d index into a linear index
@@ -519,11 +541,11 @@ namespace kernel
             return Op.m_val;
         } else {
 
-            unique_ptr<T> h_ptr(new T[in_elements]);
+            unique_ptr<T[]> h_ptr(new T[in_elements]);
             T* h_ptr_raw = h_ptr.get();
             CUDA_CHECK(cudaMemcpyAsync(h_ptr_raw, in.ptr, in_elements * sizeof(T),
-                       cudaMemcpyDeviceToHost, cuda::getStream(cuda::getActiveDeviceId())));
-            CUDA_CHECK(cudaStreamSynchronize(cuda::getStream(cuda::getActiveDeviceId())));
+                       cudaMemcpyDeviceToHost, cuda::getActiveStream()));
+            CUDA_CHECK(cudaStreamSynchronize(cuda::getActiveStream()));
 
             MinMaxOp<op, T> Op(h_ptr_raw[0], 0);
             for (int i = 1; i < in_elements; i++) {

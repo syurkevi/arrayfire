@@ -11,7 +11,7 @@
 #include <af/defines.h>
 #include <af/image.h>
 #include <af/seq.h>
-#include <err_common.hpp>
+#include <common/err_common.hpp>
 #include <backend.hpp>
 #include <Array.hpp>
 #include <handle.hpp>
@@ -30,9 +30,10 @@
 #include <tile.hpp>
 #include <iota.hpp>
 #include <utility>
-#include <iostream>
+#include <vector>
 
 using af::dim4;
+using std::vector;
 using namespace detail;
 
 Array<float> gradientMagnitude(const Array<float>& gx, const Array<float>& gy, const bool& isf)
@@ -144,7 +145,7 @@ computeCandidates(const Array<float>& supEdges, const float t1,
 
     switch(ct)
     {
-        case AF_AUTO_OTSU_THRESHOLD:
+        case AF_CANNY_THRESHOLD_AUTO_OTSU:
             {
                 auto T2            = otsuThreshold(supEdges, NUM_BINS, maxVal);
                 auto T1            = arithOp<float, af_mul_t>(T2, lowRatio, T2.dims());
@@ -173,7 +174,7 @@ template<typename T>
 af_array cannyHelper(const Array<T> in, const float t1, const af_canny_threshold ct,
                      const float t2, const unsigned sw, const bool isf)
 {
-    static const std::vector<float> v = {-0.11021f, -0.23691f, -0.30576f, -0.23691f, -0.11021f};
+    static const vector<float> v{-0.11021f, -0.23691f, -0.30576f, -0.23691f, -0.11021f};
     Array<float> cFilter= detail::createHostDataArray<float>(dim4(5, 1), v.data());
     Array<float> rFilter= detail::createHostDataArray<float>(dim4(1, 5), v.data());
 

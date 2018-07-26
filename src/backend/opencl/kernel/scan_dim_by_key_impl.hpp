@@ -15,7 +15,7 @@
 #include <kernel_headers/ops.hpp>
 #include <program.hpp>
 #include <traits.hpp>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <Param.hpp>
 #include <debug_opencl.hpp>
 #include <type_util.hpp>
@@ -57,12 +57,11 @@ namespace kernel
             std::to_string(int(inclusive_scan));
 
         int device = getActiveDeviceId();
-        kc_t::iterator idx = kernelCaches[device].find(ref_name);
 
-        kc_entry_t entry;
-        if (idx == kernelCaches[device].end()) {
+        kc_entry_t entry = kernelCache(device, ref_name);
 
-            Binary<To, op> scan;
+        if (entry.prog==0 && entry.ker==0) {
+
             ToNumStr<To> toNumStr;
 
             std::ostringstream options;
@@ -73,7 +72,7 @@ namespace kernel
                     << " -D dim=" << dim
                     << " -D DIMY=" << threads_y
                     << " -D THREADS_X=" << THREADS_X
-                    << " -D init=" << toNumStr(scan.init())
+                    << " -D init=" << toNumStr(Binary<To, op>::init())
                     << " -D " << binOpName<op>()
                     << " -D CPLX=" << af::iscplx<Ti>()
                     << " -D calculateFlags=" << calculateFlags
@@ -95,22 +94,19 @@ namespace kernel
             entry.ker[1] = Kernel(*entry.prog, "scan_dim_by_key_nonfinal_kernel");
             entry.ker[2] = Kernel(*entry.prog, "bcast_dim_kernel");
 
-            kernelCaches[device][ref_name] = entry;
-
-        } else {
-            entry = idx->second;
+            addKernelToCache(device, ref_name, entry);
         }
 
         return entry.ker[kerIdx];
     }
 
     template<typename Ti, typename Tk, typename To, af_op_t op, bool inclusive_scan>
-    static void scan_dim_nonfinal_launcher(Param &out,
-                                  Param &tmp,
-                                  Param &tmpflg,
-                                  Param &tmpid,
-                                  const Param &in,
-                                  const Param &key,
+    static void scan_dim_nonfinal_launcher(Param out,
+                                  Param tmp,
+                                  Param tmpflg,
+                                  Param tmpid,
+                                  const Param in,
+                                  const Param key,
                                   int dim, uint threads_y,
                                   const uint groups_all[4])
     {
@@ -143,9 +139,9 @@ namespace kernel
     }
 
     template<typename Ti, typename Tk, typename To, af_op_t op, bool inclusive_scan>
-    static void scan_dim_final_launcher(Param &out,
-                                  const Param &in,
-                                  const Param &key,
+    static void scan_dim_final_launcher(Param out,
+                                  const Param in,
+                                  const Param key,
                                   int dim, const bool calculateFlags, uint threads_y,
                                   const uint groups_all[4])
     {
@@ -171,9 +167,9 @@ namespace kernel
     }
 
     template<typename Ti, typename Tk, typename To, af_op_t op, bool inclusive_scan>
-    static void bcast_dim_launcher(Param &out,
-                                   Param &tmp,
-                                   Param &tmpid,
+    static void bcast_dim_launcher(Param out,
+                                   Param tmp,
+                                   Param tmpid,
                                    int dim, uint threads_y,
                                    const uint groups_all[4])
     {
@@ -199,7 +195,7 @@ namespace kernel
     }
 
     template<typename Ti, typename Tk, typename To, af_op_t op, bool inclusive_scan>
-    void scan_dim(Param &out, const Param &in, const Param &key, int dim)
+    void scan_dim(Param out, const Param in, const Param key, int dim)
     {
         uint threads_y = std::min(THREADS_Y, nextpow2(out.info.dims[dim]));
         uint threads_x = THREADS_X;
@@ -268,8 +264,8 @@ namespace kernel
 }
 
 #define INSTANTIATE_SCAN_DIM_BY_KEY(ROp, Ti, Tk, To)\
-    template void scan_dim<Ti, Tk, To, ROp,  true>(Param &out, const Param &in, const Param &key, int dim);\
-    template void scan_dim<Ti, Tk, To, ROp, false>(Param &out, const Param &in, const Param &key, int dim);
+    template void scan_dim<Ti, Tk, To, ROp,  true>(Param out, const Param in, const Param key, int dim);\
+    template void scan_dim<Ti, Tk, To, ROp, false>(Param out, const Param in, const Param key, int dim);
 
 #define INSTANTIATE_SCAN_DIM_BY_KEY_TYPES(ROp, Tk)          \
     INSTANTIATE_SCAN_DIM_BY_KEY(ROp, float  , Tk, float  )  \

@@ -8,7 +8,7 @@
  ********************************************************/
 
 #include <math.hpp>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <Param.hpp>
 #include <err_cuda.hpp>
 #include <debug_cuda.hpp>
@@ -43,10 +43,10 @@ namespace cuda
                          const unsigned blocksPerMatX, const unsigned blocksPerMatY)
         {
             unsigned idz = blockIdx.x / blocksPerMatX;
-            unsigned idw = blockIdx.y / blocksPerMatY;
+            unsigned idw = (blockIdx.y + blockIdx.z * gridDim.y) / blocksPerMatY;
 
             unsigned blockIdx_x = blockIdx.x - idz * blocksPerMatX;
-            unsigned blockIdx_y = blockIdx.y - idw * blocksPerMatY;
+            unsigned blockIdx_y = (blockIdx.y + blockIdx.z * gridDim.y) - idw * blocksPerMatY;
 
             unsigned idx = threadIdx.x + blockIdx_x * blockDim.x;
             unsigned idy = threadIdx.y + blockIdx_y * blockDim.y;
@@ -88,10 +88,14 @@ namespace cuda
 
             const int oElem = out.dims[0] * out.dims[1] * out.dims[2] * out.dims[3];
 
+            const int maxBlocksY = cuda::getDeviceProp(cuda::getActiveDeviceId()).maxGridSize[1];
+            blocks.z = divup(blocks.y, maxBlocksY);
+            blocks.y = divup(blocks.y, blocks.z);
+
             CUDA_LAUNCH((diff_kernel<T, dim, isDiff2>), blocks, threads,
                 out, in, oElem, blocksPerMatX, blocksPerMatY);
 
             POST_LAUNCH_CHECK();
         }
-}
+    }
 }

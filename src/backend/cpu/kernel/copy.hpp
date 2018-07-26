@@ -8,8 +8,12 @@
  ********************************************************/
 
 #pragma once
-#include <Array.hpp>
+#include <Param.hpp>
 #include <math.hpp>
+#include <af/dim4.hpp>
+#include <af/defines.h>
+
+#include <cstring> //memcpy
 
 namespace cpu
 {
@@ -23,7 +27,7 @@ void stridedCopy(T* dst, af::dim4 const & ostrides, T const * src,
     if(dim == 0) {
         if(strides[dim] == 1) {
             //FIXME: Check for errors / exceptions
-            memcpy(dst, src, dims[dim] * sizeof(T));
+            std::memcpy(dst, src, dims[dim] * sizeof(T));
         } else {
             for(dim_t i = 0; i < dims[dim]; i++) {
                 dst[i] = src[strides[dim]*i];
@@ -39,7 +43,7 @@ void stridedCopy(T* dst, af::dim4 const & ostrides, T const * src,
 }
 
 template<typename OutT, typename InT>
-void copyElemwise(Array<OutT> dst, Array<InT> const src, OutT default_value, double factor)
+void copyElemwise(Param<OutT> dst, CParam<InT> src, OutT default_value, double factor)
 {
     af::dim4 src_dims       = src.dims();
     af::dim4 dst_dims       = dst.dims();
@@ -89,7 +93,7 @@ void copyElemwise(Array<OutT> dst, Array<InT> const src, OutT default_value, dou
 template<typename OutT, typename InT>
 struct CopyImpl
 {
-    static void copy(Array<OutT> dst, Array<InT> const src)
+    static void copy(Param<OutT> dst, CParam<InT> src)
     {
         copyElemwise(dst, src, scalar<OutT>(0), 1.0);
     }
@@ -98,7 +102,7 @@ struct CopyImpl
 template<typename T>
 struct CopyImpl<T, T>
 {
-    static void copy(Array<T> dst, Array<T> const src)
+    static void copy(Param<T> dst, CParam<T> src)
     {
         af::dim4 src_dims       = src.dims();
         af::dim4 dst_dims       = dst.dims();
@@ -153,7 +157,7 @@ struct CopyImpl<T, T>
 };
 
 template<typename OutT, typename InT>
-void copy(Array<OutT> dst, Array<InT> const src)
+void copy(Param<OutT> dst, CParam<InT> src)
 {
     CopyImpl<OutT, InT>::copy(dst, src);
 }

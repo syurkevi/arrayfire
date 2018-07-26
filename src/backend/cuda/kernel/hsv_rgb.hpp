@@ -8,7 +8,7 @@
  ********************************************************/
 
 #include <backend.hpp>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <Param.hpp>
 #include <debug_cuda.hpp>
 
@@ -31,9 +31,9 @@ void convert(Param<T> out, CParam<T> in, int nBBS)
     T*       dst    = (T *      )out.ptr + (batchId * out.strides[3]);
     // global indices
     int gx = blockDim.x * (blockIdx.x-batchId*nBBS) + threadIdx.x;
-    int gy = blockDim.y * blockIdx.y + threadIdx.y;
+    int gy = blockDim.y * (blockIdx.y + blockIdx.z * gridDim.y) + threadIdx.y;
 
-    if (gx < out.dims[0] && gy < out.dims[1]) {
+    if (gx < out.dims[0] && gy < out.dims[1] && batchId < out.dims[3]) {
 
         int oIdx0 = gx + gy * out.strides[1];
         int oIdx1 = oIdx0 + out.strides[2];
@@ -104,6 +104,10 @@ void hsv2rgb_convert(Param<T> out, CParam<T> in)
     // all images are three channels, so batch
     // parameter would be along 4th dimension
     dim3 blocks(blk_x*in.dims[3], blk_y);
+
+    const int maxBlocksY = cuda::getDeviceProp(cuda::getActiveDeviceId()).maxGridSize[1];
+    blocks.z = divup(blocks.y, maxBlocksY);
+    blocks.y = divup(blocks.y, blocks.z);
 
     CUDA_LAUNCH((convert<T, isHSV2RGB>), blocks, threads, out, in, blk_x);
 

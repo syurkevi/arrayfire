@@ -8,7 +8,7 @@
  ********************************************************/
 
 #pragma once
-#include <Array.hpp>
+#include <Param.hpp>
 #include <vector>
 #include <algorithm>
 
@@ -18,7 +18,7 @@ namespace kernel
 {
 
 template<typename T, af_border_type Pad>
-void medfilt1(Array<T> out, const Array<T> in, dim_t w_wid)
+void medfilt1(Param<T> out, CParam<T> in, dim_t w_wid)
 {
     const af::dim4 dims     = in.dims();
     const af::dim4 istrides = in.strides();
@@ -28,7 +28,6 @@ void medfilt1(Array<T> out, const Array<T> in, dim_t w_wid)
     wind_vals.reserve(w_wid);
 
     for(int b3=0; b3<(int)dims[3]; b3++) {
-
         T const * in_ptr = in.get() + b3 * istrides[3];
         T * out_ptr = out.get() + b3 * ostrides[3];
 
@@ -87,7 +86,7 @@ void medfilt1(Array<T> out, const Array<T> in, dim_t w_wid)
 
 
 template<typename T, af_border_type Pad>
-void medfilt2(Array<T> out, const Array<T> in, dim_t w_len, dim_t w_wid)
+void medfilt2(Param<T> out, CParam<T> in, dim_t w_len, dim_t w_wid)
 {
     const af::dim4 dims     = in.dims();
     const af::dim4 istrides = in.strides();
@@ -95,9 +94,6 @@ void medfilt2(Array<T> out, const Array<T> in, dim_t w_len, dim_t w_wid)
 
     std::vector<T> wind_vals;
     wind_vals.reserve(w_len*w_wid);
-
-    T const * in_ptr = in.get();
-    T * out_ptr = out.get();
 
     for(int b3=0; b3<(int)dims[3]; b3++) {
         T const * in_ptr = in.get() + b3 * istrides[3];

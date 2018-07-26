@@ -9,7 +9,7 @@
 
 #include <af/dim4.hpp>
 #include <math.hpp>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <Param.hpp>
 #include <err_cuda.hpp>
 #include <debug_cuda.hpp>
@@ -32,12 +32,11 @@ namespace cuda
                          const int blocksPerMatX, const int blocksPerMatY)
         {
             const int oz = blockIdx.x / blocksPerMatX;
-            const int ow = blockIdx.y / blocksPerMatY;
-
             const int blockIdx_x = blockIdx.x - oz * blocksPerMatX;
-            const int blockIdx_y = blockIdx.y - ow * blocksPerMatY;
-
             const int xx = threadIdx.x + blockIdx_x * blockDim.x;
+
+            const int ow = (blockIdx.y + blockIdx.z * gridDim.y) / blocksPerMatY;
+            const int blockIdx_y = (blockIdx.y + blockIdx.z * gridDim.y) - ow * blocksPerMatY;
             const int yy = threadIdx.y + blockIdx_y * blockDim.y;
 
             if(xx >= out.dims[0] ||
@@ -76,13 +75,19 @@ namespace cuda
 
             int blocksPerMatX = divup(out.dims[0], TILEX);
             int blocksPerMatY = divup(out.dims[1], TILEY);
+
             dim3 blocks(blocksPerMatX * out.dims[2],
                         blocksPerMatY * out.dims[3],
                         1);
 
+            const int maxBlocksY = cuda::getDeviceProp(cuda::getActiveDeviceId()).maxGridSize[1];
+            blocks.z = divup(blocks.y, maxBlocksY);
+            blocks.y = divup(blocks.y, blocks.z);
+
             CUDA_LAUNCH((iota_kernel<T>), blocks, threads,
                     out, sdims[0], sdims[1], sdims[2], sdims[3],
                     tdims[0], tdims[1], tdims[2], tdims[3], blocksPerMatX, blocksPerMatY);
+
             POST_LAUNCH_CHECK();
         }
     }

@@ -7,7 +7,7 @@
  * http://arrayfire.com/licenses/BSD-3-Clause
  ********************************************************/
 
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <Param.hpp>
 #include <err_cuda.hpp>
 #include <debug_cuda.hpp>
@@ -38,11 +38,11 @@ namespace cuda
                            CParam<T> a, CParam<T> b, int blk_x, int blk_y)
         {
             const int idz = blockIdx.x / blk_x;
-            const int idw = blockIdx.y / blk_y;
+            const int idw = (blockIdx.y + blockIdx.z * gridDim.y) / blk_y;
 
 
             const int blockIdx_x = blockIdx.x - idz * blk_x;
-            const int blockIdx_y = blockIdx.y - idw * blk_y;
+            const int blockIdx_y = (blockIdx.y + blockIdx.z * gridDim.y) - idw * blk_y;
 
             const int idy = blockIdx_y * blockDim.y + threadIdx.y;
             const int idx0 = blockIdx_x * blockDim.x + threadIdx.x;
@@ -101,6 +101,10 @@ namespace cuda
             dim3 blocks(blk_x * out.dims[2],
                         blk_y * out.dims[3]);
 
+            const int maxBlocksY = cuda::getDeviceProp(cuda::getActiveDeviceId()).maxGridSize[1];
+            blocks.z = divup(blocks.y, maxBlocksY);
+            blocks.y = divup(blocks.y, blocks.z);
+
             if (is_same) {
                 CUDA_LAUNCH((select_kernel<T, true>), blocks, threads,
                             out, cond, a, b, blk_x, blk_y);
@@ -117,10 +121,10 @@ namespace cuda
                                   CParam<T> a, T b, int blk_x, int blk_y)
         {
             const int idz = blockIdx.x / blk_x;
-            const int idw = blockIdx.y / blk_y;
+            const int idw = (blockIdx.y + blockIdx.z * gridDim.y) / blk_y;
 
             const int blockIdx_x = blockIdx.x - idz * blk_x;
-            const int blockIdx_y = blockIdx.y - idw * blk_y;
+            const int blockIdx_y = (blockIdx.y + blockIdx.z * gridDim.y) - idw * blk_y;
 
             const int idx0 = blockIdx_x * blockDim.x + threadIdx.x;
             const int idy = blockIdx_y * blockDim.y + threadIdx.y;

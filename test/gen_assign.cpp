@@ -23,51 +23,56 @@
 
 using std::vector;
 using std::string;
-using std::generate;
-using std::cout;
 using std::endl;
 using std::ostream_iterator;
+using af::array;
+using af::dim4;
 using af::dtype_traits;
+using af::exception;
+using af::freeHost;
+using af::randu;
+using af::seq;
+using af::span;
+using af::where;
 
 void testGeneralAssignOneArray(string pTestFile, const dim_t ndims, af_index_t* indexs, int arrayDim)
 {
-    vector<af::dim4>        numDims;
+    vector<dim4>        numDims;
     vector< vector<float> >      in;
     vector< vector<float> >   tests;
 
     readTestsFromFile<float, float>(pTestFile, numDims, in, tests);
 
-    af::dim4 dims0     = numDims[0];
-    af::dim4 dims1     = numDims[1];
-    af::dim4 dims2     = numDims[2];
+    dim4 dims0     = numDims[0];
+    dim4 dims1     = numDims[1];
+    dim4 dims2     = numDims[2];
     af_array outArray  = 0;
     af_array rhsArray  = 0;
     af_array lhsArray  = 0;
     af_array idxArray  = 0;
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&lhsArray, &(in[0].front()),
-                dims0.ndims(), dims0.get(), (af_dtype)af::dtype_traits<float>::af_type));
+                dims0.ndims(), dims0.get(), (af_dtype)dtype_traits<float>::af_type));
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&rhsArray, &(in[1].front()),
-                dims1.ndims(), dims1.get(), (af_dtype)af::dtype_traits<float>::af_type));
+                dims1.ndims(), dims1.get(), (af_dtype)dtype_traits<float>::af_type));
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&idxArray, &(in[2].front()),
-                dims2.ndims(), dims2.get(), (af_dtype)af::dtype_traits<float>::af_type));
+                dims2.ndims(), dims2.get(), (af_dtype)dtype_traits<float>::af_type));
     indexs[arrayDim].idx.arr = idxArray;
 
     ASSERT_EQ(AF_SUCCESS, af_assign_gen(&outArray, lhsArray, ndims, indexs, rhsArray));
 
     vector<float> currGoldBar = tests[0];
     size_t nElems = currGoldBar.size();
-    float *outData = new float[nElems];
+    vector<float> outData(nElems);
 
-    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)outData, outArray));
+    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)outData.data(), outArray));
 
     for (size_t elIter=0; elIter<nElems; ++elIter) {
-        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< std::endl;
+        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< endl;
     }
 
-    delete[] outData;
     ASSERT_EQ(AF_SUCCESS, af_release_array(rhsArray));
     ASSERT_EQ(AF_SUCCESS, af_release_array(lhsArray));
     ASSERT_EQ(AF_SUCCESS, af_release_array(idxArray));
@@ -96,14 +101,14 @@ TEST(GeneralAssign, SASS)
 
 TEST(GeneralAssign, SSSS)
 {
-    vector<af::dim4>        numDims;
+    vector<dim4>        numDims;
     vector< vector<float> >      in;
     vector< vector<float> >   tests;
 
     readTestsFromFile<float, float>(string(TEST_DIR"/gen_assign/s10_14s0_9s0_ns0_n.test"), numDims, in, tests);
 
-    af::dim4 dims0     = numDims[0];
-    af::dim4 dims1     = numDims[1];
+    dim4 dims0     = numDims[0];
+    dim4 dims1     = numDims[1];
     af_array outArray  = 0;
     af_array rhsArray  = 0;
     af_array lhsArray  = 0;
@@ -115,24 +120,23 @@ TEST(GeneralAssign, SSSS)
     indexs[1].isSeq = true;
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&lhsArray, &(in[0].front()),
-                dims0.ndims(), dims0.get(), (af_dtype)af::dtype_traits<float>::af_type));
+                dims0.ndims(), dims0.get(), (af_dtype)dtype_traits<float>::af_type));
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&rhsArray, &(in[1].front()),
-                dims1.ndims(), dims1.get(), (af_dtype)af::dtype_traits<float>::af_type));
+                dims1.ndims(), dims1.get(), (af_dtype)dtype_traits<float>::af_type));
 
     ASSERT_EQ(AF_SUCCESS, af_assign_gen(&outArray, lhsArray, 2, indexs, rhsArray));
 
     vector<float> currGoldBar = tests[0];
     size_t nElems = currGoldBar.size();
-    float *outData = new float[nElems];
+    vector<float> outData(nElems);
 
-    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)outData, outArray));
+    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)outData.data(), outArray));
 
     for (size_t elIter=0; elIter<nElems; ++elIter) {
-        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< std::endl;
+        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< endl;
     }
 
-    delete[] outData;
     ASSERT_EQ(AF_SUCCESS, af_release_array(rhsArray));
     ASSERT_EQ(AF_SUCCESS, af_release_array(lhsArray));
     ASSERT_EQ(AF_SUCCESS, af_release_array(outArray));
@@ -140,18 +144,18 @@ TEST(GeneralAssign, SSSS)
 
 TEST(GeneralAssign, AAAA)
 {
-    vector<af::dim4>        numDims;
+    vector<dim4>        numDims;
     vector< vector<float> >      in;
     vector< vector<float> >   tests;
 
     readTestsFromFile<float, float>(string(TEST_DIR"/gen_assign/aaaa.test"), numDims, in, tests);
 
-    af::dim4 dims0     = numDims[0];
-    af::dim4 dims1     = numDims[1];
-    af::dim4 dims2     = numDims[2];
-    af::dim4 dims3     = numDims[3];
-    af::dim4 dims4     = numDims[4];
-    af::dim4 dims5     = numDims[5];
+    dim4 dims0     = numDims[0];
+    dim4 dims1     = numDims[1];
+    dim4 dims2     = numDims[2];
+    dim4 dims3     = numDims[3];
+    dim4 dims4     = numDims[4];
+    dim4 dims5     = numDims[5];
     af_array outArray  = 0;
     af_array rhsArray  = 0;
     af_array lhsArray  = 0;
@@ -167,43 +171,46 @@ TEST(GeneralAssign, AAAA)
     indexs[3].isSeq = false;
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&lhsArray, &(in[0].front()),
-                dims0.ndims(), dims0.get(), (af_dtype)af::dtype_traits<float>::af_type));
+                dims0.ndims(), dims0.get(), (af_dtype)dtype_traits<float>::af_type));
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&rhsArray, &(in[1].front()),
-                dims1.ndims(), dims1.get(), (af_dtype)af::dtype_traits<float>::af_type));
+                dims1.ndims(), dims1.get(), (af_dtype)dtype_traits<float>::af_type));
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&idxArray0, &(in[2].front()),
-                dims2.ndims(), dims2.get(), (af_dtype)af::dtype_traits<float>::af_type));
+                dims2.ndims(), dims2.get(), (af_dtype)dtype_traits<float>::af_type));
     indexs[0].idx.arr = idxArray0;
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&idxArray1, &(in[3].front()),
-                dims3.ndims(), dims3.get(), (af_dtype)af::dtype_traits<float>::af_type));
+                dims3.ndims(), dims3.get(), (af_dtype)dtype_traits<float>::af_type));
     indexs[1].idx.arr = idxArray1;
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&idxArray2, &(in[4].front()),
-                dims4.ndims(), dims4.get(), (af_dtype)af::dtype_traits<float>::af_type));
+                dims4.ndims(), dims4.get(), (af_dtype)dtype_traits<float>::af_type));
     indexs[2].idx.arr = idxArray2;
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&idxArray3, &(in[5].front()),
-                dims5.ndims(), dims5.get(), (af_dtype)af::dtype_traits<float>::af_type));
+                dims5.ndims(), dims5.get(), (af_dtype)dtype_traits<float>::af_type));
     indexs[3].idx.arr = idxArray3;
 
     ASSERT_EQ(AF_SUCCESS, af_assign_gen(&outArray, lhsArray, 4, indexs, rhsArray));
 
     vector<float> currGoldBar = tests[0];
     size_t nElems = currGoldBar.size();
-    float *outData = new float[nElems];
+    vector<float> outData(nElems);
 
-    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)outData, outArray));
+    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)outData.data(), outArray));
 
     for (size_t elIter=0; elIter<nElems; ++elIter) {
-        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< std::endl;
+        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< endl;
     }
 
-    delete[] outData;
     ASSERT_EQ(AF_SUCCESS, af_release_array(rhsArray));
     ASSERT_EQ(AF_SUCCESS, af_release_array(lhsArray));
     ASSERT_EQ(AF_SUCCESS, af_release_array(outArray));
+    ASSERT_EQ(AF_SUCCESS, af_release_array(idxArray0));
+    ASSERT_EQ(AF_SUCCESS, af_release_array(idxArray1));
+    ASSERT_EQ(AF_SUCCESS, af_release_array(idxArray2));
+    ASSERT_EQ(AF_SUCCESS, af_release_array(idxArray3));
 }
 
 
@@ -213,13 +220,13 @@ TEST(ArrayAssign, CPP_ASSIGN_INDEX)
 
     const int num = 20000;
 
-    array a = af::randu(num);
+    array a = randu(num);
     float *hAO = a.host<float>();
 
     array a_copy = a;
     array idx = where(a < 0.5);
     const int len = idx.elements();
-    array b = af::randu(len);
+    array b = randu(len);
     a(idx) = b;
 
     float *hA = a.host<float>();
@@ -251,11 +258,11 @@ TEST(ArrayAssign, CPP_ASSIGN_INDEX)
         ASSERT_EQ(hAO[i], hAC[i]);
     }
 
-    delete[] hA;
-    delete[] hB;
-    delete[] hAC;
-    delete[] hAO;
-    delete[] hIdx;
+    freeHost(hA);
+    freeHost(hB);
+    freeHost(hAC);
+    freeHost(hAO);
+    freeHost(hIdx);
 }
 
 TEST(ArrayAssign, CPP_ASSIGN_INDEX_LOGICAL)
@@ -265,13 +272,13 @@ TEST(ArrayAssign, CPP_ASSIGN_INDEX_LOGICAL)
 
         const int num = 20000;
 
-        array a = af::randu(num);
+        array a = randu(num);
         float *hAO = a.host<float>();
 
         array a_copy = a;
         array idx = where(a < 0.5);
         const int len = idx.elements();
-        array b = af::randu(len);
+        array b = randu(len);
         a(a < 0.5) = b;
 
         float *hA = a.host<float>();
@@ -303,20 +310,19 @@ TEST(ArrayAssign, CPP_ASSIGN_INDEX_LOGICAL)
             ASSERT_EQ(hAO[i], hAC[i]);
         }
 
-        delete[] hA;
-        delete[] hB;
-        delete[] hAC;
-        delete[] hAO;
-        delete[] hIdx;
-    } catch(af::exception &ex) {
-        FAIL() << ex.what() << std::endl;
+        freeHost(hA);
+        freeHost(hB);
+        freeHost(hAC);
+        freeHost(hAO);
+        freeHost(hIdx);
+    } catch(exception &ex) {
+        FAIL() << ex.what() << endl;
     }
 }
 
 
 TEST(GeneralAssign, CPP_ASNN)
 {
-    using namespace af;
     const int nx = 1000;
     const int ny = 1000;
     const int st = 200;
@@ -342,18 +348,17 @@ TEST(GeneralAssign, CPP_ASNN)
         float *hBt = hB + j * nxb;
         for (int i = 0; i < nxb; i++) {
             ASSERT_EQ(hAt[hIdx[i]], hBt[i])
-                << "at " << i << " " << j << std::endl;
+                << "at " << i << " " << j << endl;
         }
     }
 
-    delete[] hA;
-    delete[] hB;
-    delete[] hIdx;
+    freeHost(hA);
+    freeHost(hB);
+    freeHost(hIdx);
 }
 
 TEST(GeneralAssign, CPP_SANN)
 {
-    using namespace af;
     const int nx = 1000;
     const int ny = 1000;
     const int st = 200;
@@ -379,18 +384,17 @@ TEST(GeneralAssign, CPP_SANN)
 
         for (int i = 0; i < nxb; i++) {
             ASSERT_EQ(hAt[i + st], hBt[i])
-            << "at " << i << " " << j << std::endl;
+            << "at " << i << " " << j << endl;
         }
     }
 
-    delete[] hA;
-    delete[] hB;
-    delete[] hIdx;
+    freeHost(hA);
+    freeHost(hB);
+    freeHost(hIdx);
 }
 
 TEST(GeneralAssign, CPP_SSAN)
 {
-    using namespace af;
     const int nx = 100;
     const int ny = 100;
     const int nz = 100;
@@ -418,19 +422,18 @@ TEST(GeneralAssign, CPP_SSAN)
         for (int j = 0; j < nyb; j++) {
             for (int i = 0; i < nxb; i++) {
                 ASSERT_EQ(hAt[j * nx  + i + st], hBt[j * nxb + i])
-                    << "at " << i << " " << j << " " << k << std::endl;
+                    << "at " << i << " " << j << " " << k << endl;
             }
         }
     }
 
-    delete[] hA;
-    delete[] hB;
-    delete[] hIdx;
+    freeHost(hA);
+    freeHost(hB);
+    freeHost(hIdx);
 }
 
 TEST(GeneralAssign, CPP_AANN)
 {
-    using namespace af;
     const int nx = 1000;
     const int ny = 1000;
 
@@ -454,12 +457,12 @@ TEST(GeneralAssign, CPP_AANN)
         float *hBt = hB + j * nxb;
         for (int i = 0; i < nxb; i++) {
             ASSERT_EQ(hAt[hIdx0[i]], hBt[i])
-                << "at " << i << " " << j << std::endl;
+                << "at " << i << " " << j << endl;
         }
     }
 
-    delete[] hA;
-    delete[] hB;
-    delete[] hIdx0;
-    delete[] hIdx1;
+    freeHost(hA);
+    freeHost(hB);
+    freeHost(hIdx0);
+    freeHost(hIdx1);
 }

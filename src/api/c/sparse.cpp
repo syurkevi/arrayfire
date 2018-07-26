@@ -14,7 +14,7 @@
 #include <sparse.hpp>
 #include <handle.hpp>
 #include <backend.hpp>
-#include <err_common.hpp>
+#include <common/err_common.hpp>
 #include <arith.hpp>
 #include <lookup.hpp>
 #include <platform.hpp>
@@ -87,6 +87,18 @@ af_err af_create_sparse_array(
         ARG_ASSERT(5, cInfo.getType() == s32);
         DIM_ASSERT(5, cInfo.isLinear());
 
+        const size_t nNZ = vInfo.elements();
+        if(stype == AF_STORAGE_COO) {
+          DIM_ASSERT(4, rInfo.elements() == nNZ);
+          DIM_ASSERT(5, cInfo.elements() == nNZ);
+        } else if(stype == AF_STORAGE_CSR) {
+          DIM_ASSERT(4, rInfo.elements() == nRows + 1);
+          DIM_ASSERT(5, cInfo.elements() == nNZ);
+        } else if(stype == AF_STORAGE_CSC) {
+          DIM_ASSERT(4, rInfo.elements() == nNZ);
+          DIM_ASSERT(5, cInfo.elements() == nCols + 1);
+        }
+
         af_array output = 0;
 
         af::dim4 dims(nRows, nCols);
@@ -113,12 +125,14 @@ af_array createSparseArrayFromPtr(
 {
     SparseArray<T> sparse = createEmptySparseArray<T>(dims, nNZ, stype);
 
-    if(source == afHost)
-        sparse = common::createHostDataSparseArray(
-                         dims, nNZ, values, rowIdx, colIdx, stype);
-    else if (source == afDevice)
-        sparse = common::createDeviceDataSparseArray(
-                         dims, nNZ, values, rowIdx, colIdx, stype);
+    if(nNZ) {
+        if(source == afHost)
+            sparse = common::createHostDataSparseArray(
+                            dims, nNZ, values, rowIdx, colIdx, stype);
+        else if (source == afDevice)
+            sparse = common::createDeviceDataSparseArray(
+                            dims, nNZ, values, rowIdx, colIdx, stype);
+    }
 
     return getHandle(sparse);
 }

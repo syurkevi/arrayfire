@@ -7,17 +7,20 @@
  * http://arrayfire.com/licenses/BSD-3-Clause
  ********************************************************/
 
+#include <kernel_headers/ops.hpp>
 #include <kernel_headers/convolve_separable.hpp>
+
 #include <program.hpp>
 #include <traits.hpp>
 #include <string>
 #include <mutex>
 #include <map>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <Param.hpp>
 #include <debug_opencl.hpp>
 #include <memory.hpp>
 #include <cache.hpp>
+#include <kernel/names.hpp>
 
 using cl::Buffer;
 using cl::Program;
@@ -54,34 +57,45 @@ void convSep(Param out, const Param signal, const Param filter)
         std::to_string(fLen);
 
     int device = getActiveDeviceId();
-    kc_t::iterator idx = kernelCaches[device].find(ref_name);
 
-    kc_entry_t entry;
-    if (idx == kernelCaches[device].end()) {
+    kc_entry_t entry = kernelCache(device, ref_name);
+
+    if (entry.prog==0 && entry.ker==0) {
         const size_t C0_SIZE  = (THREADS_X+2*(fLen-1))* THREADS_Y;
         const size_t C1_SIZE  = (THREADS_Y+2*(fLen-1))* THREADS_X;
 
         size_t locSize = (conv_dim==0 ? C0_SIZE : C1_SIZE);
 
         std::ostringstream options;
-        options << " -D T=" << dtype_traits<T>::getName()
-                << " -D accType="<< dtype_traits<accType>::getName()
-                << " -D CONV_DIM="<< conv_dim
-                << " -D EXPAND="<< expand
-                << " -D FLEN="<< fLen
-                << " -D LOCAL_MEM_SIZE="<<locSize;
-        if (std::is_same<T, double>::value ||
-            std::is_same<T, cdouble>::value) {
+        options << " -D T="             << dtype_traits<T>::getName()
+                << " -D Ti="            << dtype_traits<T>::getName()
+                << " -D To="            << dtype_traits<accType>::getName()
+                << " -D accType="       << dtype_traits<accType>::getName()
+                << " -D CONV_DIM="      << conv_dim
+                << " -D EXPAND="        << expand
+                << " -D FLEN="          << fLen
+                << " -D LOCAL_MEM_SIZE="<<locSize
+                << " -D "               << binOpName<af_mul_t>();
+
+        if((af_dtype) dtype_traits<T>::af_type == c32 ||
+            (af_dtype) dtype_traits<T>::af_type == c64) {
+            options << " -D CPLX=1";
+        } else {
+            options << " -D CPLX=0";
+        }
+        if (std::is_same<T, double>::value || std::is_same<T, cdouble>::value) {
             options << " -D USE_DOUBLE";
         }
+
+        const char *ker_strs[] = {ops_cl, convolve_separable_cl};
+        const int   ker_lens[] = {ops_cl_len, convolve_separable_cl_len};
         Program prog;
-        buildProgram(prog, convolve_separable_cl, convolve_separable_cl_len, options.str());
+        buildProgram(prog, 2, ker_strs, ker_lens, options.str());
 
         entry.prog   = new Program(prog);
         entry.ker  = new Kernel(*entry.prog, "convolve");
-        kernelCaches[device][ref_name] = entry;
-    } else {
-        entry = idx->second;
+
+        addKernelToCache(device, ref_name, entry);
     }
 
     auto convOp = KernelFunctor<Buffer, KParam, Buffer, KParam, Buffer,

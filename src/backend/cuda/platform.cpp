@@ -10,26 +10,28 @@
 #include <af/version.h>
 #include <af/cuda.h>
 #include <platform.hpp>
-#include <defines.hpp>
-#include <util.hpp>
+#include <common/defines.hpp>
+#include <common/util.hpp>
 #include <version.hpp>
 #include <driver.h>
-#include <vector>
-#include <string>
+#include <err_cuda.hpp>
+#include <common/util.hpp>
+#include <common/host_memory.hpp>
+
 #include <algorithm>
+#include <array>
+#include <cstdio>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
-#include <cstdio>
-#include <cstring>
-#include <err_cuda.hpp>
-#include <util.hpp>
-#include <host_memory.hpp>
+#include <string>
+#include <thread>
+#include <vector>
 
 using namespace std;
 
 namespace cuda
 {
-
 ///////////////////////////////////////////////////////////////////////////
 // HELPERS
 ///////////////////////////////////////////////////////////////////////////
@@ -143,6 +145,18 @@ static inline string toString(T val)
     stringstream s;
     s << val;
     return s.str();
+}
+
+static inline
+int getMinSupportedCompute(int cudaMajorVer)
+{
+    // Vector of minimum supported compute versions
+    // for CUDA toolkit (i+1).* where i is the index
+    // of the vector
+    static const std::array<int,10> minSV{1, 1, 1, 1, 1, 1, 2, 2, 3, 3};
+
+    auto CVSize = minSV.size();
+    return (cudaMajorVer>CVSize ? minSV[CVSize-1] : minSV[cudaMajorVer-1]);
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -268,7 +282,7 @@ unsigned getMaxJitSize()
 {
     const int MAX_JIT_LEN = 100;
 
-    static int length = 0;
+    thread_local int length = 0;
     if (length == 0) {
         std::string env_var = getEnvVar("AF_CUDA_MAX_JIT_LEN");
         if (!env_var.empty()) {
@@ -281,6 +295,13 @@ unsigned getMaxJitSize()
     return length;
 }
 
+int& tlocalActiveDeviceId()
+{
+    thread_local int activeDeviceId = 0;
+
+    return activeDeviceId;
+}
+
 int getDeviceCount()
 {
     return DeviceManager::getInstance().nDevices;
@@ -288,7 +309,7 @@ int getDeviceCount()
 
 int getActiveDeviceId()
 {
-    return DeviceManager::getInstance().activeDev;
+    return tlocalActiveDeviceId();
 }
 
 int getDeviceNativeId(int device)
@@ -312,17 +333,20 @@ int getDeviceIdFromNativeId(int nativeId)
 
 cudaStream_t getStream(int device)
 {
-    cudaStream_t str = DeviceManager::getInstance().streams[device];
-    // if the stream has not yet been initialized, ie. the device has not been
-    // set to active at least once (cuz that's where the stream is created)
-    // then set the device, get the stream, reset the device to current
-    if(!str) {
-        int active_dev = DeviceManager::getInstance().activeDev;
-        setDevice(device);
-        str = DeviceManager::getInstance().streams[device];
-        setDevice(active_dev);
-    }
-    return str;
+    static std::once_flag streamInitFlags[DeviceManager::MAX_DEVICES];
+
+    std::call_once(streamInitFlags[device],
+            [device]() {
+                DeviceManager& inst = DeviceManager::getInstance();
+                CUDA_CHECK(cudaStreamCreate( & (inst.streams[device]) ));
+            });
+
+    return DeviceManager::getInstance().streams[device];
+}
+
+cudaStream_t getActiveStream()
+{
+    return getStream(getActiveDeviceId());
 }
 
 size_t getDeviceMemorySize(int device)
@@ -350,28 +374,161 @@ cudaDeviceProp getDeviceProp(int device)
 ///////////////////////////////////////////////////////////////////////////
 // DeviceManager Class Functions
 ///////////////////////////////////////////////////////////////////////////
+#if defined(WITH_GRAPHICS)
+bool DeviceManager::checkGraphicsInteropCapability()
+{
+    static std::once_flag checkInteropFlag;
+    thread_local bool capable  = true;
+
+    std::call_once(checkInteropFlag, [](){
+            unsigned int pCudaEnabledDeviceCount = 0;
+            int pCudaGraphicsEnabledDeviceIds = 0;
+            cudaGetLastError(); // Reset Errors
+            cudaError_t err = cudaGLGetDevices(&pCudaEnabledDeviceCount, &pCudaGraphicsEnabledDeviceIds, getDeviceCount(), cudaGLDeviceListAll);
+            if(err == 63) { // OS Support Failure - Happens when devices are only Tesla
+                capable = false;
+                printf("Warning: No CUDA Device capable of CUDA-OpenGL. CUDA-OpenGL Interop will use CPU fallback.\n");
+                printf("Corresponding CUDA Error (%d): %s.\n", err, cudaGetErrorString(err));
+                printf("This may happen if all CUDA Devices are in TCC Mode and/or not connected to a display.\n");
+            }
+            cudaGetLastError(); // Reset Errors
+        });
+
+    return capable;
+}
+#endif
+
 DeviceManager& DeviceManager::getInstance()
 {
-    static DeviceManager my_instance;
-    return my_instance;
+    static DeviceManager *my_instance = new DeviceManager();
+    return *my_instance;
+}
+
+MemoryManager& memoryManager()
+{
+    static std::once_flag flag;
+
+    DeviceManager& inst = DeviceManager::getInstance();
+
+    std::call_once(flag, [&]() { inst.memManager.reset(new MemoryManager()); });
+
+    return *(inst.memManager.get());
+}
+
+MemoryManagerPinned& pinnedMemoryManager()
+{
+    static std::once_flag flag;
+
+    DeviceManager& inst = DeviceManager::getInstance();
+
+    std::call_once(flag, [&]() { inst.pinnedMemManager.reset(new MemoryManagerPinned()); });
+
+    return *(inst.pinnedMemManager.get());
+}
+
+#if defined(WITH_GRAPHICS)
+GraphicsResourceManager& interopManager()
+{
+    static std::once_flag initFlags[DeviceManager::MAX_DEVICES];
+
+    int id = getActiveDeviceId();
+
+    DeviceManager& inst = DeviceManager::getInstance();
+
+    std::call_once(initFlags[id], [&]{ inst.gfxManagers[id].reset(new GraphicsResourceManager()); });
+
+    return *(inst.gfxManagers[id].get());
+}
+#endif
+
+PlanCache& fftManager()
+{
+    thread_local PlanCache cufftManagers[DeviceManager::MAX_DEVICES];
+
+    return cufftManagers[getActiveDeviceId()];
+}
+
+BlasHandle blasHandle()
+{
+    thread_local std::unique_ptr<cublasHandle> cublasHandles[DeviceManager::MAX_DEVICES];
+    thread_local std::once_flag initFlags[DeviceManager::MAX_DEVICES];
+
+    int id = cuda::getActiveDeviceId();
+
+    std::call_once(initFlags[id], [&]{ cublasHandles[id].reset(new cublasHandle()); });
+
+    CUBLAS_CHECK(cublasSetStream(cublasHandles[id].get()->get(), cuda::getStream(id)));
+
+    return cublasHandles[id].get()->get();
+}
+
+SolveHandle solverDnHandle()
+{
+    thread_local std::unique_ptr<cusolverDnHandle> cusolverHandles[DeviceManager::MAX_DEVICES];
+    thread_local std::once_flag initFlags[DeviceManager::MAX_DEVICES];
+
+    int id = cuda::getActiveDeviceId();
+
+    std::call_once(initFlags[id], [&]{ cusolverHandles[id].reset(new cusolverDnHandle()); });
+
+    //FIXME
+    // This is not an ideal case. It's just a hack.
+    // The correct way to do is to use
+    // CUSOLVER_CHECK(cusolverDnSetStream(cuda::getStream(cuda::getActiveDeviceId())))
+    // in the class constructor.
+    // However, this is causing a lot of the cusolver functions to fail.
+    // The only way to fix them is to use cudaDeviceSynchronize() and
+    //     cudaStreamSynchronize()
+    // all over the place, but even then some calls like getrs in solve_lu
+    // continue to fail on any stream other than 0.
+    //
+    // cuSolver Streams patch:
+    // https://gist.github.com/shehzan10/414c3d04a40e7c4a03ed3c2e1b9072e7
+    CUDA_CHECK(cudaStreamSynchronize(cuda::getStream(id)));
+
+    return cusolverHandles[id].get()->get();
+}
+
+SparseHandle sparseHandle()
+{
+    thread_local std::unique_ptr<cusparseHandle> cusparseHandles[DeviceManager::MAX_DEVICES];
+    thread_local std::once_flag initFlags[DeviceManager::MAX_DEVICES];
+
+    int id = cuda::getActiveDeviceId();
+
+    std::call_once(initFlags[id], [&]{ cusparseHandles[id].reset(new cusparseHandle()); });
+
+    CUSPARSE_CHECK(cusparseSetStream(cusparseHandles[id].get()->get(), cuda::getStream(id)));
+
+    return cusparseHandles[id].get()->get();
 }
 
 DeviceManager::DeviceManager()
-    : cuDevices(0), activeDev(0), nDevices(0)
+    : cuDevices(0), nDevices(0)
 {
     CUDA_CHECK(cudaGetDeviceCount(&nDevices));
     if (nDevices == 0)
         throw runtime_error("No CUDA-Capable devices found");
-
     cuDevices.reserve(nDevices);
+
+    int cudaRtVer = 0;
+    CUDA_CHECK(cudaRuntimeGetVersion(&cudaRtVer));
+    int cudaMajorVer = cudaRtVer / 1000;
 
     for(int i = 0; i < nDevices; i++) {
         cudaDevice_t dev;
         cudaGetDeviceProperties(&dev.prop, i);
-        dev.flops = dev.prop.multiProcessorCount * compute2cores(dev.prop.major, dev.prop.minor) * dev.prop.clockRate;
-        dev.nativeId = i;
-        cuDevices.push_back(dev);
+        if (dev.prop.major<getMinSupportedCompute(cudaMajorVer)) {
+            continue;
+        } else {
+            dev.flops = dev.prop.multiProcessorCount *
+                        compute2cores(dev.prop.major, dev.prop.minor) *
+                        dev.prop.clockRate;
+            dev.nativeId = i;
+            cuDevices.push_back(dev);
+        }
     }
+    nDevices = cuDevices.size();
 
     sortDevices();
 
@@ -417,48 +574,49 @@ void DeviceManager::sortDevices(sort_mode mode)
 
 int DeviceManager::setActiveDevice(int device, int nId)
 {
-    static bool first = true;
+    thread_local bool retryFlag = true;
 
     int numDevices = cuDevices.size();
 
-    if(device > numDevices) return -1;
+    if (device >= numDevices)
+        return -1;
 
-    int old = activeDev;
-    if(nId == -1) nId = getDeviceNativeId(device);
-    CUDA_CHECK(cudaSetDevice(nId));
+    int old = getActiveDeviceId();
 
-    cudaError_t err = cudaSuccess;
-    if(!streams[device])
-        err = cudaStreamCreate(&streams[device]);
+    if(nId == -1)
+        nId = getDeviceNativeId(device);
 
-    activeDev = device;
+    cudaError_t err = cudaSetDevice(nId);
 
-    if (err == cudaSuccess) return old;
+    if (err == cudaSuccess) {
+        tlocalActiveDeviceId() = device;
+        return old;
+    }
 
-    // Comes when user sets device
-    // If success, return. Else throw error
-    if (!first) {
+    // For the first time a thread calls setDevice,
+    // if the requested device is unavailable, try checking
+    // for other available devices - while loop below
+    if (!retryFlag) {
         CUDA_CHECK(err);
         return old;
     }
 
-    // Comes only when first is true. Set it to false
-    first = false;
+    // Comes only when retryFlag is true. Set it to false
+    retryFlag = false;
 
     while(true) {
         // Check for errors other than DevicesUnavailable
         // If success, return. Else throw error
         // If DevicesUnavailable, try other devices (while loop below)
-        if (err != cudaErrorDevicesUnavailable) {
+        if (err != cudaErrorDeviceAlreadyInUse) {
             CUDA_CHECK(err);
-            activeDev = device;
+            tlocalActiveDeviceId() = device;
             return old;
         }
         cudaGetLastError(); // Reset error stack
 #ifndef NDEBUG
         printf("Warning: Device %d is unavailable. Incrementing to next device \n", device);
 #endif
-
         // Comes here is the device is in exclusive mode or
         // otherwise fails streamCreate with this error.
         // All other errors will error out
@@ -468,11 +626,10 @@ int DeviceManager::setActiveDevice(int device, int nId)
         // Can't call getNativeId here as it will cause an infinite loop with the constructor
         nId = cuDevices[device].nativeId;
 
-        CUDA_CHECK(cudaSetDevice(nId));
-        err = cudaStreamCreate(&streams[device]);
+        err = cudaSetDevice(nId);
     }
 
-    // If all devices fail with DevicesUnavailable, then throw this error
+    // If all devices fail with DeviceAlreadyInUse, then throw this error
     CUDA_CHECK(err);
 
     return old;
@@ -482,21 +639,21 @@ void sync(int device)
 {
     int currDevice = getActiveDeviceId();
     setDevice(device);
-    CUDA_CHECK(cudaStreamSynchronize(getStream(getActiveDeviceId())));
+    CUDA_CHECK(cudaStreamSynchronize(getActiveStream()));
     setDevice(currDevice);
 }
 
-bool synchronize_calls() {
-    static bool sync = getEnvVar("AF_SYNCHRONOUS_CALLS") == "1";
+bool synchronize_calls()
+{
+    static const bool sync = getEnvVar("AF_SYNCHRONOUS_CALLS") == "1";
     return sync;
 }
 
 bool& evalFlag()
 {
-    static bool flag = true;
+    thread_local bool flag = true;
     return flag;
 }
-
 }
 
 af_err afcu_get_stream(cudaStream_t* stream, int id)

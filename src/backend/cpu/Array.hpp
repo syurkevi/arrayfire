@@ -9,40 +9,39 @@
 
 //This is the array implementation class.
 #pragma once
-#include <af/dim4.hpp>
-#include <ArrayInfo.hpp>
-#include <backend.hpp>
-#include <types.hpp>
-#include <traits.hpp>
+#include <Param.hpp>
 #include <TNJ/Node.hpp>
+#include <common/ArrayInfo.hpp>
 #include <memory.hpp>
-#include <memory>
-#include <algorithm>
-#include <vector>
 #include <platform.hpp>
 #include <queue.hpp>
 
-// cpu::Array class forward declaration
-namespace cpu
-{
-template<typename T> class Array;
-// kernel::evalArray fn forward declaration
-namespace kernel
-{
-template<typename T> void evalArray(cpu::Array<T> in);
-}
-}
+#include <af/defines.h>
+#include <af/dim4.hpp>
+#include <af/seq.h>
+
+#include <cstddef>
+#include <memory>
+#include <vector>
 
 namespace cpu
 {
+    namespace kernel
+    {
+        template<typename T> void evalArray(Param<T> in, TNJ::Node_ptr node);
+
+        template<typename T>
+        void evalMultiple(std::vector<Param<T>> arrays, std::vector<TNJ::Node_ptr> nodes);
+
+    }
+
+    template<typename T> class Array;
 
     using std::shared_ptr;
     using af::dim4;
 
     template<typename T>
     void evalMultiple(std::vector<Array<T> *> arrays);
-
-    template<typename T> class Array;
 
     // Creates a new Array object on the heap and returns a reference to it.
     template<typename T>
@@ -59,17 +58,22 @@ namespace cpu
     template<typename T>
     Array<T> createDeviceDataArray(const af::dim4 &size, const void *data);
 
-    // Copies data to an existing Array object from a host pointer
+    /// Copies data to an existing Array object from a host pointer
     template<typename T>
     void writeHostDataArray(Array<T> &arr, const T * const data, const size_t bytes);
 
-    // Copies data to an existing Array object from a device pointer
+    /// Copies data to an existing Array object from a device pointer
     template<typename T>
     void writeDeviceDataArray(Array<T> &arr, const void * const data, const size_t bytes);
 
-    // Create an Array object and do not assign any values to it
+    /// Create an Array object and do not assign any values to it.
+    /// \NOTE: This object should not be used to initalize an array. Use
+    ///       createEmptyArray instead
     template<typename T> Array<T> *initArray();
 
+    /// Creates an empty array of a given size. No data is initialized
+    ///
+    /// \param[in] size The dimension of the output array
     template<typename T>
     Array<T> createEmptyArray(const af::dim4 &size);
 
@@ -121,8 +125,6 @@ namespace cpu
         explicit Array(af::dim4 dims, TNJ::Node_ptr n);
 
     public:
-
-
         Array(af::dim4 dims, af::dim4 strides, dim_t offset,
               const T * const in_data, bool is_device = false);
 
@@ -147,21 +149,21 @@ namespace cpu
 #define INFO_IS_FUNC(NAME)\
     bool NAME () const { return info.NAME(); }
 
-        INFO_IS_FUNC(isEmpty);
-        INFO_IS_FUNC(isScalar);
-        INFO_IS_FUNC(isRow);
-        INFO_IS_FUNC(isColumn);
-        INFO_IS_FUNC(isVector);
-        INFO_IS_FUNC(isComplex);
-        INFO_IS_FUNC(isReal);
-        INFO_IS_FUNC(isDouble);
-        INFO_IS_FUNC(isSingle);
-        INFO_IS_FUNC(isRealFloating);
-        INFO_IS_FUNC(isFloating);
-        INFO_IS_FUNC(isInteger);
-        INFO_IS_FUNC(isBool);
-        INFO_IS_FUNC(isLinear);
-        INFO_IS_FUNC(isSparse);
+        INFO_IS_FUNC(isEmpty)
+        INFO_IS_FUNC(isScalar)
+        INFO_IS_FUNC(isRow)
+        INFO_IS_FUNC(isColumn)
+        INFO_IS_FUNC(isVector)
+        INFO_IS_FUNC(isComplex)
+        INFO_IS_FUNC(isReal)
+        INFO_IS_FUNC(isDouble)
+        INFO_IS_FUNC(isSingle)
+        INFO_IS_FUNC(isRealFloating)
+        INFO_IS_FUNC(isFloating)
+        INFO_IS_FUNC(isInteger)
+        INFO_IS_FUNC(isBool)
+        INFO_IS_FUNC(isLinear)
+        INFO_IS_FUNC(isSparse)
 
 #undef INFO_IS_FUNC
 
@@ -182,15 +184,17 @@ namespace cpu
             return data_dims;
         }
 
-        void setDataDims(const dim4 &new_dims)
-        {
-            modDims(new_dims);
-            data_dims = new_dims;
-        }
+        void setDataDims(const dim4 &new_dims);
 
         size_t getAllocatedBytes() const
         {
-            return data_dims.elements() * sizeof(T);
+            if (!isReady()) return 0;
+            size_t bytes = memoryManager().allocated(data.get());
+            // External device poitner
+            if (bytes == 0 && data.get()) {
+                return data_dims.elements() * sizeof(T);
+            }
+            return  bytes;
         }
 
         T* device();
@@ -207,14 +211,24 @@ namespace cpu
 
         const T* get(bool withOffset = true) const
         {
-            if (!isReady()) eval();
+            if (!data.get()) eval();
             return data.get() + (withOffset ? getOffset() : 0);
         }
 
         int useCount() const
         {
-            if (!isReady()) eval();
+            if (!data.get()) eval();
             return data.use_count();
+        }
+
+        operator Param<T>()
+        {
+            return Param<T>(this->get(), this->dims(), this->strides());
+        }
+
+        operator CParam<T>() const
+        {
+            return CParam<T>(this->get(), this->dims(), this->strides());
         }
 
         TNJ::Node_ptr getNode() const;
@@ -233,7 +247,9 @@ namespace cpu
                                           const std::vector<af_seq> &index,
                                           bool copy);
 
-        friend void kernel::evalArray<T>(Array<T> in);
+        friend void kernel::evalArray<T>(Param<T> in, TNJ::Node_ptr node);
+        friend void kernel::evalMultiple<T>(std::vector<Param<T>> arrays,
+                                            std::vector<TNJ::Node_ptr> nodes);
 
         friend void destroyArray<T>(Array<T> *arr);
         friend void *getDevicePtr<T>(const Array<T>& arr);

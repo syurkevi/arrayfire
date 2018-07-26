@@ -10,10 +10,10 @@
 #include <af/array.h>
 #include <af/signal.h>
 #include <af/defines.h>
-#include <err_common.hpp>
+#include <common/err_common.hpp>
 #include <handle.hpp>
 #include <backend.hpp>
-#include <ArrayInfo.hpp>
+#include <common/ArrayInfo.hpp>
 #include <approx.hpp>
 
 using af::dim4;
@@ -61,8 +61,7 @@ af_err af_approx1(af_array *out, const af_array in, const af_array pos,
                        method == AF_INTERP_LOWER));
 
         if(idims.ndims() == 0 || pdims.ndims() ==  0) {
-            dim_t my_dims[] = { 0, 0, 0, 0 };
-            return af_create_handle(out, AF_MAX_DIMS, my_dims, itype);
+            return af_create_handle(out, 0, nullptr, itype);
         }
 
         af_array output;
@@ -108,8 +107,7 @@ af_err af_approx2(af_array *out, const af_array in, const af_array pos0, const a
                       (pdims[2] == idims[2] && pdims[3] == idims[3]));
 
         if(idims.ndims() == 0 || pdims.ndims() ==  0 || qdims.ndims() == 0) {
-            dim_t my_dims[] = { 0, 0, 0, 0 };
-            return af_create_handle(out, AF_MAX_DIMS, my_dims, itype);
+            return af_create_handle(out, 0, nullptr, itype);
         }
 
         af_array output;

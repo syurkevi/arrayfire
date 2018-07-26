@@ -16,9 +16,14 @@
 #include <iostream>
 #include <testHelpers.hpp>
 
+using std::abs;
+using std::cout;
+using std::endl;
+using std::ostream_iterator;
 using std::string;
 using std::vector;
-using std::abs;
+using af::dim4;
+using af::dtype_traits;
 
 template<typename T>
 class Histogram : public ::testing::Test
@@ -39,34 +44,33 @@ void histTest(string pTestFile, unsigned nbins, double minval, double maxval)
     if (noDoubleTests<inType>()) return;
     if (noDoubleTests<outType>()) return;
 
-    vector<af::dim4> numDims;
+    vector<dim4> numDims;
 
     vector<vector<inType> >  in;
     vector<vector<outType> > tests;
     readTests<inType,uint,int>(pTestFile,numDims,in,tests);
-    af::dim4 dims       = numDims[0];
+    dim4 dims       = numDims[0];
 
     af_array outArray   = 0;
     af_array inArray    = 0;
-    outType *outData;
-    ASSERT_EQ(AF_SUCCESS, af_create_array(&inArray, &(in[0].front()), dims.ndims(), dims.get(), (af_dtype) af::dtype_traits<inType>::af_type));
+
+    ASSERT_EQ(AF_SUCCESS, af_create_array(&inArray, &(in[0].front()), dims.ndims(), dims.get(), (af_dtype) dtype_traits<inType>::af_type));
 
     ASSERT_EQ(AF_SUCCESS,af_histogram(&outArray,inArray,nbins,minval,maxval));
 
-    outData = new outType[dims.elements()];
+    vector<outType> outData(dims.elements());
 
-    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)outData, outArray));
+    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)outData.data(), outArray));
 
     for (size_t testIter=0; testIter<tests.size(); ++testIter) {
         vector<outType> currGoldBar = tests[testIter];
         size_t nElems        = currGoldBar.size();
         for (size_t elIter=0; elIter<nElems; ++elIter) {
-            ASSERT_EQ(currGoldBar[elIter],outData[elIter])<< "at: " << elIter<< std::endl;
+            ASSERT_EQ(currGoldBar[elIter],outData[elIter])<< "at: " << elIter<< endl;
         }
     }
 
     // cleanup
-    delete[] outData;
     ASSERT_EQ(AF_SUCCESS, af_release_array(inArray));
     ASSERT_EQ(AF_SUCCESS, af_release_array(outArray));
 }
@@ -98,6 +102,16 @@ TYPED_TEST(Histogram,256Bins0min255max_zeros)
 
 /////////////////////////////////// CPP //////////////////////////////////
 //
+using af::array;
+using af::constant;
+using af::histogram;
+using af::max;
+using af::randu;
+using af::range;
+using af::round;
+using af::seq;
+using af::span;
+
 TEST(Histogram, CPP)
 {
     if (noDoubleTests<float>()) return;
@@ -107,42 +121,33 @@ TEST(Histogram, CPP)
     const double minval = 0.0;
     const double maxval = 99.0;
 
-    vector<af::dim4> numDims;
+    vector<dim4> numDims;
 
     vector<vector<float> >  in;
     vector<vector<uint> > tests;
     readTests<float,uint,int>(string(TEST_DIR"/histogram/100bin0min99max.test"),numDims,in,tests);
 
 //! [hist_nominmax]
-    af::array input(numDims[0], &(in[0].front()));
-    af::array output = histogram(input, nbins, minval, maxval);
+    array input(numDims[0], &(in[0].front()));
+    array output = histogram(input, nbins, minval, maxval);
 //! [hist_nominmax]
 
-    uint *outData = new uint[output.elements()];
-    output.host((void*)outData);
+    vector<uint> outData(output.elements());
+    output.host((void*)outData.data());
 
     for (size_t testIter=0; testIter<tests.size(); ++testIter) {
         vector<uint> currGoldBar = tests[testIter];
         size_t nElems        = currGoldBar.size();
         for (size_t elIter=0; elIter<nElems; ++elIter) {
-            ASSERT_EQ(currGoldBar[elIter],outData[elIter])<< "at: " << elIter<< std::endl;
+            ASSERT_EQ(currGoldBar[elIter],outData[elIter])<< "at: " << elIter<< endl;
         }
     }
-
-    // cleanup
-    delete[] outData;
 }
 
 /////////////////////////////////// Documentation Snippets //////////////////////////////////
 //
 TEST(Histogram, SNIPPET_hist_nominmax)
 {
-    using af::array;
-    using af::histogram;
-    using std::ostream_iterator;
-    using std::cout;
-    using std::endl;
-
     unsigned output[] = {3, 1, 2, 0, 0, 0, 0, 1, 1, 1};
 
     //! [ex_image_hist_nominmax]
@@ -170,12 +175,6 @@ TEST(Histogram, SNIPPET_hist_nominmax)
 
 TEST(Histogram, SNIPPET_hist_minmax)
 {
-    using af::array;
-    using af::histogram;
-    using std::ostream_iterator;
-    using std::cout;
-    using std::endl;
-
     unsigned output[] = {0, 3, 1, 2, 0, 0, 1, 1, 1, 0};
 
     //! [ex_image_hist_minmax]
@@ -203,12 +202,6 @@ TEST(Histogram, SNIPPET_hist_minmax)
 
 TEST(Histogram, SNIPPET_histequal)
 {
-    using af::array;
-    using af::histogram;
-    using std::ostream_iterator;
-    using std::cout;
-    using std::endl;
-
     float output[] = { 1.5, 4.5,  1.5, 1.5, 4.5, 4.5, 6.0, 7.5, 4.5 };
 
     //! [ex_image_histequal]
@@ -231,7 +224,7 @@ TEST(Histogram, SNIPPET_histequal)
 
     if( false == equal(h_out.begin(), h_out.end(), output) ) {
         cout << "Expected: ";
-        copy(output, output + nbins, ostream_iterator<float>(cout, ", "));
+        copy(output, output + nElems, ostream_iterator<float>(cout, ", "));
         cout << endl << "Actual: ";
         copy(h_out.begin(), h_out.end(), ostream_iterator<float>(cout, ", "));
         FAIL() << "Output did not match";
@@ -240,8 +233,6 @@ TEST(Histogram, SNIPPET_histequal)
 
 TEST(histogram, GFOR)
 {
-    using namespace af;
-
     dim4 dims = dim4(100, 100, 3);
     array A = round(100 * randu(dims));
     array B = constant(0, 100, 1, 3);
@@ -259,8 +250,6 @@ TEST(histogram, GFOR)
 
 TEST(histogram, IndexedArray)
 {
-    using namespace af;
-
     const dim_t LEN = 32;
     array A = range(LEN, (dim_t)2);
     for (int i=16; i<28; ++i) {
@@ -274,4 +263,32 @@ TEST(histogram, IndexedArray)
     ASSERT_EQ(true, out[1] ==  8);
     ASSERT_EQ(true, out[2] ==  8);
     ASSERT_EQ(true, out[3] ==  8);
+}
+
+TEST(histogram, LargeBins)
+{
+    const int max_val = 20000;
+    const int min_val = 0;
+    const int nbins = max_val / 2;
+    const int num = 1 << 20;
+    array A = round(max_val * randu(num) + min_val).as(u32);
+    eval(A);
+    array H = histogram(A, nbins, min_val, max_val);
+
+    vector<unsigned> hA(num);
+    A.host(hA.data());
+
+    vector<unsigned> hH(nbins);
+    H.host(hH.data());
+
+    int dx = (max_val - min_val) / nbins;
+    for (int i = 0; i < num; i++) {
+        int bin = (hA[i] - min_val) / dx;
+        bin = std::min(bin, nbins - 1);
+        hH[bin] -= 1;
+    }
+
+    for (int i = 0; i < nbins; i++) {
+        ASSERT_EQ(hH[i], 0u);
+    }
 }

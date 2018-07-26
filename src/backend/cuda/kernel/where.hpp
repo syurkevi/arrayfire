@@ -10,7 +10,7 @@
 #include <ops.hpp>
 #include <backend.hpp>
 #include <Param.hpp>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <math.hpp>
 #include <err_cuda.hpp>
 #include <debug_cuda.hpp>
@@ -37,9 +37,9 @@ namespace kernel
         const uint tidy = threadIdx.y;
 
         const uint zid = blockIdx.x / blocks_x;
-        const uint wid = blockIdx.y / blocks_y;
+        const uint wid = (blockIdx.y + blockIdx.z * gridDim.y) / blocks_y;
         const uint blockIdx_x = blockIdx.x - (blocks_x) * zid;
-        const uint blockIdx_y = blockIdx.y - (blocks_y) * wid;
+        const uint blockIdx_y = (blockIdx.y + blockIdx.z * gridDim.y) - (blocks_y) * wid;
         const uint xid = blockIdx_x * blockDim.x * lim + tidx;
         const uint yid = blockIdx_y * blockDim.y + tidy;
 
@@ -95,10 +95,11 @@ namespace kernel
         }
 
         int rtmp_elements = rtmp.strides[3] * rtmp.dims[3];
-        rtmp.ptr = memAlloc<uint>(rtmp_elements);
-
         int otmp_elements = otmp.strides[3] * otmp.dims[3];
-        otmp.ptr = memAlloc<uint>(otmp_elements);
+        auto rtmp_alloc = memAlloc<uint>(rtmp_elements);
+        auto otmp_alloc = memAlloc<uint>(otmp_elements);
+        rtmp.ptr = rtmp_alloc.get();
+        otmp.ptr = otmp_alloc.get();
 
         scan_first_launcher<T, uint, af_notzero_t, false, true>(otmp, rtmp, in,
                                                           blocks_x, blocks_y,
@@ -118,10 +119,11 @@ namespace kernel
         uint total;
         CUDA_CHECK(cudaMemcpyAsync(&total, rtmp.ptr + rtmp_elements - 1,
                               sizeof(uint), cudaMemcpyDeviceToHost,
-                              cuda::getStream(cuda::getActiveDeviceId())));
-        CUDA_CHECK(cudaStreamSynchronize(cuda::getStream(cuda::getActiveDeviceId())));
+                              cuda::getActiveStream()));
+        CUDA_CHECK(cudaStreamSynchronize(cuda::getActiveStream()));
 
-        out.ptr = memAlloc<uint>(total);
+        auto out_alloc = memAlloc<uint>(total);
+        out.ptr = out_alloc.get();
 
         out.dims[0] = total;
         out.strides[0] = 1;
@@ -136,12 +138,15 @@ namespace kernel
 
         uint lim = divup(otmp.dims[0], (threads_x * blocks_x));
 
+        const int maxBlocksY = cuda::getDeviceProp(cuda::getActiveDeviceId()).maxGridSize[1];
+        blocks.z = divup(blocks.y, maxBlocksY);
+        blocks.y = divup(blocks.y, blocks.z);
+
         CUDA_LAUNCH((get_out_idx<T>), blocks, threads,
                 out.ptr, otmp, rtmp, in, blocks_x, blocks_y, lim);
         POST_LAUNCH_CHECK();
 
-        memFree(rtmp.ptr);
-        memFree(otmp.ptr);
+        out_alloc.release();
     }
 }
 }

@@ -18,10 +18,15 @@
 #include <algorithm>
 #include <testHelpers.hpp>
 
+using std::endl;
 using std::string;
 using std::vector;
+using af::array;
 using af::cdouble;
 using af::cfloat;
+using af::constant;
+using af::dim4;
+using af::randu;
 
 template<typename T>
 class Mean : public ::testing::Test
@@ -78,57 +83,51 @@ void meanDimTest(string pFileName, dim_t dim, bool isWeighted=false)
     if (noDoubleTests<T>()) return;
     if (noDoubleTests<outType>()) return;
 
-    vector<af::dim4>      numDims;
+    vector<dim4>      numDims;
     vector<vector<int> >        in;
     vector<vector<float> >   tests;
 
     readTestsFromFile<int,float>(pFileName, numDims, in, tests);
 
     if (!isWeighted) {
-        af::dim4 dims = numDims[0];
+        dim4 dims = numDims[0];
         vector<T> input(in[0].begin(), in[0].end());
 
-        af::array inArray(dims, &(input.front()));
+        array inArray(dims, &(input.front()));
 
-        af::array outArray = af::mean(inArray, dim);
+        array outArray = mean(inArray, dim);
 
-        outType *outData = new outType[dims.elements()];
+        vector<outType> outData(dims.elements());
 
-        outArray.host((void*)outData);
+        outArray.host((void*)outData.data());
 
         vector<outType> currGoldBar(tests[0].begin(), tests[0].end());
         size_t nElems = currGoldBar.size();
         for (size_t elIter=0; elIter<nElems; ++elIter) {
-            ASSERT_NEAR(::real(currGoldBar[elIter]), ::real(outData[elIter]), 1.0e-3)<< "at: " << elIter<< std::endl;
-            ASSERT_NEAR(::imag(currGoldBar[elIter]), ::imag(outData[elIter]), 1.0e-3)<< "at: " << elIter<< std::endl;
+            ASSERT_NEAR(::real(currGoldBar[elIter]), ::real(outData[elIter]), 1.0e-3)<< "at: " << elIter<< endl;
+            ASSERT_NEAR(::imag(currGoldBar[elIter]), ::imag(outData[elIter]), 1.0e-3)<< "at: " << elIter<< endl;
         }
-
-        // cleanup
-        delete[] outData;
     } else {
-        af::dim4 dims  = numDims[0];
-        af::dim4 wdims = numDims[1];
+        dim4 dims  = numDims[0];
+        dim4 wdims = numDims[1];
         vector<T> input(in[0].begin(), in[0].end());
         vector<float> weights(in[1].begin(), in[1].end());
 
-        af::array inArray(dims, &(input.front()));
-        af::array wtsArray(wdims, &(weights.front()));
+        array inArray(dims, &(input.front()));
+        array wtsArray(wdims, &(weights.front()));
 
-        af::array outArray = af::mean(inArray, wtsArray, dim);
+        array outArray = mean(inArray, wtsArray, dim);
 
-        outType *outData = new outType[dims.elements()];
+        vector<outType> outData(dims.elements());
 
-        outArray.host((void*)outData);
+        outArray.host((void*)outData.data());
 
         vector<outType> currGoldBar(tests[0].begin(), tests[0].end());
         size_t nElems = currGoldBar.size();
         for (size_t elIter=0; elIter<nElems; ++elIter) {
-            ASSERT_NEAR(::real(currGoldBar[elIter]), ::real(outData[elIter]), 1.0e-3)<< "at: " << elIter<< std::endl;
-            ASSERT_NEAR(::imag(currGoldBar[elIter]), ::imag(outData[elIter]), 1.0e-3)<< "at: " << elIter<< std::endl;
+            ASSERT_NEAR(::real(currGoldBar[elIter]), ::real(outData[elIter]), 1.0e-3)<< "at: " << elIter<< endl;
+            ASSERT_NEAR(::imag(currGoldBar[elIter]), ::imag(outData[elIter]), 1.0e-3)<< "at: " << elIter<< endl;
         }
-
-        // cleanup
-        delete[] outData;
     }
 }
 
@@ -173,7 +172,7 @@ TYPED_TEST(Mean, Wtd_Dim1Matrix)
 }
 
 template<typename T>
-void meanAllTest(T const_value, af::dim4 dims)
+void meanAllTest(T const_value, dim4 dims)
 {
     typedef typename meanOutType<T>::type outType;
     if (noDoubleTests<T>()) return;
@@ -200,52 +199,52 @@ void meanAllTest(T const_value, af::dim4 dims)
 
 TEST(MeanAll, f64)
 {
-    meanAllTest<double>(2.1, af::dim4(10, 10, 1, 1));
+    meanAllTest<double>(2.1, dim4(10, 10, 1, 1));
 }
 
 TEST(MeanAll, f32)
 {
-    meanAllTest<float>(2.1f, af::dim4(10, 5, 2, 1));
+    meanAllTest<float>(2.1f, dim4(10, 5, 2, 1));
 }
 
 TEST(MeanAll, s32)
 {
-    meanAllTest<int>(2, af::dim4(5, 5, 2, 2));
+    meanAllTest<int>(2, dim4(5, 5, 2, 2));
 }
 
 TEST(MeanAll, u32)
 {
-    meanAllTest<unsigned>(2, af::dim4(100, 1, 1, 1));
+    meanAllTest<unsigned>(2, dim4(100, 1, 1, 1));
 }
 
 TEST(MeanAll, s8)
 {
-    meanAllTest<char>(2, af::dim4(5, 5, 2, 2));
+    meanAllTest<char>(2, dim4(5, 5, 2, 2));
 }
 
 TEST(MeanAll, u8)
 {
-    meanAllTest<uchar>(2, af::dim4(100, 1, 1, 1));
+    meanAllTest<uchar>(2, dim4(100, 1, 1, 1));
 }
 
 TEST(MeanAll, c32)
 {
-    meanAllTest<cfloat>(cfloat(2.1f), af::dim4(10, 5, 2, 1));
+    meanAllTest<cfloat>(cfloat(2.1f), dim4(10, 5, 2, 1));
 }
 
 TEST(MeanAll, s16)
 {
-    meanAllTest<short>(2, af::dim4(5, 5, 2, 2));
+    meanAllTest<short>(2, dim4(5, 5, 2, 2));
 }
 
 TEST(MeanAll, u16)
 {
-    meanAllTest<ushort>(2, af::dim4(100, 1, 1, 1));
+    meanAllTest<ushort>(2, dim4(100, 1, 1, 1));
 }
 
 TEST(MeanAll, c64)
 {
-    meanAllTest<cdouble>(cdouble(2.1), af::dim4(10, 10, 1, 1));
+    meanAllTest<cdouble>(cdouble(2.1), dim4(10, 10, 1, 1));
 }
 
 
@@ -267,7 +266,7 @@ class WeightedMean : public ::testing::Test
 TYPED_TEST_CASE(WeightedMean, TestTypes);
 
 template<typename T, typename wtsType>
-void weightedMeanAllTest(af::dim4 dims)
+void weightedMeanAllTest(dim4 dims)
 {
     typedef typename meanOutType<T>::type outType;
 
@@ -305,5 +304,46 @@ void weightedMeanAllTest(af::dim4 dims)
 
 TYPED_TEST(WeightedMean, Basic)
 {
-    weightedMeanAllTest<TypeParam, float>(af::dim4(32, 30, 33, 17));
+    weightedMeanAllTest<TypeParam, float>(dim4(32, 30, 33, 17));
+}
+
+TEST(WeightedMean, Broadacst)
+{
+    float val = 0.5f;
+    array a = randu(4096, 32);
+    array w = constant(val, a.dims());
+    array c = mean(a);
+    array d = mean(a, w);
+
+    vector<float> hc(c.elements());
+    vector<float> hd(d.elements());
+
+    c.host(hc.data());
+    d.host(hd.data());
+
+    for(size_t i = 0; i < hc.size(); i++) {
+        //C and D are the same because they are normalized by the sum of the weights.
+        ASSERT_NEAR(hc[i], hd[i], 1E-5);
+    }
+}
+
+TEST(Mean, Issue2093)
+{
+  const int NELEMS = 512;
+
+  array data = randu(1, NELEMS);
+  array wts  = constant(1.0f, 1, NELEMS);
+  vector<float> hdata(NELEMS);
+  data.host(hdata.data());
+
+  array out = mean(data, wts, 1);
+  float outVal;
+  out.host(&outVal);
+
+  float expected = 0.0;
+  for (size_t i=0; i<NELEMS; ++i)
+      expected += hdata[i];
+  expected /= NELEMS;
+
+  ASSERT_NEAR(outVal, expected, 0.001);
 }

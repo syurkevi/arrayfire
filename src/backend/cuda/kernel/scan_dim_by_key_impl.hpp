@@ -11,7 +11,7 @@
 #include <ops.hpp>
 #include <backend.hpp>
 #include <Param.hpp>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <math.hpp>
 #include <err_cuda.hpp>
 #include <debug_cuda.hpp>
@@ -99,7 +99,7 @@ namespace kernel
         Transform<Ti, To, op> transform;
         Binary<To, op> binop;
 
-        const To init = binop.init();
+        const To init = Binary<To, op>::init();
         To val = init;
 
         const bool isLast = (tidy == (DIMY - 1));
@@ -254,7 +254,7 @@ namespace kernel
         Transform<Ti, To, op> transform;
         Binary<To, op> binop;
 
-        const To init = binop.init();
+        const To init = Binary<To, op>::init();
         To val = init;
 
         const bool isLast = (tidy == (DIMY - 1));
@@ -524,9 +524,12 @@ namespace kernel
             }
 
             int tmp_elements = tmp.strides[3] * tmp.dims[3];
-            tmp.ptr = memAlloc<To>(tmp_elements);
-            tmpflg.ptr = memAlloc<char>(tmp_elements);
-            tmpid.ptr = memAlloc<int>(tmp_elements);
+            auto tmp_alloc = memAlloc<To>(tmp_elements);
+            auto tmpflg_alloc = memAlloc<char>(tmp_elements);
+            auto tmpid_alloc = memAlloc<int>(tmp_elements);
+            tmp.ptr = tmp_alloc.get();
+            tmpflg.ptr = tmpflg_alloc.get();
+            tmpid.ptr = tmpid_alloc.get();
 
             scan_dim_nonfinal_launcher<Ti, Tk, To, op>(out, tmp, tmpflg,
                                                        tmpid, in, key,
@@ -545,9 +548,6 @@ namespace kernel
             blocks_all[dim] = bdim;
             bcast_dim_launcher<To, op>(out, tmp, tmpid, dim, threads_y, blocks_all);
 
-            memFree(tmp.ptr);
-            memFree(tmpflg.ptr);
-            memFree(tmpid.ptr);
         }
     }
 

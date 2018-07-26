@@ -8,7 +8,7 @@
  ********************************************************/
 
 #include <math.hpp>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <Param.hpp>
 #include <kernel/iota.hpp>
 #include <err_cuda.hpp>
@@ -67,9 +67,9 @@ namespace cuda
             // Create/call iota
             // Array<uint> key = iota<uint>(seqDims, tileDims);
             dim4 keydims = inDims;
-            uint* key = memAlloc<uint>(keydims.elements());
+            auto key = memAlloc<uint>(keydims.elements());
             Param<uint> pKey;
-            pKey.ptr = key;
+            pKey.ptr = key.get();
             pKey.strides[0] = 1;
             pKey.dims[0] = keydims[0];
             for(int i = 1; i < 4; i++) {
@@ -104,8 +104,7 @@ namespace cuda
             //val.modDims(inDims);
 
             // Not really necessary
-            // CUDA_CHECK(cudaStreamSynchronize(cuda::getStream(cuda::getActiveDeviceId())));
-            memFree(key);
+            // CUDA_CHECK(cudaStreamSynchronize(cuda::getActiveStream()));
         }
 
         template<typename T>

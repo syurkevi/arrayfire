@@ -10,9 +10,9 @@
 #include <af/graphics.h>
 #include <af/data.h>
 
-#include <ArrayInfo.hpp>
-#include <graphics_common.hpp>
-#include <err_common.hpp>
+#include <common/ArrayInfo.hpp>
+#include <common/graphics_common.hpp>
+#include <common/err_common.hpp>
 #include <backend.hpp>
 #include <handle.hpp>
 #include <join.hpp>
@@ -159,9 +159,12 @@ af_err vectorFieldWrapper(const af_window wind, const af_array points, const af_
             default:  TYPE_ERROR(1, pType);
         }
 
+        auto gridDims = ForgeManager::getInstance().getWindowGrid(window);
         // Window's draw function requires either image or chart
         if (props->col > -1 && props->row > -1)
-            window->draw(props->row, props->col, *chart, props->title);
+            window->draw(gridDims.first, gridDims.second,
+                         props->row * gridDims.second + props->col,
+                         *chart, props->title);
         else
             window->draw(*chart);
     }
@@ -247,9 +250,12 @@ af_err vectorFieldWrapper(const af_window wind,
             default:  TYPE_ERROR(1, xpType);
         }
 
+        auto gridDims = ForgeManager::getInstance().getWindowGrid(window);
         // Window's draw function requires either image or chart
         if (props->col > -1 && props->row > -1)
-            window->draw(props->row, props->col, *chart, props->title);
+            window->draw(gridDims.first, gridDims.second,
+                         props->row * gridDims.second + props->col,
+                         *chart, props->title);
         else
             window->draw(*chart);
     }
@@ -323,9 +329,12 @@ af_err vectorFieldWrapper(const af_window wind,
             default:  TYPE_ERROR(1, xpType);
         }
 
+        auto gridDims = ForgeManager::getInstance().getWindowGrid(window);
         // Window's draw function requires either image or chart
         if (props->col > -1 && props->row > -1)
-            window->draw(props->row, props->col, *chart, props->title);
+            window->draw(gridDims.first, gridDims.second,
+                         props->row * gridDims.second + props->col,
+                         *chart, props->title);
         else
             window->draw(*chart);
     }

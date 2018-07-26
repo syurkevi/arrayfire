@@ -1,365 +1,86 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
+# Copyright (c) 2017, ArrayFire
+# All rights reserved.
+#
+# This file is distributed under 3-clause BSD license.
+# The complete license agreement can be obtained at:
+# http://arrayfire.com/licenses/BSD-3-Clause
 
-FIND_PACKAGE(CUDA 7.0 REQUIRED)
+include(InternalUtils)
+include(select_compute_arch)
 
-INCLUDE(CLKernelToH)
-INCLUDE(FindNVVM)
+dependency_check(CUDA_FOUND "CUDA not found.")
 
-OPTION(USE_LIBDEVICE "Use libdevice for CUDA JIT" ON)
-SET(CUDA_LIBDEVICE_DIR "${CUDA_NVVM_HOME}/libdevice" CACHE PATH "Path where libdevice compute files are located" FORCE)
+find_cuda_helper_libs(nvrtc)
+find_cuda_helper_libs(nvrtc-builtins)
 
-MARK_AS_ADVANCED(
-    CUDA_BUILD_CUBIN
-    CUDA_BUILD_EMULATION
-    CUDA_SDK_ROOT_DIR
-    CUDA_VERBOSE_BUILD)
+get_filename_component(CUDA_LIBRARIES_PATH ${CUDA_cudart_static_LIBRARY} DIRECTORY CACHE)
 
-# Disables running cuda_compute_check.c when build windows using remote
-OPTION(CUDA_COMPUTE_DETECT "Run autodetection of CUDA Architecture" ON)
-MARK_AS_ADVANCED(CUDA_COMPUTE_DETECT)
+include(CLKernelToH)
 
-IF(CUDA_COMPUTE_DETECT AND NOT DEFINED COMPUTES_DETECTED_LIST)
-    INCLUDE(CUDACheckCompute)
-ENDIF()
+if(NOT CUDA_architecture_build_targets)
+  cuda_detect_installed_gpus(detected_gpus)
+endif()
 
-IF(    CUDA_COMPUTE_20
-    OR CUDA_COMPUTE_30
-    OR CUDA_COMPUTE_32
-    OR CUDA_COMPUTE_35
-    OR CUDA_COMPUTE_37
-    OR CUDA_COMPUTE_50
-    OR CUDA_COMPUTE_52
-    OR CUDA_COMPUTE_53
-    OR CUDA_COMPUTE_60
-    OR CUDA_COMPUTE_61
-    OR CUDA_COMPUTE_62
-    )
-    SET(FALLBACK OFF)
-ELSE()
-    SET(FALLBACK ON)
-ENDIF()
+set(CUDA_architecture_build_targets ${detected_gpus} CACHE
+  STRING "The compute architectures targeted by this build. (Options: 3.0;Maxwell;All;Common)")
 
-LIST(LENGTH COMPUTES_DETECTED_LIST COMPUTES_LEN)
-IF(${COMPUTES_LEN} EQUAL 0 AND ${FALLBACK})
-    MESSAGE(STATUS "You can use -DCOMPUTES_DETECTED_LIST=\"AB;XY\" (semicolon separated list of CUDA Compute versions to enable the specified computes")
-    MESSAGE(STATUS "Individual compute versions flags are also available under CMake Advance options")
-    LIST(APPEND COMPUTES_DETECTED_LIST "30" "50")
-    IF(${CUDA_VERSION_MAJOR} GREATER 7) # Enable 60 only if CUDA 8 or greater
-        MESSAGE(STATUS "No computes detected. Fall back to 30, 50, 60")
-        LIST(APPEND COMPUTES_DETECTED_LIST "60")
-    ELSE(${CUDA_VERSION_MAJOR} GREATER 7)
-        LIST(APPEND COMPUTES_DETECTED_LIST "20")
-    ENDIF(${CUDA_VERSION_MAJOR} GREATER 7)
-ENDIF()
+cuda_select_nvcc_arch_flags(cuda_architecture_flags ${CUDA_architecture_build_targets})
+message(STATUS "CUDA_architecture_build_targets: ${CUDA_architecture_build_targets}")
 
-LIST(LENGTH COMPUTES_DETECTED_LIST COMPUTES_LEN)
-MESSAGE(STATUS "Number of Computes Detected = ${COMPUTES_LEN}")
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};
+  ${cuda_architecture_flags}
+  )
 
-FOREACH(COMPUTE_DETECTED ${COMPUTES_DETECTED_LIST})
-    SET(CUDA_COMPUTE_${COMPUTE_DETECTED} ON CACHE BOOL "" FORCE)
-ENDFOREACH()
+mark_as_advanced(
+    CUDA_LIBRARIES_PATH
+    CUDA_architecture_build_targets)
 
-MACRO(SET_COMPUTE VERSION)
-    SET(CUDA_GENERATE_CODE_${VERSION} "-gencode arch=compute_${VERSION},code=sm_${VERSION}")
-    SET(CUDA_GENERATE_CODE ${CUDA_GENERATE_CODE} ${CUDA_GENERATE_CODE_${VERSION}})
-    LIST(APPEND COMPUTE_VERSIONS "${VERSION}")
-    ADD_DEFINITIONS(-DCUDA_COMPUTE_${VERSION})
-    MESSAGE(STATUS "Setting Compute ${VERSION} to ON")
-ENDMACRO(SET_COMPUTE)
+cuda_include_directories(
+  ${CMAKE_CURRENT_BINARY_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${ArrayFire_SOURCE_DIR}/include
+  ${ArrayFire_BINARY_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/kernel
+  ${CMAKE_CURRENT_SOURCE_DIR}/JIT
+  ${CMAKE_CURRENT_SOURCE_DIR}/cub
+  ${ArrayFire_SOURCE_DIR}/src/api/c
+  ${ArrayFire_SOURCE_DIR}/src/backend
 
-# Iterate over compute versions. Create variables and enable computes if needed
-FOREACH(VER 20 30 32 35 37 50 52 53 60 61 62)
-    OPTION(CUDA_COMPUTE_${VER} "CUDA Compute Capability ${VER}" OFF)
-    MARK_AS_ADVANCED(CUDA_COMPUTE_${VER})
-    IF(${CUDA_COMPUTE_${VER}})
-        SET_COMPUTE(${VER})
-    ENDIF()
-ENDFOREACH()
+  # NOTE: Space after comma is necessary
+  $<JOIN:$<TARGET_PROPERTY:afcommon_interface,INTERFACE_INCLUDE_DIRECTORIES>, >
+  )
 
-# Error out if Compute 6x is enabled but CUDA version is less than 8
-IF(${CUDA_VERSION_MAJOR} LESS 8)
-    IF(   CUDA_COMPUTE_60
-       OR CUDA_COMPUTE_61
-       OR CUDA_COMPUTE_62
-      )
-        MESSAGE(FATAL_ERROR
-                "CUDA Compute 6x was enabled.\
-                 CUDA Compute 6x (Pascal) GPUs require CUDA 8 or greater.\
-                 Your CUDA Version is ${CUDA_VERSION}."
-                )
-    ENDIF()
-ENDIF(${CUDA_VERSION_MAJOR} LESS 8)
+set(jit_kernel_headers
+    "kernel_headers")
 
-IF(UNIX)
-    # GCC 5.3 and above give errors for mempcy from <string.h>
-    # This is a (temporary) fix for that
-    # This was fixed in CUDA 8.0
-    IF("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER "5.3.0")
-        IF(${CUDA_VERSION_MAJOR} LESS 8)
-            ADD_DEFINITIONS(-D_FORCE_INLINES)
-        ENDIF(${CUDA_VERSION_MAJOR} LESS 8)
+file(GLOB jit_src "kernel/jit.cuh")
 
-        # GCC 6.0 and above default to g++14, enabling c++11 features by default
-        # Enabling c++11 with nvcc 7.5 + gcc 6.x doesn't seem to work
-        # Only solution for now is to force use c++03 for gcc 6.x
-        IF(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER "6.0.0")
-          message( FATAL_ERROR "NVCC does not support GCC version 6.0 or greater." )
-        ENDIF()
-    ENDIF()
-
-    # Forcing STRICT ANSI should resolve a bunch of issues that NVIDIA seems to face with GCC compilers.
-    ADD_DEFINITIONS(-D__STRICT_ANSI__)
-    SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -Xcompiler -fvisibility=hidden)
-    IF(${WITH_COVERAGE})
-        SET(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -Xcompiler -fprofile-arcs -Xcompiler -ftest-coverage -Xlinker -fprofile-arcs -Xlinker -ftest-coverage")
-    ENDIF(${WITH_COVERAGE})
-ELSE()
-    ADD_DEFINITIONS(-DAFDLL)
-ENDIF()
-
-ADD_DEFINITIONS(-DAF_CUDA)
-
-# CMake 3.2 Adds CUDA_cusolver_LIBRARY variable to FindCUDA
-# Older version, use FIND_LIBRARY
-IF(CMAKE_VERSION VERSION_LESS 3.2)
-    IF(${CUDA_cusolver_LIBRARY} MATCHES " ")
-        UNSET(CUDA_cusolver_LIBRARY CACHE)  # When going from higher version to lower version
-    ENDIF()
-
-    # Use CUDA_cusolver_DIR to keep track of CUDA Toolkit for which cusolver was found.
-    # If the toolkit changed, then find cusolver again
-    IF(NOT "${CUDA_cusolver_DIR}" STREQUAL "${CUDA_TOOLKIT_ROOT_DIR}")
-        UNSET(CUDA_cusolver_DIR CACHE)
-        UNSET(CUDA_cusolver_LIBRARY CACHE)
-        FIND_LIBRARY (
-            CUDA_cusolver_LIBRARY
-            NAMES "cusolver"
-            PATHS ${CUDA_TOOLKIT_ROOT_DIR}
-            PATH_SUFFIXES "lib64" "lib/x64" "lib"
-            DOC "CUDA cusolver Library"
-            NO_DEFAULT_PATH
-            )
-        SET(CUDA_cusolver_DIR "${CUDA_TOOLKIT_ROOT_DIR}" CACHE INTERNAL "CUDA cusolver Root Directory")
-    ENDIF()
-    MARK_AS_ADVANCED(CUDA_cusolver_LIBRARY)
-    MESSAGE(STATUS "CUDA cusolver library available in CUDA Version ${CUDA_VERSION_STRING}")
-ENDIF(CMAKE_VERSION VERSION_LESS 3.2)
-
-INCLUDE_DIRECTORIES(
-    ${CMAKE_INCLUDE_PATH}
-    ${CUDA_INCLUDE_DIRS}
-    "${PROJECT_SOURCE_DIR}/src/backend/cuda"
-    "${CMAKE_CURRENT_BINARY_DIR}"
-    ${CUDA_nvvm_INCLUDE_DIR}
-    )
-
-FILE(GLOB cuda_headers
-     "*.hpp"
-     "*.h")
-
-FILE(GLOB cuda_sources
-    "*.cu"
-    "*.cpp"
-    "kernel/*.cu")
-
-FILE(GLOB jit_sources
-    "JIT/*.hpp")
-
-FILE(GLOB kernel_headers
-    "kernel/*.hpp")
-
-FILE(GLOB ptx_sources
-    "JIT/*.cu")
-
-LIST(SORT cuda_headers)
-LIST(SORT cuda_sources)
-LIST(SORT jit_sources)
-LIST(SORT kernel_headers)
-LIST(SORT ptx_sources)
-
-SOURCE_GROUP(backend\\cuda\\Headers FILES ${cuda_headers})
-SOURCE_GROUP(backend\\cuda\\Sources FILES ${cuda_sources})
-SOURCE_GROUP(backend\\cuda\\JIT FILES ${jit_sources})
-SOURCE_GROUP(backend\\cuda\\kernel\\Headers FILES ${kernel_headers})
-
-FILE(GLOB backend_headers
-    "../*.hpp"
-    "../*.h"
-    )
-
-FILE(GLOB backend_sources
-    "../*.cpp"
-    )
-
-LIST(SORT backend_headers)
-LIST(SORT backend_sources)
-
-SOURCE_GROUP(backend\\Headers FILES ${backend_headers})
-SOURCE_GROUP(backend\\Sources FILES ${backend_sources})
-
-FILE(GLOB c_headers
-    "../../api/c/*.hpp"
-    "../../api/c/*.h"
-    )
-
-FILE(GLOB c_sources
-    "../../api/c/*.cpp"
-    )
-
-LIST(SORT c_headers)
-LIST(SORT c_sources)
-
-SOURCE_GROUP(api\\c\\Headers FILES ${c_headers})
-SOURCE_GROUP(api\\c\\Sources FILES ${c_sources})
-
-FILE(GLOB cpp_sources
-    "../../api/cpp/*.cpp"
-    )
-
-LIST(SORT cpp_sources)
-
-SOURCE_GROUP(api\\cpp\\Sources FILES ${cpp_sources})
-
-INCLUDE("${CMAKE_CURRENT_SOURCE_DIR}/kernel/thrust_sort_by_key/CMakeLists.txt")
-
-INCLUDE("${CMAKE_CURRENT_SOURCE_DIR}/kernel/scan_by_key/CMakeLists.txt")
-
-LIST(LENGTH COMPUTE_VERSIONS COMPUTE_COUNT)
-IF(${COMPUTE_COUNT} EQUAL 1)
-    SET(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} ${CUDA_GENERATE_CODE}")
-ELSE()
-    # Use -arch sm_30 if CUDA 8 or greater and compute_20 not defined
-    IF(CUDA_COMPUTE_20 OR ${CUDA_VERSION_MAJOR} LESS 8)
-        SET(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -arch sm_20")
-    ELSE()
-        SET(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -arch sm_30")
-    ENDIF()
-ENDIF()
-
-# PUSH/POP --keep-device-functions flag. Only available in CUDA 8 or newer
-SET(OLD_CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS})
-IF(${CUDA_VERSION_MAJOR} GREATER 7) # CUDA 8 or newer
-    SET(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} --keep-device-functions")
-ENDIF()
-CUDA_COMPILE_PTX(ptx_files ${ptx_sources})
-SET(CUDA_NVCC_FLAGS ${OLD_CUDA_NVCC_FLAGS})
-
-set(cuda_ptx "")
-foreach(ptx_src_file ${ptx_sources})
-
-      get_filename_component(_name "${ptx_src_file}" NAME_WE)
-
-      # CUDA_COMPILE_PTX from CMake 3.7 has new features that require this change
-      # TODO Fix this with a more complete solution
-      IF(CMAKE_VERSION VERSION_LESS 3.7) # Before 3.7
-        SET(NAME_APPEND "")
-      ELSE(CMAKE_VERSION VERSION_LESS 3.7)  # 3.7 and newer
-        SET(NAME_APPEND "_1")
-      ENDIF(CMAKE_VERSION VERSION_LESS 3.7)
-
-      set(_gen_file_name
-        "${PROJECT_BINARY_DIR}/src/backend/cuda/cuda_compile_ptx${NAME_APPEND}_generated_${_name}.cu.ptx")
-      set(_out_file_name
-        "${PROJECT_BINARY_DIR}/src/backend/cuda/${_name}.ptx")
-
-      ADD_CUSTOM_COMMAND(
-        OUTPUT "${_out_file_name}"
-        DEPENDS "${_gen_file_name}"
-        COMMAND ${CMAKE_COMMAND} -E copy "${_gen_file_name}" "${_out_file_name}")
-
-      list(APPEND cuda_ptx "${_out_file_name}")
-endforeach()
-
-SET( ptx_headers
-    "ptx_headers")
-
-CL_KERNEL_TO_H(
-    SOURCES ${cuda_ptx}
-    VARNAME kernel_files
+cl_kernel_to_h(
+    SOURCES ${jit_src}
+    VARNAME jit_files
     EXTENSION "hpp"
-    OUTPUT_DIR ${ptx_headers}
-    TARGETS ptx_targets
+    OUTPUT_DIR ${jit_kernel_headers}
+    TARGETS jit_kernel_targets
     NAMESPACE "cuda"
-    NULLTERM TRUE
     )
-
-SET(libdevice_bc "")
-IF (USE_LIBDEVICE)
-    SET(libdevice_computes "")
-    LIST(APPEND libdevice_computes "20" "30" "35" "50")
-    FOREACH(libdevice_compute ${libdevice_computes})
-        SET(_libdevice_bc_file "${CUDA_LIBDEVICE_DIR}/libdevice.compute_${libdevice_compute}.10.bc")
-        SET(_libdevice_bc_copy "${PROJECT_BINARY_DIR}/src/backend/cuda/compute_${libdevice_compute}.bc")
-        IF (EXISTS ${_libdevice_bc_file})
-            ADD_CUSTOM_COMMAND(
-                OUTPUT "${_libdevice_bc_copy}"
-                DEPENDS "${_libdevice_bc_file}"
-                COMMAND ${CMAKE_COMMAND} -E copy "${_libdevice_bc_file}" "${_libdevice_bc_copy}")
-            LIST(APPEND libdevice_bc ${_libdevice_bc_copy})
-            ADD_DEFINITIONS(-D"__LIBDEVICE_COMPUTE_${libdevice_compute}")
-        ENDIF()
-    ENDFOREACH()
-ENDIF()
-
-LIST(LENGTH libdevice_bc libdevice_bc_len)
-
-IF (${libdevice_bc_len} GREATER 0)
-
-  SET(libdevice_headers
-    "libdevice_headers")
-
-  CL_KERNEL_TO_H(
-    SOURCES ${libdevice_bc}
-    VARNAME libdevice_files
-    EXTENSION "hpp"
-    OUTPUT_DIR ${libdevice_headers}
-    TARGETS libdevice_targets
-    NAMESPACE "cuda"
-    BINARY TRUE
-    )
-
-  MESSAGE(STATUS "LIBDEVICE found.")
-  ADD_DEFINITIONS(-DUSE_LIBDEVICE)
-ELSE()
-  MESSAGE(STATUS "LIBDEVICE not found on system. CUDA JIT may be slower")
-ENDIF()
-
-IF("${APPLE}")
-    ADD_DEFINITIONS(-D__STRICT_ANSI__)
-ELSE()
-  IF(UNIX)
-    IF(${CUDA_VERSION_MAJOR} GREATER 7)
-      FIND_PACKAGE(OpenMP)
-      IF(OPENMP_FOUND)
-        SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-      ENDIF()
-    ENDIF()
-  ENDIF()
-ENDIF()
-
-IF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_MWAITXINTRIN_H_INCLUDED -D_FORCE_INLINES")
-ENDIF()
 
 ## Copied from FindCUDA.cmake
 ## The target_link_library needs to link with the cuda libraries using
 ## PRIVATE
-macro(MY_CUDA_ADD_LIBRARY cuda_target)
-
-  CUDA_ADD_CUDA_INCLUDE_ONCE()
+function(cuda_add_library cuda_target)
+  cuda_add_cuda_include_once()
 
   # Separate the sources from the options
-  CUDA_GET_SOURCES_AND_OPTIONS(_sources _cmake_options _options ${ARGN})
-  CUDA_BUILD_SHARED_LIBRARY(_cuda_shared_flag ${ARGN})
+  cuda_get_sources_and_options(_sources _cmake_options _options ${ARGN})
+  cuda_build_shared_library(_cuda_shared_flag ${ARGN})
   # Create custom commands and targets for each file.
-  CUDA_WRAP_SRCS( ${cuda_target} OBJ _generated_files ${_sources}
+  cuda_wrap_srcs( ${cuda_target} OBJ _generated_files ${_sources}
     ${_cmake_options} ${_cuda_shared_flag}
     OPTIONS ${_options} )
 
   # Compute the file name of the intermedate link file used for separable
   # compilation.
-  CUDA_COMPUTE_SEPARABLE_COMPILATION_OBJECT_FILE_NAME(link_file ${cuda_target} "${${cuda_target}_SEPARABLE_COMPILATION_OBJECTS}")
+  cuda_compute_separable_compilation_object_file_name(link_file ${cuda_target} "${${cuda_target}_SEPARABLE_COMPILATION_OBJECTS}")
 
   # Add the library.
   add_library(${cuda_target} ${_cmake_options}
@@ -371,7 +92,7 @@ macro(MY_CUDA_ADD_LIBRARY cuda_target)
   # Add a link phase for the separable compilation if it has been enabled.  If
   # it has been enabled then the ${cuda_target}_SEPARABLE_COMPILATION_OBJECTS
   # variable will have been defined.
-  CUDA_LINK_SEPARABLE_COMPILATION_OBJECTS("${link_file}" ${cuda_target} "${_options}" "${${cuda_target}_SEPARABLE_COMPILATION_OBJECTS}")
+  cuda_link_separable_compilation_objects("${link_file}" ${cuda_target} "${_options}" "${${cuda_target}_SEPARABLE_COMPILATION_OBJECTS}")
 
   target_link_libraries(${cuda_target}
       PRIVATE ${CUDA_LIBRARIES}
@@ -384,82 +105,473 @@ macro(MY_CUDA_ADD_LIBRARY cuda_target)
     LINKER_LANGUAGE ${CUDA_C_OR_CXX}
     )
 
+endfunction()
+
+arrayfire_get_cuda_cxx_flags(cuda_cxx_flags)
+
+if(AF_WITH_NONFREE AND CMAKE_VERSION VERSION_LESS "3.7")
+  # This definition is required in addition to the definition below because in
+  # an older verion of cmake definitions added using target_compile_definitions
+  # were not added to the nvcc flags. This manually adds these definitions and
+  # pass them to the options parameter in cuda_add_library
+  string(APPEND cuda_cxx_flags " -DAF_WITH_NONFREE_SIFT")
+endif()
+
+include(kernel/scan_by_key/CMakeLists.txt)
+include(kernel/thrust_sort_by_key/CMakeLists.txt)
+
+cuda_add_library(afcuda
+    scan.cu
+    all.cu
+    anisotropic_diffusion.cu
+    any.cu
+    approx.cu
+    assign.cu
+    bilateral.cu
+    canny.cu
+    cholesky.cu
+    copy.cu
+    count.cu
+    diagonal.cu
+    diff.cu
+    dilate.cu
+    dilate3d.cu
+    erode.cu
+    erode3d.cu
+    exampleFunction.cu
+    fast.cu
+    fast_pyramid.cu
+    fftconvolve.cu
+    gradient.cu
+    harris.cu
+    histogram.cu
+    homography.cu
+    hsv_rgb.cu
+    identity.cu
+    iir.cu
+    index.cu
+    inverse.cu
+    iota.cu
+    ireduce.cu
+    join.cu
+    lookup.cu
+    lu.cu
+    match_template.cu
+    max.cu
+    mean.cu
+    meanshift.cu
+    medfilt.cu
+    min.cu
+    moments.cu
+    nearest_neighbour.cu
+    orb.cu
+    pad_array_borders.cu
+    product.cu
+    qr.cu
+    random_engine.cu
+    range.cu
+    regions.cu
+    reorder.cu
+    resize.cu
+    rotate.cu
+    scan_by_key.cu
+    select.cu
+    set.cu
+    sift.cu
+    sobel.cu
+    solve.cu
+    sort.cu
+    sort_by_key.cu
+    sort_index.cu
+    sparse.cu
+    sparse_arith.cu
+    sum.cu
+    susan.cu
+    svd.cu
+    tile.cu
+    topk.cu
+    transform.cu
+    transpose.cu
+    transpose_inplace.cu
+    triangle.cu
+    unwrap.cu
+    where.cu
+    wrap.cu
+
+    kernel/convolve.cu
+    kernel/convolve_separable.cu
+
+    kernel/anisotropic_diffusion.hpp
+    kernel/approx.hpp
+    kernel/assign.hpp
+    kernel/atomics.hpp
+    kernel/bilateral.hpp
+    kernel/canny.hpp
+    kernel/config.hpp
+    kernel/convolve.hpp
+    kernel/diagonal.hpp
+    kernel/diff.hpp
+    kernel/exampleFunction.hpp
+    kernel/fast.hpp
+    kernel/fast_lut.hpp
+    kernel/fast_pyramid.hpp
+    kernel/fftconvolve.hpp
+    kernel/gradient.hpp
+    kernel/harris.hpp
+    kernel/histogram.hpp
+    kernel/homography.hpp
+    kernel/hsv_rgb.hpp
+    kernel/identity.hpp
+    kernel/iir.hpp
+    kernel/index.hpp
+    kernel/interp.hpp
+    kernel/iota.hpp
+    kernel/ireduce.hpp
+    kernel/join.hpp
+    kernel/lookup.hpp
+    kernel/lu_split.hpp
+    kernel/match_template.hpp
+    kernel/mean.hpp
+    kernel/meanshift.hpp
+    kernel/medfilt.hpp
+    kernel/memcopy.hpp
+    kernel/moments.hpp
+    kernel/morph.hpp
+    kernel/nearest_neighbour.hpp
+    kernel/orb.hpp
+    kernel/orb_patch.hpp
+    kernel/pad_array_borders.hpp
+    kernel/random_engine.hpp
+    kernel/random_engine_mersenne.hpp
+    kernel/random_engine_philox.hpp
+    kernel/random_engine_threefry.hpp
+    kernel/range.hpp
+    kernel/reduce.hpp
+    kernel/regions.hpp
+    kernel/reorder.hpp
+    kernel/resize.hpp
+    kernel/rotate.hpp
+    kernel/scan_dim.hpp
+    kernel/scan_dim_by_key.hpp
+    kernel/scan_dim_by_key_impl.hpp
+    kernel/scan_first.hpp
+    kernel/scan_first_by_key.hpp
+    kernel/scan_first_by_key_impl.hpp
+    kernel/select.hpp
+    kernel/shared.hpp
+    kernel/sift_nonfree.hpp
+    kernel/sobel.hpp
+    kernel/sort.hpp
+    kernel/sort_by_key.hpp
+    kernel/sparse.hpp
+    kernel/sparse_arith.hpp
+    kernel/susan.hpp
+    kernel/thrust_sort_by_key.hpp
+    kernel/thrust_sort_by_key_impl.hpp
+    kernel/tile.hpp
+    kernel/topk.hpp
+    kernel/transform.hpp
+    kernel/transpose.hpp
+    kernel/transpose_inplace.hpp
+    kernel/triangle.hpp
+    kernel/unwrap.hpp
+    kernel/where.hpp
+    kernel/wrap.hpp
+
+    Array.cpp
+    Array.hpp
+    Param.hpp
+    anisotropic_diffusion.hpp
+    approx.hpp
+    arith.hpp
+    assign.hpp
+    backend.hpp
+    bilateral.hpp
+    binary.hpp
+    blas.cpp
+    blas.hpp
+    canny.hpp
+    cast.hpp
+    cholesky.hpp
+    complex.hpp
+    convolve.cpp
+    convolve.hpp
+    copy.hpp
+    cublas.cpp
+    cublas.hpp
+    cufft.cpp
+    cufft.hpp
+    cusolverDn.cpp
+    cusolverDn.hpp
+    cusparse.cpp
+    cusparse.hpp
+    debug_cuda.hpp
+    diagonal.hpp
+    diff.hpp
+    driver.cpp
+    err_cuda.hpp
+    exampleFunction.hpp
+    fast.hpp
+    fast_pyramid.hpp
+    fft.cpp
+    fft.hpp
+    fftconvolve.hpp
+    gradient.hpp
+    harris.hpp
+    histogram.hpp
+    homography.hpp
+    hsv_rgb.hpp
+    identity.hpp
+    iir.hpp
+    index.hpp
+    inverse.hpp
+    iota.hpp
+    ireduce.hpp
+    jit.cpp
+    join.hpp
+    logic.hpp
+    lookup.hpp
+    lu.hpp
+    match_template.hpp
+    math.cpp
+    math.hpp
+    mean.hpp
+    meanshift.hpp
+    medfilt.hpp
+    memory.cpp
+    memory.hpp
+    moments.hpp
+    morph.hpp
+    morph3d_impl.hpp
+    morph_impl.hpp
+    nearest_neighbour.hpp
+    orb.hpp
+    platform.cpp
+    platform.hpp
+    print.hpp
+    qr.hpp
+    random_engine.hpp
+    range.hpp
+    reduce.hpp
+    reduce_impl.hpp
+    regions.hpp
+    reorder.hpp
+    resize.hpp
+    rotate.hpp
+    scalar.hpp
+    scan.hpp
+    scan_by_key.hpp
+    select.hpp
+    set.hpp
+    shift.cpp
+    shift.hpp
+    sift.hpp
+    sobel.hpp
+    solve.hpp
+    sort.hpp
+    sort_by_key.hpp
+    sort_index.hpp
+    sparse.hpp
+    sparse_arith.hpp
+    sparse_blas.cpp
+    sparse_blas.hpp
+    susan.hpp
+    svd.hpp
+    tile.hpp
+    topk.hpp
+    traits.hpp
+    transform.hpp
+    transpose.hpp
+    triangle.hpp
+    types.cpp
+    types.hpp
+    unary.hpp
+    unwrap.hpp
+    utility.hpp
+    where.hpp
+    wrap.hpp
+
+    JIT/BinaryNode.hpp
+    JIT/BufferNode.hpp
+    JIT/Node.hpp
+    JIT/ScalarNode.hpp
+    JIT/UnaryNode.hpp
+    JIT/NaryNode.hpp
+    JIT/ShiftNode.hpp
+    JIT/types.h
+
+    OPTIONS "${cuda_cxx_flags} -Xcudafe \"--diag_suppress=1427\""
+  )
+
+arrayfire_set_default_cxx_flags(afcuda)
+target_compile_definitions(afcuda PRIVATE AF_CUDA)
+
+add_library(ArrayFire::afcuda ALIAS afcuda)
+
+if(AF_WITH_NONFREE)
+  target_compile_definitions(afcuda PRIVATE AF_WITH_NONFREE_SIFT)
+endif()
+
+if(AF_WITH_GRAPHICS)
+  if(NOT AF_USE_SYSTEM_FORGE)
+    add_dependencies(afcuda forge-ext)
+  endif()
+  target_sources(afcuda
+    PRIVATE
+      GraphicsResourceManager.cpp
+      GraphicsResourceManager.hpp
+      hist_graphics.cpp
+      hist_graphics.hpp
+      image.cpp
+      image.hpp
+      plot.cpp
+      plot.hpp
+      surface.cpp
+      surface.hpp
+      vector_field.cpp
+      vector_field.hpp)
+endif()
+
+add_dependencies(afcuda ${jit_kernel_targets})
+
+target_include_directories (afcuda
+  PUBLIC
+    $<BUILD_INTERFACE:${ArrayFire_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${ArrayFire_BINARY_DIR}/include>
+    $<INSTALL_INTERFACE:${AF_INSTALL_INC_DIR}>
+  PRIVATE
+    ${CUDA_INCLUDE_DIRS}
+    ${ArrayFire_SOURCE_DIR}/src/api/c
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/kernel
+    ${CMAKE_CURRENT_SOURCE_DIR}/JIT
+    ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(afcuda
+    PRIVATE
+      OpenMP::OpenMP_CXX
+    )
+elseif(NOT APPLE)
+  message(FATAL_ERROR "OpenMP is required to compile CUDA Backend")
+endif()
+
+set_target_properties(afcuda PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+target_link_libraries(afcuda
+  PRIVATE
+    c_api_interface
+    cpp_api_interface
+    afcommon_interface
+    cuda_scan_by_key
+    cuda_thrust_sort_by_key
+    ${CUDA_LIBRARIES}
+    ${CUDA_nvrtc_LIBRARY}
+    ${CUDA_CUBLAS_LIBRARIES}
+    ${CUDA_CUFFT_LIBRARIES}
+    ${CUDA_cusolver_LIBRARY}
+    ${CUDA_cusparse_LIBRARY}
+  )
+
+# If the driver is not found the cuda driver api need to be linked against the
+# libcuda.so stub located in the lib[64]/stubs directory
+if(CUDA_CUDA_LIBRARY)
+  target_link_libraries(afcuda PRIVATE ${CUDA_CUDA_LIBRARY})
+else()
+  message(STATUS "CUDA driver library missing. Looking for libcuda stub.")
+  find_library(CUDA_CUDA_STUB
+             NAMES cuda
+             PATHS ${CUDA_LIBRARIES_PATH}/stubs
+             NO_DEFAULT_PATH
+         )
+  if(CUDA_CUDA_STUB)
+    message(STATUS "CUDA driver stub FOUND: ${CUDA_CUDA_STUB}")
+  endif()
+
+  #NOTE: Only link against the stub library when building
+  target_link_libraries(afcuda
+    PUBLIC
+      $<BUILD_INTERFACE:${CUDA_CUDA_STUB}>)
+endif()
+
+# TODO(umar): This is required for NVRTC to work correctly on OSX. It may not
+#             be necessary on other platforms.
+if(APPLE)
+  target_link_libraries(afcuda PUBLIC -Wl,-rpath,${CUDA_LIBRARIES_PATH})
+endif()
+
+install(TARGETS afcuda
+  EXPORT ArrayFireCUDATargets
+  COMPONENT cuda
+  PUBLIC_HEADER DESTINATION af
+  RUNTIME DESTINATION ${AF_INSTALL_BIN_DIR}
+  LIBRARY DESTINATION ${AF_INSTALL_LIB_DIR}
+  ARCHIVE DESTINATION ${AF_INSTALL_LIB_DIR}
+  FRAMEWORK DESTINATION framework
+  INCLUDES DESTINATION ${AF_INSTALL_INC_DIR}
+  )
+
+set(cuda_deps "")
+set (PX ${CMAKE_SHARED_LIBRARY_PREFIX})
+set (SX ${CMAKE_SHARED_LIBRARY_SUFFIX})
+set (dlib_path_prefix ${CUDA_LIBRARIES_PATH})
+if (WIN32)
+  set(dlib_path_prefix "${CUDA_TOOLKIT_ROOT_DIR}/bin")
+endif ()
+
+macro(afcu_collect_libs libname)
+  if (WIN32)
+    install(FILES       "${dlib_path_prefix}/${PX}${libname}64_${CUDA_VERSION_MAJOR}${CUDA_VERSION_MINOR}${SX}"
+            DESTINATION ${AF_INSTALL_BIN_DIR}
+            COMPONENT   cuda_dependencies)
+  elseif (APPLE)
+    get_filename_component(outpath "${dlib_path_prefix}/${PX}${libname}.${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}${SX}" REALPATH)
+    install(FILES       "${outpath}"
+            DESTINATION ${AF_INSTALL_BIN_DIR}
+            RENAME      "${PX}${libname}.${CUDA_VERSION}${SX}"
+            COMPONENT   cuda_dependencies)
+  else () #UNIX
+    get_filename_component(outpath "${dlib_path_prefix}/${PX}${libname}${SX}" REALPATH)
+    install(FILES       ${outpath}
+            DESTINATION ${AF_INSTALL_LIB_DIR}
+            RENAME      "${PX}${libname}${SX}.${CUDA_VERSION}"
+            COMPONENT   cuda_dependencies)
+  endif ()
 endmacro()
 
-IF(NOT CUDA_CUDA_LIBRARY)
-    MESSAGE(SEND_ERROR "CMake CUDA Variable CUDA_CUDA_LIBRARY Not found.")
-    MESSAGE("CUDA Driver Library (libcuda.so/libcuda.dylib/cuda.lib) cannot be found.")
-    FIND_FILE(CUDA_CUDA_LIBRARY_STUB
-              NAMES "libcuda.so" "libcuda.dylib" "cuda.lib"
-              PATHS ${CUDA_TOOLKIT_ROOT_DIR}
-              PATH_SUFFIXES "lib64" "lib64/stubs" "lib" "lib/stubs" "lib/x64" "lib/Win32"
-              DOC "CUDA Library STUB"
-             )
-    IF(CUDA_CUDA_LIBRARY_STUB)
-        MESSAGE("You can use the library stub available in the CUDA Toolkit: ${CUDA_CUDA_LIBRARY_STUB}")
-        MESSAGE("Run the following commands (Linux) to set it up:")
-        MESSAGE("ln -s ${CUDA_CUDA_LIBRARY_STUB} /usr/lib/libcuda.so.1")
-        MESSAGE("ln -s /usr/lib/libcuda.so.1 /usr/lib/libcuda.so")
-    ENDIF()
-    MESSAGE(FATAL_ERROR "Ending CMake configuration because of missing CUDA_CUDA_LIBRARY")
-ENDIF(NOT CUDA_CUDA_LIBRARY)
+if(AF_INSTALL_STANDALONE)
+  afcu_collect_libs(cufft)
+  afcu_collect_libs(cublas)
+  afcu_collect_libs(cusolver)
+  afcu_collect_libs(cusparse)
+  afcu_collect_libs(nvrtc)
 
-SET(CUDA_ADD_LIBRARY_OPTIONS "")
-IF(UNIX)
-    # These flags enable C++11 and disable invalid offsetof warning
-    SET(CUDA_ADD_LIBRARY_OPTIONS "-std=c++11 -Xcudafe \"--diag_suppress=1427\"")
-ENDIF(UNIX)
+  if(APPLE)
+    afcu_collect_libs(cudart)
 
-MY_CUDA_ADD_LIBRARY(afcuda SHARED
-                ${cuda_headers}
-                ${cuda_sources}
-                ${jit_sources}
-                ${kernel_headers}
-                ${backend_headers}
-                ${backend_sources}
-                ${c_headers}
-                ${c_sources}
-                ${cpp_sources}
-                ${thrust_sort_by_key_sources}
-                ${scan_by_key_sources}
-                OPTIONS ${CUDA_GENERATE_CODE} ${CUDA_ADD_LIBRARY_OPTIONS})
+    get_filename_component(nvrtc_outpath "${dlib_path_prefix}/${PX}nvrtc-builtins.${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}${SX}" REALPATH)
+    install(FILES       ${nvrtc_outpath}
+            DESTINATION ${AF_INSTALL_BIN_DIR}
+            RENAME      "${PX}nvrtc-builtins${SX}"
+            COMPONENT   cuda_dependencies)
+  elseif(UNIX)
+    get_filename_component(nvrtc_outpath "${dlib_path_prefix}/${PX}nvrtc-builtins${SX}" REALPATH)
+    install(FILES       ${nvrtc_outpath}
+            DESTINATION ${AF_INSTALL_LIB_DIR}
+            RENAME      "${PX}nvrtc-builtins${SX}"
+            COMPONENT   cuda_dependencies)
+  else()
+    afcu_collect_libs(nvrtc-builtins)
+  endif()
+endif()
 
-ADD_DEPENDENCIES(afcuda ${ptx_targets})
 
-IF (${libdevice_bc_len} GREATER 0)
-  ADD_DEPENDENCIES(afcuda ${libdevice_targets})
-ENDIF()
-
-TARGET_LINK_LIBRARIES(afcuda    PRIVATE ${CUDA_CUBLAS_LIBRARIES}
-                                PRIVATE ${CUDA_LIBRARIES}
-                                PRIVATE ${FreeImage_LIBS}
-                                PRIVATE ${CUDA_CUFFT_LIBRARIES}
-                                PRIVATE ${CUDA_cusparse_LIBRARY}
-                                PRIVATE ${CUDA_cusolver_LIBRARY}
-                                PRIVATE ${CUDA_nvvm_LIBRARY}
-                                PRIVATE ${CUDA_CUDA_LIBRARY})
-
-LIST(LENGTH GRAPHICS_DEPENDENCIES GRAPHICS_DEPENDENCIES_LEN)
-IF(${GRAPHICS_DEPENDENCIES_LEN} GREATER 0)
-    ADD_DEPENDENCIES(afcuda ${GRAPHICS_DEPENDENCIES})
-ENDIF(${GRAPHICS_DEPENDENCIES_LEN} GREATER 0)
-
-IF(FORGE_FOUND)
-    TARGET_LINK_LIBRARIES(afcuda PRIVATE ${GRAPHICS_LIBRARIES})
-ENDIF()
-
-SET_TARGET_PROPERTIES(afcuda PROPERTIES
-    VERSION "${AF_VERSION}"
-    SOVERSION "${AF_VERSION_MAJOR}")
-
-INSTALL(TARGETS afcuda EXPORT CUDA DESTINATION "${AF_INSTALL_LIB_DIR}"
-        COMPONENT libraries)
-
-IF(APPLE)
-    INSTALL(SCRIPT "${PROJECT_SOURCE_DIR}/CMakeModules/osx_install/InstallTool.cmake")
-ENDIF(APPLE)
-
-export(TARGETS afcuda FILE ArrayFireCUDA.cmake)
-INSTALL(EXPORT CUDA DESTINATION "${AF_INSTALL_CMAKE_DIR}"
-    COMPONENT cmake
-    FILE ArrayFireCUDA.cmake)
+source_group(include REGULAR_EXPRESSION ${ArrayFire_SOURCE_DIR}/include/*)
+source_group(api\\cpp REGULAR_EXPRESSION ${ArrayFire_SOURCE_DIR}/src/api/cpp/*)
+source_group(api\\c   REGULAR_EXPRESSION ${ArrayFire_SOURCE_DIR}/src/api/c/*)
+source_group(backend  REGULAR_EXPRESSION ${ArrayFire_SOURCE_DIR}/src/backend/common/*|${CMAKE_CURRENT_SOURCE_DIR}/*)
+source_group(backend\\kernel  REGULAR_EXPRESSION ${CMAKE_CURRENT_SOURCE_DIR}/kernel/*|${CMAKE_CURRENT_SOURCE_DIR}/kernel/thrust_sort_by_key/*|${CMAKE_CURRENT_SOURCE_DIR}/kernel/scan_by_key/*)
+source_group("generated files"  FILES ${ArrayFire_BINARY_DIR}/version.hpp ${ArrayFire_BINARY_DIR}/include/af/version.h
+                                REGULAR_EXPRESSION ${CMAKE_CURRENT_BINARY_DIR}/${kernel_headers_dir}/*)
+source_group("" FILES CMakeLists.txt)

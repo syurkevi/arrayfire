@@ -13,9 +13,9 @@
 #include <af/index.h>
 #include <af/data.h>
 
-#include <ArrayInfo.hpp>
-#include <graphics_common.hpp>
-#include <err_common.hpp>
+#include <common/ArrayInfo.hpp>
+#include <common/graphics_common.hpp>
+#include <common/err_common.hpp>
 #include <backend.hpp>
 #include <image.hpp>
 #include <handle.hpp>
@@ -25,7 +25,6 @@
 #include <cast.hpp>
 #include <arith.hpp>
 
-#include <iostream>
 #include <limits>
 
 using af::dim4;
@@ -79,7 +78,7 @@ af_err af_draw_image(const af_window wind, const af_array in, const af_cell* con
 {
 #if defined(WITH_GRAPHICS)
     if(wind==0) {
-        std::cerr<<"Not a valid window"<<std::endl;
+        fprintf(stderr, "Not a valid window\n");
         return AF_SUCCESS;
     }
 
@@ -106,9 +105,12 @@ af_err af_draw_image(const af_window wind, const af_array in, const af_cell* con
             default:  TYPE_ERROR(1, type);
         }
 
+        auto gridDims = ForgeManager::getInstance().getWindowGrid(window);
         window->setColorMap((forge::ColorMap)props->cmap);
         if (props->col>-1 && props->row>-1)
-            window->draw(props->row, props->col, *image, props->title);
+            window->draw(gridDims.first, gridDims.second,
+                         props->row * gridDims.second + props->col,
+                         *image, props->title);
         else
             window->draw(*image);
     }

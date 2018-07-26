@@ -8,19 +8,20 @@
  ********************************************************/
 
 #include <lu.hpp>
-#include <err_common.hpp>
+#include <common/err_common.hpp>
 
-#if defined(WITH_CPU_LINEAR_ALGEBRA)
+#if defined(WITH_LINEAR_ALGEBRA)
 #include <af/dim4.hpp>
 #include <handle.hpp>
-#include <iostream>
-#include <cassert>
-#include <range.hpp>
+#include <kernel/lu.hpp>
 #include <lapack_helper.hpp>
 #include <math.hpp>
 #include <platform.hpp>
 #include <queue.hpp>
-#include <kernel/lu.hpp>
+#include <range.hpp>
+
+#include <cassert>
+#include <iostream>
 
 namespace cpu
 {
@@ -74,9 +75,9 @@ Array<int> lu_inplace(Array<T> &in, const bool convert_pivot)
     dim4 iDims = in.dims();
     Array<int> pivot = createEmptyArray<int>(af::dim4(min(iDims[0], iDims[1]), 1, 1, 1));
 
-    auto func = [=] (Array<T> in, Array<int> pivot) {
+    auto func = [=] (Param<T> in, Param<int> pivot) {
         dim4 iDims = in.dims();
-        getrf_func<T>()(AF_LAPACK_COL_MAJOR, iDims[0], iDims[1], in.get(), in.strides()[1], pivot.get());
+        getrf_func<T>()(AF_LAPACK_COL_MAJOR, iDims[0], iDims[1], in.get(), in.strides(1), pivot.get());
     };
     getQueue().enqueue(func, in, pivot);
 
@@ -96,7 +97,7 @@ bool isLAPACKAvailable()
 
 }
 
-#else
+#else  // WITH_LINEAR_ALGEBRA
 
 namespace cpu
 {
@@ -120,7 +121,7 @@ bool isLAPACKAvailable()
 
 }
 
-#endif
+#endif  // WITH_LINEAR_ALGEBRA
 
 namespace cpu
 {

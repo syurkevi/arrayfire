@@ -8,7 +8,7 @@
  ********************************************************/
 
 #pragma once
-#include <Array.hpp>
+#include <Param.hpp>
 
 namespace cpu
 {
@@ -18,8 +18,8 @@ namespace kernel
 template<af_op_t op, typename Ti, typename To, int D, bool inclusive_scan>
 struct scan_dim
 {
-    void operator()(Array<To> out, dim_t outOffset,
-                    const Array<Ti> in, dim_t inOffset,
+    void operator()(Param<To> out, dim_t outOffset,
+                    CParam<Ti> in, dim_t inOffset,
                     const int dim) const
     {
         const dim4 odims    = out.dims();
@@ -29,9 +29,8 @@ struct scan_dim
         const int D1 = D - 1;
         for (dim_t i = 0; i < odims[D1]; i++) {
             scan_dim<op, Ti, To, D1, inclusive_scan> func;
-            getQueue().enqueue(func,
-                    out, outOffset + i * ostrides[D1],
-                    in, inOffset + i * istrides[D1], dim);
+            func(out, outOffset + i * ostrides[D1], in,
+                 inOffset + i * istrides[D1], dim);
             if (D1 == dim) break;
         }
     }
@@ -40,8 +39,8 @@ struct scan_dim
 template<af_op_t op, typename Ti, typename To, bool inclusive_scan>
 struct scan_dim<op, Ti, To, 0, inclusive_scan>
 {
-    void operator()(Array<To> output, dim_t outOffset,
-                    const Array<Ti> input,  dim_t inOffset,
+    void operator()(Param<To> output, dim_t outOffset,
+                    CParam<Ti> input,  dim_t inOffset,
                     const int dim) const
     {
         const Ti* in = input.get() + inOffset;
@@ -58,7 +57,7 @@ struct scan_dim<op, Ti, To, 0, inclusive_scan>
         // FIXME: Change the name to something better
         Binary<To, op> scan;
 
-        To out_val = scan.init();
+        To out_val = Binary<To, op>::init();
         for (dim_t i = 0; i < idims[dim]; i++) {
             To in_val = transform(in[i * istride]);
             out_val = scan(in_val, out_val);
@@ -66,7 +65,7 @@ struct scan_dim<op, Ti, To, 0, inclusive_scan>
                 //The loop shifts the output index by 1.
                 //The last index wraps around and writes the first element.
                 if (i == (idims[dim] - 1)) {
-                    out[0] = scan.init();
+                    out[0] = Binary<To, op>::init();
                 } else {
                     out[(i + 1) * ostride] = out_val;
                 }

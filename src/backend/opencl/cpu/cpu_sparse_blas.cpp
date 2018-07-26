@@ -7,7 +7,7 @@
  * http://arrayfire.com/licenses/BSD-3-Clause
  ********************************************************/
 
-#if defined(WITH_OPENCL_LINEAR_ALGEBRA)
+#if defined(WITH_LINEAR_ALGEBRA)
 #include <cpu/cpu_sparse_blas.hpp>
 
 #include <stdexcept>
@@ -202,7 +202,7 @@ toSparseTranspose(af_mat_prop opt)
 template<typename T, int value>
 scale_type<T> getScale()
 {
-    static T val = scalar<T>(value);
+    thread_local T val = scalar<T>(value);
     return getScaleValue<scale_type<T>, T>(val);
 }
 
@@ -532,4 +532,4 @@ INSTANTIATE_SPARSE(cdouble)
 
 }
 }
-#endif
+#endif  // WITH_LINEAR_ALGEBRA

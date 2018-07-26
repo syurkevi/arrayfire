@@ -15,7 +15,7 @@
 #include <kernel_headers/ops.hpp>
 #include <program.hpp>
 #include <traits.hpp>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <Param.hpp>
 #include <debug_opencl.hpp>
 #include <type_util.hpp>
@@ -55,12 +55,10 @@ namespace kernel
             std::to_string(int(inclusive_scan));
 
         int device = getActiveDeviceId();
-        kc_t::iterator idx = kernelCaches[device].find(ref_name);
 
-        kc_entry_t entry;
-        if (idx == kernelCaches[device].end()) {
+        kc_entry_t entry = kernelCache(device, ref_name);
 
-            Binary<To, op> scan;
+        if (entry.prog==0 && entry.ker==0) {
             ToNumStr<To> toNumStr;
 
             std::ostringstream options;
@@ -70,7 +68,7 @@ namespace kernel
                     << " -D dim=" << dim
                     << " -D DIMY=" << threads_y
                     << " -D THREADS_X=" << THREADS_X
-                    << " -D init=" << toNumStr(scan.init())
+                    << " -D init=" << toNumStr(Binary<To, op>::init())
                     << " -D " << binOpName<op>()
                     << " -D CPLX=" << af::iscplx<Ti>()
                     << " -D isFinalPass=" << (int)(isFinalPass)
@@ -91,19 +89,17 @@ namespace kernel
             entry.ker[0] = Kernel(*entry.prog, "scan_dim_kernel");
             entry.ker[1] = Kernel(*entry.prog, "bcast_dim_kernel");
 
-            kernelCaches[device][ref_name] = entry;
 
-        } else {
-            entry = idx->second;
+            addKernelToCache(device, ref_name, entry);
         }
 
         return entry.ker[kerIdx];
     }
 
     template<typename Ti, typename To, af_op_t op, bool inclusive_scan>
-    static void scan_dim_launcher(Param &out,
-                                  Param &tmp,
-                                  const Param &in,
+    static void scan_dim_launcher(Param out,
+                                  Param tmp,
+                                  const Param in,
                                   int dim, bool isFinalPass, uint threads_y,
                                   const uint groups_all[4])
     {
@@ -130,8 +126,8 @@ namespace kernel
     }
 
     template<typename Ti, typename To, af_op_t op, bool inclusive_scan>
-    static void bcast_dim_launcher(Param &out,
-                                   Param &tmp,
+    static void bcast_dim_launcher(Param out,
+                                   Param tmp,
                                    int dim, bool isFinalPass, uint threads_y,
                                    const uint groups_all[4])
     {
@@ -156,7 +152,7 @@ namespace kernel
     }
 
     template<typename Ti, typename To, af_op_t op, bool inclusive_scan = true>
-    static void scan_dim(Param &out, const Param &in, int dim)
+    static void scan_dim(Param out, const Param in, int dim)
     {
         uint threads_y = std::min(THREADS_Y, nextpow2(out.info.dims[dim]));
         uint threads_x = THREADS_X;

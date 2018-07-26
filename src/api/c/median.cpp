@@ -14,7 +14,7 @@
 #include <af/arith.h>
 #include <af/data.h>
 #include <handle.hpp>
-#include <err_common.hpp>
+#include <common/err_common.hpp>
 #include <backend.hpp>
 #include <sort.hpp>
 #include <math.hpp>
@@ -45,7 +45,7 @@ static double median(const af_array& in)
         if (input.isFloating()) {
             return division(result[0] + result[1], 2.0);
         } else {
-            return division(result[0] + result[1], 2.0);
+            return division((float)result[0] + (float)result[1], 2.0);
         }
     }
 
@@ -104,7 +104,10 @@ static af_array median(const af_array& in, const dim_t dim)
 
     if (dimLength % 2 == 1) {
         // mid-1 is our guy
-        if (input.isFloating()) return left;
+        if (input.isFloating()) {
+            AF_CHECK(af_release_array(sortedIn_handle));
+            return left;
+        }
 
         // Return as floats for consistency
         af_array out;

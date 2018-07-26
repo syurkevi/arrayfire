@@ -8,7 +8,7 @@
  ********************************************************/
 
 #include <math.hpp>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <Param.hpp>
 #include <err_cuda.hpp>
 #include <debug_cuda.hpp>
@@ -23,21 +23,18 @@ namespace cuda
         static const int TY = 16;
         static const int THREADS = 256;
 
-        ///////////////////////////////////////////////////////////////////////////
-        // Approx Kernel
-        ///////////////////////////////////////////////////////////////////////////
         template<typename Ty, typename Tp, int order>
         __global__
         void approx1_kernel(Param<Ty> out, CParam<Ty> in, CParam<Tp> xpos,
                             const float offGrid, const int blocksMatX, const bool batch,
                             af_interp_type method)
         {
-            const int idw = blockIdx.y / out.dims[2];
-            const int idz = blockIdx.y - idw * out.dims[2];
-
             const int idy = blockIdx.x / blocksMatX;
             const int blockIdx_x = blockIdx.x - idy * blocksMatX;
             const int idx = blockIdx_x * blockDim.x + threadIdx.x;
+
+            const int idw = (blockIdx.y + blockIdx.z * gridDim.y) / out.dims[2];
+            const int idz = (blockIdx.y + blockIdx.z * gridDim.y) - idw * out.dims[2];
 
             if (idx >= out.dims[0] || idy >= out.dims[1] ||
                 idz >= out.dims[2] || idw >= out.dims[3])
@@ -73,13 +70,12 @@ namespace cuda
                             af_interp_type method)
         {
             const int idz = blockIdx.x / blocksMatX;
-            const int idw = blockIdx.y / blocksMatY;
+            const int blockIdx_x = blockIdx.x - idz * blocksMatX;
+            const int idx = threadIdx.x + blockIdx_x * blockDim.x;
 
-            int blockIdx_x = blockIdx.x - idz * blocksMatX;
-            int blockIdx_y = blockIdx.y - idw * blocksMatY;
-
-            int idx = threadIdx.x + blockIdx_x * blockDim.x;
-            int idy = threadIdx.y + blockIdx_y * blockDim.y;
+            const int idw = (blockIdx.y + blockIdx.z * gridDim.y) / blocksMatY;
+            const int blockIdx_y = (blockIdx.y + blockIdx.z * gridDim.y) - idw * blocksMatY;
+            const int idy = threadIdx.y + blockIdx_y * blockDim.y;
 
             if (idx >= out.dims[0] || idy >= out.dims[1] ||
                 idz >= out.dims[2] || idw >= out.dims[3])
@@ -125,8 +121,12 @@ namespace cuda
 
             bool batch = !(xpos.dims[1] == 1 && xpos.dims[2] == 1 && xpos.dims[3] == 1);
 
+            const int maxBlocksY    = cuda::getDeviceProp(cuda::getActiveDeviceId()).maxGridSize[1];
+            blocks.z = divup(blocks.y, maxBlocksY);
+            blocks.y = divup(blocks.y, blocks.z);
+
             CUDA_LAUNCH((approx1_kernel<Ty, Tp, order>), blocks, threads,
-                        out, in, xpos, offGrid, blocksPerMat, batch, method);
+                            out, in, xpos, offGrid, blocksPerMat, batch, method);
             POST_LAUNCH_CHECK();
         }
 
@@ -141,6 +141,10 @@ namespace cuda
             dim3 blocks(blocksPerMatX * out.dims[2], blocksPerMatY * out.dims[3]);
 
             bool batch = !(xpos.dims[2] == 1 && xpos.dims[3] == 1);
+
+            const int maxBlocksY    = cuda::getDeviceProp(cuda::getActiveDeviceId()).maxGridSize[1];
+            blocks.z = divup(blocks.y, maxBlocksY);
+            blocks.y = divup(blocks.y, blocks.z);
 
             CUDA_LAUNCH((approx2_kernel<Ty, Tp, order>), blocks, threads,
                         out, in, xpos, ypos, offGrid, blocksPerMatX, blocksPerMatY, batch, method);

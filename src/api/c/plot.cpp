@@ -11,9 +11,9 @@
 #include <af/image.h>
 #include <af/data.h>
 
-#include <ArrayInfo.hpp>
-#include <graphics_common.hpp>
-#include <err_common.hpp>
+#include <common/ArrayInfo.hpp>
+#include <common/graphics_common.hpp>
+#include <common/err_common.hpp>
 #include <backend.hpp>
 #include <plot.hpp>
 #include <reduce.hpp>
@@ -152,9 +152,12 @@ af_err plotWrapper(const af_window wind, const af_array in, const int order_dim,
             default:  TYPE_ERROR(1, type);
         }
 
+        auto gridDims = ForgeManager::getInstance().getWindowGrid(window);
         // Window's draw function requires either image or chart
         if (props->col>-1 && props->row>-1)
-            window->draw(props->row, props->col, *chart, props->title);
+            window->draw(gridDims.first, gridDims.second,
+                         props->row * gridDims.second + props->col,
+                         *chart, props->title);
         else
             window->draw(*chart);
     }
@@ -212,9 +215,12 @@ af_err plotWrapper(const af_window wind, const af_array X, const af_array Y, con
             default:  TYPE_ERROR(1, xType);
         }
 
+        auto gridDims = ForgeManager::getInstance().getWindowGrid(window);
         // Window's draw function requires either image or chart
         if (props->col>-1 && props->row>-1)
-            window->draw(props->row, props->col, *chart, props->title);
+            window->draw(gridDims.first, gridDims.second,
+                         props->row * gridDims.second + props->col,
+                         *chart, props->title);
         else
             window->draw(*chart);
 
@@ -266,9 +272,12 @@ af_err plotWrapper(const af_window wind, const af_array X, const af_array Y,
             default:  TYPE_ERROR(1, xType);
         }
 
+        auto gridDims = ForgeManager::getInstance().getWindowGrid(window);
         // Window's draw function requires either image or chart
         if (props->col>-1 && props->row>-1)
-            window->draw(props->row, props->col, *chart, props->title);
+            window->draw(gridDims.first, gridDims.second,
+                         props->row * gridDims.second + props->col,
+                         *chart, props->title);
         else
             window->draw(*chart);
 

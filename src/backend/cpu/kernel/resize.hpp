@@ -8,7 +8,8 @@
  ********************************************************/
 
 #pragma once
-#include <Array.hpp>
+#include <Param.hpp>
+#include <af/traits.hpp>
 
 namespace cpu
 {
@@ -101,7 +102,7 @@ struct resize_op<T, AF_INTERP_BILINEAR>
         dim_t i2_x  = (i1_x + 1 >= idims[0] ? idims[0] - 1 : i1_x + 1);
         dim_t i2_y  = (i1_y + 1 >= idims[1] ? idims[1] - 1 : i1_y + 1);
 
-        typedef typename dtype_traits<T>::base_type BT;
+        typedef typename af::dtype_traits<T>::base_type BT;
         typedef wtype_t<BT> WT;
         typedef vtype_t<T> VT;
 
@@ -155,7 +156,7 @@ struct resize_op<T, AF_INTERP_LOWER>
 };
 
 template<typename T, af_interp_type method>
-void resize(Array<T> out, const Array<T> in)
+void resize(Param<T> out, CParam<T> in)
 {
     af::dim4 idims    = in.dims();
     af::dim4 odims    = out.dims();

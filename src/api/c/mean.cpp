@@ -8,12 +8,13 @@
  ********************************************************/
 
 #include <af/dim4.hpp>
+#include <af/data.h>
 #include <af/statistics.h>
 #include <af/defines.h>
-#include <err_common.hpp>
+#include <common/err_common.hpp>
 #include <backend.hpp>
 #include <handle.hpp>
-#include <reduce.hpp>
+#include <mean.hpp>
 #include <arith.hpp>
 #include <math.hpp>
 #include <cast.hpp>
@@ -25,30 +26,29 @@ using namespace detail;
 template<typename Ti, typename To>
 static To mean(const af_array &in)
 {
-    /* following function is defined in stats.h */
-    return mean<Ti, To>(getArray<Ti>(in)); /* defined in stats.h */
+    typedef typename baseOutType<To>::type Tw;
+    return mean<Ti, Tw, To>(getArray<Ti>(in));
 }
 
 template<typename T>
 static T mean(const af_array &in, const af_array &weights)
 {
     typedef typename baseOutType<T>::type Tw;
-    /* following function is defined in stats.h */
     return mean<T, Tw>(castArray<T>(in), castArray<Tw>(weights));
 }
 
 template<typename Ti, typename To>
 static af_array mean(const af_array &in, const dim_t dim)
 {
-    /* following function is defined in stats.h */
-    return getHandle<To>(mean<Ti, To>(getArray<Ti>(in), dim));
+    typedef typename baseOutType<To>::type Tw;
+    return getHandle<To>(mean<Ti, Tw, To>(getArray<Ti>(in), dim));
 }
 
 template<typename T>
 static af_array mean(const af_array &in, const af_array &weights, const dim_t dim)
 {
-    /* following function is defined in stats.h */
-    return getHandle<T>(mean<T>(castArray<T>(in), castArray<T>(weights), dim));
+    typedef typename baseOutType<T>::type Tw;
+    return getHandle<T>(mean<T, Tw>(castArray<T>(in), castArray<Tw>(weights), dim));
 }
 
 af_err af_mean(af_array *out, const af_array in, const dim_t dim)
@@ -83,7 +83,7 @@ af_err af_mean(af_array *out, const af_array in, const dim_t dim)
 af_err af_mean_weighted(af_array *out, const af_array in, const af_array weights, const dim_t dim)
 {
     try {
-        ARG_ASSERT(2, (dim>=0 && dim<=3));
+        ARG_ASSERT(3, (dim>=0 && dim<=3));
 
         af_array output = 0;
         const ArrayInfo& iInfo = getInfo(in);
@@ -93,20 +93,37 @@ af_err af_mean_weighted(af_array *out, const af_array in, const af_array weights
 
         ARG_ASSERT(2, (wType==f32 || wType==f64)); /* verify that weights are non-complex real numbers */
 
+        //FIXME: We should avoid additional copies
+        af_array w = weights;
+        if (iInfo.dims() != wInfo.dims()) {
+            dim4 iDims = iInfo.dims();
+            dim4 wDims = wInfo.dims();
+            dim4 tDims(1,1,1,1);
+            for (int i = 0; i < 4; i++) {
+                ARG_ASSERT(2, wDims[i] == 1 || wDims[i] == iDims[i]);
+                tDims[i] = iDims[i] / wDims[i];
+            }
+            AF_CHECK(af_tile(&w, weights, tDims[0], tDims[1], tDims[2], tDims[3]));
+        }
+
         switch(iType) {
-            case f64: output = mean< double>(in, weights, dim); break;
-            case f32: output = mean< float >(in, weights, dim); break;
-            case s32: output = mean< float >(in, weights, dim); break;
-            case u32: output = mean< float >(in, weights, dim); break;
-            case s64: output = mean< double>(in, weights, dim); break;
-            case u64: output = mean< double>(in, weights, dim); break;
-            case s16: output = mean< float >(in, weights, dim); break;
-            case u16: output = mean< float >(in, weights, dim); break;
-            case  u8: output = mean< float >(in, weights, dim); break;
-            case  b8: output = mean< float >(in, weights, dim); break;
-            case c32: output = mean< cfloat>(in, weights, dim); break;
-            case c64: output = mean<cdouble>(in, weights, dim); break;
+            case f64: output = mean< double>(in, w, dim); break;
+            case f32: output = mean< float >(in, w, dim); break;
+            case s32: output = mean< float >(in, w, dim); break;
+            case u32: output = mean< float >(in, w, dim); break;
+            case s64: output = mean< double>(in, w, dim); break;
+            case u64: output = mean< double>(in, w, dim); break;
+            case s16: output = mean< float >(in, w, dim); break;
+            case u16: output = mean< float >(in, w, dim); break;
+            case  u8: output = mean< float >(in, w, dim); break;
+            case  b8: output = mean< float >(in, w, dim); break;
+            case c32: output = mean< cfloat>(in, w, dim); break;
+            case c64: output = mean<cdouble>(in, w, dim); break;
             default : TYPE_ERROR(1, iType);
+        }
+
+        if (w != weights) {
+            AF_CHECK(af_release_array(w));
         }
         std::swap(*out, output);
     }

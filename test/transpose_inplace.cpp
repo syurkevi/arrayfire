@@ -15,10 +15,13 @@
 #include <vector>
 #include <testHelpers.hpp>
 
-using std::string;
+using std::endl;
 using std::vector;
+using af::array;
 using af::cfloat;
 using af::cdouble;
+using af::dim4;
+using af::dtype_traits;
 
 template<typename T>
 class Transpose : public ::testing::Test
@@ -35,7 +38,7 @@ typedef ::testing::Types<float, cfloat, double, cdouble, int, uint, char, uchar,
 TYPED_TEST_CASE(Transpose, TestTypes);
 
 template<typename T>
-void transposeip_test(af::dim4 dims)
+void transposeip_test(dim4 dims)
 {
     if (noDoubleTests<T>())
         return;
@@ -43,25 +46,23 @@ void transposeip_test(af::dim4 dims)
     af_array inArray  = 0;
     af_array outArray = 0;
 
-    ASSERT_EQ(AF_SUCCESS, af_randu(&inArray, dims.ndims(), dims.get(), (af_dtype) af::dtype_traits<T>::af_type));
+    ASSERT_EQ(AF_SUCCESS, af_randu(&inArray, dims.ndims(), dims.get(), (af_dtype) dtype_traits<T>::af_type));
 
     ASSERT_EQ(AF_SUCCESS, af_transpose(&outArray, inArray, false));
     ASSERT_EQ(AF_SUCCESS, af_transpose_inplace(inArray, false));
 
-    T *outData = new T[dims.elements()];
-    T *trsData = new T[dims.elements()];
+    vector<T> outData(dims.elements());
+    vector<T> trsData(dims.elements());
 
-    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)outData, outArray));
-    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)trsData, inArray));
+    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)&outData.front(), outArray));
+    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)&trsData.front(), inArray));
 
     dim_t nElems = dims.elements();
     for (int elIter = 0; elIter < (int)nElems; ++elIter) {
-        ASSERT_EQ(trsData[elIter] , outData[elIter])<< "at: " << elIter << std::endl;
+        ASSERT_EQ(trsData[elIter] , outData[elIter])<< "at: " << elIter << endl;
     }
 
     // cleanup
-    delete[] outData;
-    delete[] trsData;
     ASSERT_EQ(AF_SUCCESS, af_release_array(inArray));
     ASSERT_EQ(AF_SUCCESS, af_release_array(outArray));
 }
@@ -69,7 +70,7 @@ void transposeip_test(af::dim4 dims)
 #define INIT_TEST(Side, D3, D4)                                                     \
     TYPED_TEST(Transpose, TranposeIP_##Side)                                        \
     {                                                                               \
-        transposeip_test<TypeParam>(af::dim4(Side, Side, D3, D4));                  \
+        transposeip_test<TypeParam>(dim4(Side, Side, D3, D4));                      \
     }
 
 INIT_TEST(10, 1, 1);
@@ -85,23 +86,20 @@ void transposeInPlaceCPPTest()
 {
     if (noDoubleTests<float>()) return;
 
-    af::dim4 dims(64, 64, 1,1);
+    dim4 dims(64, 64, 1,1);
 
-    af::array input = randu(dims);
-    af::array output = af::transpose(input);
+    array input = randu(dims);
+    array output = transpose(input);
     transposeInPlace(input);
 
-    float *outData = new float[dims.elements()];
-    float *trsData = new float[dims.elements()];
+    vector<float> outData(dims.elements());
+    vector<float> trsData(dims.elements());
 
-    output.host((void*)outData);
-    input.host((void*)trsData);
+    output.host((void*)&outData.front());
+    input.host((void*)&trsData.front());
 
     dim_t nElems = dims.elements();
     for (int elIter = 0; elIter < (int)nElems; ++elIter) {
-        ASSERT_EQ(trsData[elIter], outData[elIter])<< "at: " << elIter << std::endl;
+        ASSERT_EQ(trsData[elIter], outData[elIter])<< "at: " << elIter << endl;
     }
-
-    // cleanup
-    delete[] outData;
 }

@@ -7,7 +7,7 @@
  * http://arrayfire.com/licenses/BSD-3-Clause
  ********************************************************/
 
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <Param.hpp>
 #include <err_cuda.hpp>
 #include <debug_cuda.hpp>
@@ -34,10 +34,10 @@ namespace cuda
                          int blocks_y)
         {
             int idx2 = blockIdx.x / blocks_x;
-            int idx3 = blockIdx.y / blocks_y;
+            int idx3 = (blockIdx.y + blockIdx.z * gridDim.y) / blocks_y;
 
             int blockIdx_x = blockIdx.x - idx2 * blocks_x;
-            int blockIdx_y = blockIdx.y - idx3 * blocks_y;
+            int blockIdx_y = (blockIdx.y + blockIdx.z * gridDim.y) - idx3 * blocks_y;
 
             int oidx0 = threadIdx.x + blockDim.x * blockIdx_x;
             int oidx1 = threadIdx.y + blockDim.y * blockIdx_y;
@@ -46,7 +46,7 @@ namespace cuda
             const T *iptr =  in.ptr + idx2 *  in.strides[2] + idx3 *  in.strides[3];
 
 
-            if (oidx0 >= out.dims[0] || oidx1 >= out.dims[1]) return;
+            if (oidx0 >= out.dims[0] || oidx1 >= out.dims[1] || idx2 >= out.dims[2] || idx3 >= out.dims[3]) return;
 
             int pidx0 = oidx0 + px;
             int pidx1 = oidx1 + py;
@@ -100,6 +100,10 @@ namespace cuda
             int blocks_y = divup(out.dims[1], threads.y);
 
             dim3 blocks(blocks_x * out.dims[2], blocks_y * out.dims[3]);
+
+            const int maxBlocksY = cuda::getDeviceProp(cuda::getActiveDeviceId()).maxGridSize[1];
+            blocks.z = divup(blocks.y, maxBlocksY);
+            blocks.y = divup(blocks.y, blocks.z);
 
             if (is_column) {
                 CUDA_LAUNCH((wrap_kernel<T, true >), blocks, threads,

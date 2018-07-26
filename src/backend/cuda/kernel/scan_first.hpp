@@ -10,7 +10,7 @@
 #include <ops.hpp>
 #include <backend.hpp>
 #include <Param.hpp>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <math.hpp>
 #include <err_cuda.hpp>
 #include <debug_cuda.hpp>
@@ -34,9 +34,9 @@ namespace kernel
         const int tidy = threadIdx.y;
 
         const int zid = blockIdx.x / blocks_x;
-        const int wid = blockIdx.y / blocks_y;
+        const int wid = (blockIdx.y + blockIdx.z * gridDim.y) / blocks_y;
         const int blockIdx_x = blockIdx.x - (blocks_x) * zid;
-        const int blockIdx_y = blockIdx.y - (blocks_y) * wid;
+        const int blockIdx_y = (blockIdx.y + blockIdx.z * gridDim.y) - (blocks_y) * wid;
         const int xid = blockIdx_x * blockDim.x * lim + tidx;
         const int yid = blockIdx_y * blockDim.y + tidy;
 
@@ -64,7 +64,7 @@ namespace kernel
         Transform<Ti, To, op> transform;
         Binary<To, op> binop;
 
-        const To init = binop.init();
+        const To init = Binary<To, op>::init();
         int id = xid;
         To val = init;
 
@@ -125,9 +125,9 @@ namespace kernel
         const int tidy = threadIdx.y;
 
         const int zid = blockIdx.x / blocks_x;
-        const int wid = blockIdx.y / blocks_y;
+        const int wid = (blockIdx.y + blockIdx.z * gridDim.y) / blocks_y;
         const int blockIdx_x = blockIdx.x - (blocks_x) * zid;
-        const int blockIdx_y = blockIdx.y - (blocks_y) * wid;
+        const int blockIdx_y = (blockIdx.y + blockIdx.z * gridDim.y) - (blocks_y) * wid;
         const int xid = blockIdx_x * blockDim.x * lim + tidx;
         const int yid = blockIdx_y * blockDim.y + tidy;
 
@@ -167,6 +167,10 @@ namespace kernel
         dim3 blocks(blocks_x * out.dims[2],
                     blocks_y * out.dims[3]);
 
+        const int maxBlocksY = cuda::getDeviceProp(cuda::getActiveDeviceId()).maxGridSize[1];
+        blocks.z = divup(blocks.y, maxBlocksY);
+        blocks.y = divup(blocks.y, blocks.z);
+
         uint lim = divup(out.dims[0], (threads_x * blocks_x));
 
         switch (threads_x) {
@@ -201,6 +205,10 @@ namespace kernel
         dim3 blocks(blocks_x * out.dims[2],
                     blocks_y * out.dims[3]);
 
+        const int maxBlocksY = cuda::getDeviceProp(cuda::getActiveDeviceId()).maxGridSize[1];
+        blocks.z = divup(blocks.y, maxBlocksY);
+        blocks.y = divup(blocks.y, blocks.z);
+
         uint lim = divup(out.dims[0], (threads_x * blocks_x));
 
         CUDA_LAUNCH((bcast_first_kernel<To, op>), blocks, threads, out, tmp, blocks_x, blocks_y, lim);
@@ -233,7 +241,8 @@ namespace kernel
             for (int k = 1; k < 4; k++) tmp.strides[k] = tmp.strides[k - 1] * tmp.dims[k - 1];
 
             int tmp_elements = tmp.strides[3] * tmp.dims[3];
-            tmp.ptr = memAlloc<To>(tmp_elements);
+            auto tmp_alloc = memAlloc<To>(tmp_elements);
+            tmp.ptr = tmp_alloc.get();
 
             scan_first_launcher<Ti, To, op, false, inclusive_scan>(out, tmp, in,
                                                    blocks_x, blocks_y,
@@ -252,7 +261,6 @@ namespace kernel
 
             bcast_first_launcher<To, op>(out, tmp, blocks_x, blocks_y, threads_x);
 
-            memFree(tmp.ptr);
         }
     }
 

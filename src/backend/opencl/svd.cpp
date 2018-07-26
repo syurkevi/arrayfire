@@ -15,7 +15,7 @@
 #include <blas.hpp>
 #include <transpose.hpp>
 
-#if defined(WITH_OPENCL_LINEAR_ALGEBRA)
+#if defined(WITH_LINEAR_ALGEBRA)
 
 #include <magma/magma.h>
 #include <magma/magma_cpu_lapack.h>
@@ -202,7 +202,6 @@ void svdInPlace(Array<Tr> &s, Array<T> &u, Array<T> &vt, Array<T> &in)
         return cpu::svdInPlace(s, u, vt, in);
     }
 
-    initBlas();
     svd<T, Tr>(u, s, vt, in, true);
 }
 
@@ -239,7 +238,7 @@ INSTANTIATE(cdouble, double)
 
 }
 
-#else
+#else  // WITH_LINEAR_ALGEBRA
 
 namespace opencl
 {
@@ -267,4 +266,4 @@ INSTANTIATE(cdouble, double)
 
 }
 
-#endif
+#endif  // WITH_LINEAR_ALGEBRA

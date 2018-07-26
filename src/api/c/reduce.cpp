@@ -11,7 +11,7 @@
 #include <af/defines.h>
 #include <af/dim4.hpp>
 #include <af/algorithm.h>
-#include <err_common.hpp>
+#include <common/err_common.hpp>
 #include <handle.hpp>
 #include <ops.hpp>
 #include <backend.hpp>
@@ -213,7 +213,7 @@ static af_err reduce_all_type(double *real, double *imag, const af_array in)
 
         ARG_ASSERT(0, real != NULL);
         *real = 0;
-        if (!imag) *imag = 0;
+        if (imag) *imag = 0;
 
         switch(type) {
         case f32:  *real = (double)reduce_all<op, float  , To>(in); break;
@@ -395,14 +395,15 @@ static af_err ireduce_common(af_array *val, af_array *idx, const af_array in, co
 {
     try {
 
-        ARG_ASSERT(2, dim >= 0);
-        ARG_ASSERT(2, dim <  4);
+        ARG_ASSERT(3, dim >= 0);
+        ARG_ASSERT(3, dim <  4);
 
         const ArrayInfo& in_info = getInfo(in);
         ARG_ASSERT(2, in_info.ndims() > 0);
 
         if (dim >= (int)in_info.ndims()) {
             *val = retain(in);
+            *idx = createHandleFromValue<uint>(in_info.dims(), 0);
             return AF_SUCCESS;
         }
 
@@ -461,7 +462,7 @@ static af_err ireduce_all_common(double *real_val, double *imag_val,
         ARG_ASSERT(3, in_info.ndims() > 0);
         ARG_ASSERT(0, real_val != NULL);
         *real_val = 0;
-        if (!imag_val) *imag_val = 0;
+        if (imag_val) *imag_val = 0;
 
         cfloat  cfval;
         cdouble cdval;

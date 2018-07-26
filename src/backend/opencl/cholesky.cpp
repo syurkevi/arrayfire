@@ -12,7 +12,7 @@
 #include <blas.hpp>
 #include <copy.hpp>
 
-#if defined(WITH_OPENCL_LINEAR_ALGEBRA)
+#if defined(WITH_LINEAR_ALGEBRA)
 #include <magma/magma.h>
 #include <triangle.hpp>
 #include <platform.hpp>
@@ -27,8 +27,6 @@ int cholesky_inplace(Array<T> &in, const bool is_upper)
     if(OpenCLCPUOffload()) {
         return cpu::cholesky_inplace(in, is_upper);
     }
-
-    initBlas();
 
     dim4 iDims = in.dims();
     int N = iDims[0];
@@ -71,7 +69,7 @@ INSTANTIATE_CH(cdouble)
 
 }
 
-#else
+#else  // WITH_LINEAR_ALGEBRA
 
 namespace opencl
 {
@@ -100,4 +98,4 @@ INSTANTIATE_CH(cdouble)
 
 }
 
-#endif
+#endif  // WITH_LINEAR_ALGEBRA

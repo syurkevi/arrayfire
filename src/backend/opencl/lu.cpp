@@ -10,7 +10,7 @@
 #include <lu.hpp>
 #include <err_opencl.hpp>
 
-#if defined(WITH_OPENCL_LINEAR_ALGEBRA)
+#if defined(WITH_LINEAR_ALGEBRA)
 #include <kernel/lu_split.hpp>
 #include <copy.hpp>
 #include <blas.hpp>
@@ -71,7 +71,6 @@ Array<int> lu_inplace(Array<T> &in, const bool convert_pivot)
         return cpu::lu_inplace(in, convert_pivot);
     }
 
-    initBlas();
     dim4 iDims = in.dims();
     int M = iDims[0];
     int N = iDims[1];
@@ -105,7 +104,7 @@ INSTANTIATE_LU(cdouble)
 
 }
 
-#else
+#else  // WITH_LINEAR_ALGEBRA
 
 namespace opencl
 {
@@ -138,4 +137,4 @@ INSTANTIATE_LU(cdouble)
 
 }
 
-#endif
+#endif  // WITH_LINEAR_ALGEBRA

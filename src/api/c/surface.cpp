@@ -10,9 +10,9 @@
 #include <af/graphics.h>
 #include <af/image.h>
 
-#include <ArrayInfo.hpp>
-#include <graphics_common.hpp>
-#include <err_common.hpp>
+#include <common/ArrayInfo.hpp>
+#include <common/graphics_common.hpp>
+#include <common/err_common.hpp>
 #include <backend.hpp>
 #include <surface.hpp>
 #include <reduce.hpp>
@@ -168,8 +168,11 @@ af_err af_draw_surface(const af_window wind, const af_array xVals, const af_arra
             default:  TYPE_ERROR(1, Xtype);
         }
 
+        auto gridDims = ForgeManager::getInstance().getWindowGrid(window);
         if (props->col>-1 && props->row>-1)
-            window->draw(props->row, props->col, *chart, props->title);
+            window->draw(gridDims.first, gridDims.second,
+                         props->row * gridDims.second + props->col,
+                         *chart, props->title);
         else
             window->draw(*chart);
     }

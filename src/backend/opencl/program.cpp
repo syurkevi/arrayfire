@@ -11,7 +11,6 @@
 #include <traits.hpp>
 #include <kernel_headers/KParam.hpp>
 #include <debug_opencl.hpp>
-#include <iostream>
 
 using cl::Buffer;
 using cl::Program;
@@ -48,7 +47,7 @@ namespace opencl
                 setSrc.emplace_back(ker_strs[i], ker_lens[i]);
             }
 
-            static std::string defaults =
+            const std::string defaults =
                 std::string(" -D dim_t=") +
                 std::string(dtype_traits<dim_t>::getName());
 

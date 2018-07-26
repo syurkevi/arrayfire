@@ -22,7 +22,7 @@ using af::dim4;
 template<>
 struct Binary<cdouble, af_add_t>
 {
-    cdouble init()
+    static cdouble init()
     {
         return cdouble(0,0);
     }
@@ -37,8 +37,8 @@ namespace cpu
 {
 
 template<af_op_t op, typename Ti, typename To>
-using reduce_dim_func = std::function<void(Array<To>, const dim_t,
-                                           const Array<Ti>, const dim_t,
+using reduce_dim_func = std::function<void(Param<To>, const dim_t,
+                                           CParam<Ti>, const dim_t,
                                            const int, bool, double)>;
 
 template<af_op_t op, typename Ti, typename To>
@@ -68,7 +68,7 @@ To reduce_all(const Array<Ti> &in, bool change_nan, double nanval)
     Transform<Ti, To, op> transform;
     Binary<To, op> reduce;
 
-    To out = reduce.init();
+    To out = Binary<To, op>::init();
 
     // Decrement dimension of select dimension
     af::dim4 dims = in.dims();

@@ -7,13 +7,17 @@
  * http://arrayfire.com/licenses/BSD-3-Clause
  ********************************************************/
 
-#include <af/dim4.hpp>
-#include <Array.hpp>
-#include <err_cpu.hpp>
+#include <kernel/fast.hpp>
 #include <fast.hpp>
+
+#include <Array.hpp>
+#include <af/dim4.hpp>
+#include <math.h>
 #include <platform.hpp>
 #include <queue.hpp>
-#include <kernel/fast.hpp>
+
+#include <cstddef>
+#include <algorithm>
 
 using af::dim4;
 
@@ -70,8 +74,8 @@ unsigned fast(Array<float> &x_out, Array<float> &y_out, Array<float> &score_out,
 
         count = 0;
         kernel::non_maximal(V, x, y,
-                    x_total, y_total, score_total,
-                    &count, feat_found, edge);
+                            x_total, y_total, score_total,
+                            &count, feat_found, edge);
 
         feat_found = std::min(max_feat, count);
     } else {

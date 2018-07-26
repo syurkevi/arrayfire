@@ -17,7 +17,7 @@
 #include <traits.hpp>
 #include <sstream>
 #include <string>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <err_opencl.hpp>
 #include <debug_opencl.hpp>
 #include <program.hpp>
@@ -83,9 +83,10 @@ namespace opencl
                 "_" + string(dtype_traits<T>::getName()) +
                 "_" + to_string(kerIdx);
             int device = getActiveDeviceId();
-            kc_t::iterator idx = kernelCaches[device].find(ref_name);
-            kc_entry_t entry;
-            if (idx == kernelCaches[device].end()) {
+
+            kc_entry_t entry = kernelCache(device, ref_name);
+
+            if (entry.prog==0 && entry.ker==0) {
                 std::ostringstream options;
                 options << " -D T=" << dtype_traits<T>::getName()
                         << " -D THREADS=" << THREADS
@@ -104,9 +105,8 @@ namespace opencl
                 buildProgram(prog, 2, ker_strs, ker_lens, options.str());
                 entry.prog = new Program(prog);
                 entry.ker = new Kernel(*entry.prog, "generate");
-                kernelCaches[device][ref_name] = entry;
-            } else {
-                entry = idx->second;
+
+                addKernelToCache(device, ref_name, entry);
             }
 
             return *entry.ker;
@@ -121,17 +121,17 @@ namespace opencl
             int ker_len = random_engine_mersenne_init_cl_len;
             string ref_name = "mersenne_init";
             int device = getActiveDeviceId();
-            kc_t::iterator idx = kernelCaches[device].find(ref_name);
-            kc_entry_t entry;
-            if (idx == kernelCaches[device].end()) {
+
+            kc_entry_t entry = kernelCache(device, ref_name);
+
+            if (entry.prog==0 && entry.ker==0) {
                 std::string emptyOptionString;
                 cl::Program prog;
                 buildProgram(prog, 1, &ker_str, &ker_len, emptyOptionString);
                 entry.prog = new Program(prog);
                 entry.ker = new Kernel(*entry.prog, "initState");
-                kernelCaches[device][ref_name] = entry;
-            } else {
-                entry = idx->second;
+
+                addKernelToCache(device, ref_name, entry);
             }
 
             return *entry.ker;
@@ -146,15 +146,17 @@ namespace opencl
 
             uint hi = seed>>32;
             uint lo = seed;
+	    uint hic = counter>>32;
+	    uint loc = counter;
 
             NDRange local(THREADS, 1);
             NDRange global(THREADS * groups, 1);
 
             if ((type == AF_RANDOM_ENGINE_PHILOX_4X32_10) || (type == AF_RANDOM_ENGINE_THREEFRY_2X32_16)) {
                 Kernel ker = get_random_engine_kernel<T>(type, kerIdx, elementsPerBlock);
-                auto randomEngineOp = KernelFunctor<cl::Buffer, uint, uint, uint, uint>(ker);
+                auto randomEngineOp = KernelFunctor<cl::Buffer, uint, uint, uint, uint, uint>(ker);
                 randomEngineOp(EnqueueArgs(getQueue(), global, local),
-                        out, elements, counter, hi, lo);
+			       out, elements, hic, loc, hi, lo);
             }
 
             counter += elements;

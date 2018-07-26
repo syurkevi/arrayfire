@@ -17,7 +17,7 @@
 #include <kernel_headers/iops.hpp>
 #include <program.hpp>
 #include <traits.hpp>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <Param.hpp>
 #include <cache.hpp>
 #include <debug_opencl.hpp>
@@ -62,39 +62,36 @@ namespace kernel
             std::to_string(threads_y);
 
         int device = getActiveDeviceId();
-        kc_t::iterator idx = kernelCaches[device].find(ref_name);
 
-        kc_entry_t entry;
-        if (idx == kernelCaches[device].end()) {
+        kc_entry_t entry = kernelCache(device, ref_name);
 
-                Binary<T, op> ireduce;
-                ToNumStr<T> toNumStr;
+        if (entry.prog==0 && entry.ker==0) {
 
-                std::ostringstream options;
-                options << " -D T=" << dtype_traits<T>::getName()
-                        << " -D dim=" << dim
-                        << " -D DIMY=" << threads_y
-                        << " -D THREADS_X=" << THREADS_X
-                        << " -D init=" << toNumStr(ireduce.init())
-                        << " -D " << binOpName<op>()
-                        << " -D CPLX=" << af::iscplx<T>()
-                        << " -D IS_FIRST=" << is_first;
+            ToNumStr<T> toNumStr;
 
-                if (std::is_same<T, double>::value ||
+            std::ostringstream options;
+            options << " -D T=" << dtype_traits<T>::getName()
+                << " -D dim=" << dim
+                << " -D DIMY=" << threads_y
+                << " -D THREADS_X=" << THREADS_X
+                << " -D init=" << toNumStr(Binary<T, op>::init())
+                << " -D " << binOpName<op>()
+                << " -D CPLX=" << af::iscplx<T>()
+                << " -D IS_FIRST=" << is_first;
+
+            if (std::is_same<T, double>::value ||
                     std::is_same<T, cdouble>::value) {
-                    options << " -D USE_DOUBLE";
-                }
+                options << " -D USE_DOUBLE";
+            }
 
-                const char *ker_strs[] = {iops_cl, ireduce_dim_cl};
-                const int   ker_lens[] = {iops_cl_len, ireduce_dim_cl_len};
-                Program prog;
-                buildProgram(prog, 2, ker_strs, ker_lens, options.str());
-                entry.prog = new Program(prog);
-                entry.ker = new Kernel(*entry.prog, "ireduce_dim_kernel");
+            const char *ker_strs[] = {iops_cl, ireduce_dim_cl};
+            const int   ker_lens[] = {iops_cl_len, ireduce_dim_cl_len};
+            Program prog;
+            buildProgram(prog, 2, ker_strs, ker_lens, options.str());
+            entry.prog = new Program(prog);
+            entry.ker = new Kernel(*entry.prog, "ireduce_dim_kernel");
 
-                kernelCaches[device][ref_name] = entry;
-        } else {
-            entry = idx->second;
+            addKernelToCache(device, ref_name, entry);
         }
 
         NDRange local(THREADS_X, threads_y);
@@ -174,19 +171,18 @@ namespace kernel
             std::to_string(threads_x);
 
         int device = getActiveDeviceId();
-        kc_t::iterator idx = kernelCaches[device].find(ref_name);
 
-        kc_entry_t entry;
-        if (idx == kernelCaches[device].end()) {
+        kc_entry_t entry = kernelCache(device, ref_name);
 
-            Binary<T, op> ireduce;
+        if (entry.prog==0 && entry.ker==0) {
+
             ToNumStr<T> toNumStr;
 
             std::ostringstream options;
             options << " -D T=" << dtype_traits<T>::getName()
                     << " -D DIMX=" << threads_x
                     << " -D THREADS_PER_GROUP=" << THREADS_PER_GROUP
-                    << " -D init=" << toNumStr(ireduce.init())
+                    << " -D init=" << toNumStr(Binary<T, op>::init())
                     << " -D " << binOpName<op>()
                     << " -D CPLX=" << af::iscplx<T>()
                     << " -D IS_FIRST=" << is_first;
@@ -203,9 +199,7 @@ namespace kernel
             entry.prog = new Program(prog);
             entry.ker = new Kernel(*entry.prog, "ireduce_first_kernel");
 
-            kernelCaches[device][ref_name] = entry;
-        } else {
-            entry = idx->second;
+            addKernelToCache(device, ref_name, entry);
         }
 
         NDRange local(threads_x, THREADS_PER_GROUP / threads_x);
@@ -363,29 +357,19 @@ namespace kernel
             threads_x = std::min(threads_x, THREADS_PER_GROUP);
             uint threads_y = THREADS_PER_GROUP / threads_x;
 
-            Param tmp;
             uint groups_x = divup(in.info.dims[0], threads_x * REPEAT);
             uint groups_y = divup(in.info.dims[1], threads_y);
+            Array<T> tmp = createEmptyArray<T>({groups_x, in.info.dims[1], in.info.dims[2], in.info.dims[3]});
 
-            tmp.info.offset = 0;
-            tmp.info.dims[0] = groups_x;
-            tmp.info.strides[0] = 1;
-
-            for (int k = 1; k < 4; k++) {
-                tmp.info.dims[k] = in.info.dims[k];
-                tmp.info.strides[k] = tmp.info.dims[k - 1] * tmp.info.strides[k - 1];
-            }
-
-            int tmp_elements = tmp.info.strides[3] * tmp.info.dims[3];
-            tmp.data = bufferAlloc(tmp_elements * sizeof(T));
+            int tmp_elements = tmp.elements();
             cl::Buffer *tidx = bufferAlloc(tmp_elements * sizeof(uint));
 
             ireduce_first_launcher<T, op>(tmp, tidx, in, tidx, threads_x, true, groups_x, groups_y);
 
-            unique_ptr<T> h_ptr(new T[tmp_elements]);
-            unique_ptr<uint> h_iptr(new uint[tmp_elements]);
+            unique_ptr<T[]> h_ptr(new T[tmp_elements]);
+            unique_ptr<uint[]> h_iptr(new uint[tmp_elements]);
 
-            getQueue().enqueueReadBuffer(*tmp.data, CL_TRUE, 0, sizeof(T) * tmp_elements, h_ptr.get());
+            getQueue().enqueueReadBuffer(*tmp.get(), CL_TRUE, 0, sizeof(T) * tmp_elements, h_ptr.get());
             getQueue().enqueueReadBuffer(*tidx, CL_TRUE, 0, sizeof(uint) * tmp_elements, h_iptr.get());
 
             T* h_ptr_raw = h_ptr.get();
@@ -407,7 +391,6 @@ namespace kernel
                 Op(h_ptr_raw[i], h_iptr_raw[i]);
             }
 
-            bufferFree(tmp.data);
             bufferFree(tidx);
 
             *loc = Op.m_idx;
@@ -415,7 +398,7 @@ namespace kernel
 
         } else {
 
-            unique_ptr<T> h_ptr(new T[in_elements]);
+            unique_ptr<T[]> h_ptr(new T[in_elements]);
             T* h_ptr_raw = h_ptr.get();
 
             getQueue().enqueueReadBuffer(*in.data, CL_TRUE, sizeof(T) * in.info.offset,

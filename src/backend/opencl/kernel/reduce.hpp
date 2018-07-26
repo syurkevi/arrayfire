@@ -16,7 +16,7 @@
 #include <kernel_headers/ops.hpp>
 #include <program.hpp>
 #include <traits.hpp>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <Param.hpp>
 #include <debug_opencl.hpp>
 #include <type_util.hpp>
@@ -61,11 +61,9 @@ namespace kernel
             std::to_string(threads_y);
 
         int device = getActiveDeviceId();
-        kc_t::iterator idx = kernelCaches[device].find(ref_name);
+        kc_entry_t entry = kernelCache(device, ref_name);
 
-        kc_entry_t entry;
-        if (idx == kernelCaches[device].end()) {
-            Binary<To, op> reduce;
+        if (entry.prog==0 && entry.ker==0) {
             ToNumStr<To> toNumStr;
 
             std::ostringstream options;
@@ -75,7 +73,7 @@ namespace kernel
                     << " -D dim=" << dim
                     << " -D DIMY=" << threads_y
                     << " -D THREADS_X=" << THREADS_X
-                    << " -D init=" << toNumStr(reduce.init())
+                    << " -D init=" << toNumStr(Binary<To, op>::init())
                     << " -D " << binOpName<op>()
                     << " -D CPLX=" << af::iscplx<Ti>();
             if (std::is_same<Ti, double>::value ||
@@ -92,9 +90,7 @@ namespace kernel
             entry.prog = new Program(prog);
             entry.ker = new Kernel(*entry.prog, "reduce_dim_kernel");
 
-            kernelCaches[device][ref_name] = entry;
-        } else {
-            entry = idx->second;
+            addKernelToCache(device, ref_name, entry);
         }
 
         NDRange local(THREADS_X, threads_y);
@@ -179,12 +175,11 @@ namespace kernel
             std::to_string(threads_x);
 
         int device = getActiveDeviceId();
-        kc_t::iterator idx = kernelCaches[device].find(ref_name);
 
-        kc_entry_t entry;
-        if (idx == kernelCaches[device].end()) {
+        kc_entry_t entry = kernelCache(device, ref_name);
 
-            Binary<To, op> reduce;
+        if (entry.prog==0 && entry.ker==0) {
+
             ToNumStr<To> toNumStr;
 
             std::ostringstream options;
@@ -193,7 +188,7 @@ namespace kernel
                     << " -D T=To"
                     << " -D DIMX=" << threads_x
                     << " -D THREADS_PER_GROUP=" << THREADS_PER_GROUP
-                    << " -D init=" << toNumStr(reduce.init())
+                    << " -D init=" << toNumStr(Binary<To, op>::init())
                     << " -D " << binOpName<op>()
                     << " -D CPLX=" << af::iscplx<Ti>();
             if (std::is_same<Ti, double>::value ||
@@ -209,9 +204,7 @@ namespace kernel
             entry.prog = new Program(prog);
             entry.ker = new Kernel(*entry.prog, "reduce_first_kernel");
 
-            kernelCaches[device][ref_name] = entry;
-        } else {
-            entry = idx->second;
+            addKernelToCache(device, ref_name, entry);
         }
 
         NDRange local(threads_x, THREADS_PER_GROUP / threads_x);
@@ -304,49 +297,36 @@ namespace kernel
             threads_x = std::min(threads_x, THREADS_PER_GROUP);
             uint threads_y = THREADS_PER_GROUP / threads_x;
 
-            Param tmp;
             uint groups_x = divup(in.info.dims[0], threads_x * REPEAT);
             uint groups_y = divup(in.info.dims[1], threads_y);
+            Array<To> tmp = createEmptyArray<To>({groups_x, in.info.dims[1], in.info.dims[2], in.info.dims[3]});
 
-            tmp.info.offset = 0;
-            tmp.info.dims[0] = groups_x;
-            tmp.info.strides[0] = 1;
-
-            for (int k = 1; k < 4; k++) {
-                tmp.info.dims[k] = in.info.dims[k];
-                tmp.info.strides[k] = tmp.info.dims[k - 1] * tmp.info.strides[k - 1];
-            }
-
-            int tmp_elements = tmp.info.strides[3] * tmp.info.dims[3];
-            tmp.data = bufferAlloc(tmp_elements * sizeof(To));
+            int tmp_elements = tmp.elements();
 
             reduce_first_launcher<Ti, To, op>(tmp, in, groups_x, groups_y, threads_x, change_nan, nanval);
 
-            unique_ptr<To> h_ptr(new To[tmp_elements]);
-            getQueue().enqueueReadBuffer(*tmp.data, CL_TRUE, 0, sizeof(To) * tmp_elements, h_ptr.get());
+            std::vector<To> h_ptr(tmp_elements);
+            getQueue().enqueueReadBuffer(*tmp.get(), CL_TRUE, 0, sizeof(To) * tmp_elements, h_ptr.data());
 
             Binary<To, op> reduce;
-            To out = reduce.init();
+            To out = Binary<To, op>::init();
             for (int i = 0; i < (int)tmp_elements; i++) {
-                out = reduce(out, h_ptr.get()[i]);
+                out = reduce(out, h_ptr[i]);
             }
-
-            bufferFree(tmp.data);
             return out;
-
         } else {
 
-            unique_ptr<Ti> h_ptr(new Ti[in_elements]);
+            std::vector<Ti> h_ptr(in_elements);
             getQueue().enqueueReadBuffer(*in.data, CL_TRUE, sizeof(Ti) * in.info.offset,
-                                          sizeof(Ti) * in_elements, h_ptr.get());
+                                          sizeof(Ti) * in_elements, h_ptr.data());
 
             Transform<Ti, To, op> transform;
             Binary<To, op> reduce;
-            To out = reduce.init();
+            To out = Binary<To, op>::init();
             To nanval_to = scalar<To>(nanval);
 
             for (int i = 0; i < (int)in_elements; i++) {
-                To in_val = transform(h_ptr.get()[i]);
+                To in_val = transform(h_ptr[i]);
                 if (change_nan) in_val = IS_NAN(in_val) ? nanval_to : in_val;
                 out = reduce(out, in_val);
             }

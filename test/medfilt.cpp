@@ -15,9 +15,12 @@
 #include <vector>
 #include <testHelpers.hpp>
 
+using std::abs;
+using std::endl;
 using std::string;
 using std::vector;
-using std::abs;
+using af::dim4;
+using af::dtype_traits;
 
 template<typename T>
 class MedianFilter : public ::testing::Test
@@ -45,33 +48,32 @@ void medfiltTest(string pTestFile, dim_t w_len, dim_t w_wid, af_border_type pad)
 {
     if (noDoubleTests<T>()) return;
 
-    vector<af::dim4>  numDims;
+    vector<dim4>  numDims;
     vector<vector<T> >      in;
     vector<vector<T> >   tests;
 
     readTests<T,T,int>(pTestFile, numDims, in, tests);
 
-    af::dim4 dims      = numDims[0];
+    dim4 dims      = numDims[0];
     af_array outArray  = 0;
     af_array inArray   = 0;
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&inArray, &(in[0].front()),
-                dims.ndims(), dims.get(), (af_dtype)af::dtype_traits<T>::af_type));
+                dims.ndims(), dims.get(), (af_dtype)dtype_traits<T>::af_type));
 
     ASSERT_EQ(AF_SUCCESS, af_medfilt2(&outArray, inArray, w_len, w_wid, pad));
 
-    T *outData = new T[dims.elements()];
+    vector<T> outData(dims.elements());
 
-    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)outData, outArray));
+    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)outData.data(), outArray));
 
     vector<T> currGoldBar = tests[0];
     size_t nElems        = currGoldBar.size();
     for (size_t elIter=0; elIter<nElems; ++elIter) {
-        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< std::endl;
+        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< endl;
     }
 
     // cleanup
-    delete[] outData;
     ASSERT_EQ(AF_SUCCESS, af_release_array(inArray));
     ASSERT_EQ(AF_SUCCESS, af_release_array(outArray));
 }
@@ -102,33 +104,32 @@ void medfilt1_Test(string pTestFile, dim_t w_wid, af_border_type pad)
 {
     if (noDoubleTests<T>()) return;
 
-    vector<af::dim4>  numDims;
+    vector<dim4>  numDims;
     vector<vector<T> >      in;
     vector<vector<T> >   tests;
 
     readTests<T,T,int>(pTestFile, numDims, in, tests);
 
-    af::dim4 dims      = numDims[0];
+    dim4 dims      = numDims[0];
     af_array outArray  = 0;
     af_array inArray   = 0;
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&inArray, &(in[0].front()),
-                dims.ndims(), dims.get(), (af_dtype)af::dtype_traits<T>::af_type));
+                dims.ndims(), dims.get(), (af_dtype)dtype_traits<T>::af_type));
 
     ASSERT_EQ(AF_SUCCESS, af_medfilt1(&outArray, inArray, w_wid, pad));
 
-    T *outData = new T[dims.elements()];
+    vector<T> outData(dims.elements());
 
-    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)outData, outArray));
+    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)outData.data(), outArray));
 
     vector<T> currGoldBar = tests[0];
     size_t nElems        = currGoldBar.size();
     for (size_t elIter=0; elIter<nElems; ++elIter) {
-        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< std::endl;
+        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< endl;
     }
 
     // cleanup
-    delete[] outData;
     ASSERT_EQ(AF_SUCCESS, af_release_array(inArray));
     ASSERT_EQ(AF_SUCCESS, af_release_array(outArray));
 }
@@ -159,8 +160,6 @@ void medfiltImageTest(string pTestFile, dim_t w_len, dim_t w_wid)
     if (noDoubleTests<T>()) return;
     if (noImageIOTests()) return;
 
-    using af::dim4;
-
     vector<dim4>       inDims;
     vector<string>    inFiles;
     vector<dim_t> outSizes;
@@ -186,13 +185,13 @@ void medfiltImageTest(string pTestFile, dim_t w_len, dim_t w_wid)
 
         ASSERT_EQ(AF_SUCCESS, af_medfilt2(&outArray, inArray, w_len, w_wid, AF_PAD_ZERO));
 
-        T * outData = new T[nElems];
-        ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)outData, outArray));
+        vector<T> outData(nElems);
+        ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)outData.data(), outArray));
 
-        T * goldData= new T[nElems];
-        ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)goldData, goldArray));
+        vector<T> goldData(nElems);
+        ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)goldData.data(), goldArray));
 
-        ASSERT_EQ(true, compareArraysRMSD(nElems, goldData, outData, 0.018f));
+        ASSERT_EQ(true, compareArraysRMSD(nElems, goldData.data(), outData.data(), 0.018f));
 
         ASSERT_EQ(AF_SUCCESS, af_release_array(inArray));
         ASSERT_EQ(AF_SUCCESS, af_release_array(outArray));
@@ -211,10 +210,10 @@ void medfiltInputTest(void)
     vector<T>   in(100, 1);
 
     // Check for 1D inputs -> medfilt1
-    af::dim4 dims = af::dim4(100, 1, 1, 1);
+    dim4 dims = dim4(100, 1, 1, 1);
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&inArray, &in.front(),
-                dims.ndims(), dims.get(), (af_dtype) af::dtype_traits<T>::af_type));
+                dims.ndims(), dims.get(), (af_dtype) dtype_traits<T>::af_type));
 
     ASSERT_EQ(AF_SUCCESS, af_medfilt2(&outArray, inArray, 1, 1, AF_PAD_ZERO));
 
@@ -224,6 +223,7 @@ void medfiltInputTest(void)
     ASSERT_EQ(true, medfilt1);
 
     ASSERT_EQ(AF_SUCCESS, af_release_array(inArray));
+    ASSERT_EQ(AF_SUCCESS, af_release_array(outArray));
 }
 
 TYPED_TEST(MedianFilter, InvalidArray)
@@ -242,10 +242,10 @@ void medfiltWindowTest(void)
     vector<T>   in(100, 1);
 
     // Check for 4D inputs
-    af::dim4 dims(10, 10, 1, 1);
+    dim4 dims(10, 10, 1, 1);
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&inArray, &in.front(),
-                dims.ndims(), dims.get(), (af_dtype) af::dtype_traits<T>::af_type));
+                dims.ndims(), dims.get(), (af_dtype) dtype_traits<T>::af_type));
 
     ASSERT_EQ(AF_ERR_ARG, af_medfilt2(&outArray, inArray, 3, 5, AF_PAD_ZERO));
 
@@ -269,10 +269,10 @@ void medfilt1d_WindowTest(void)
     vector<T>   in(100, 1);
 
     // Check for 4D inputs
-    af::dim4 dims(10, 10, 1, 1);
+    dim4 dims(10, 10, 1, 1);
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&inArray, &in.front(),
-                dims.ndims(), dims.get(), (af_dtype) af::dtype_traits<T>::af_type));
+                dims.ndims(), dims.get(), (af_dtype) dtype_traits<T>::af_type));
 
     ASSERT_EQ(AF_ERR_ARG, af_medfilt1(&outArray, inArray, -1, AF_PAD_ZERO));
 
@@ -295,10 +295,10 @@ void medfiltPadTest(void)
     vector<T>   in(100, 1);
 
     // Check for 4D inputs
-    af::dim4 dims(10, 10, 1, 1);
+    dim4 dims(10, 10, 1, 1);
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&inArray, &in.front(),
-                dims.ndims(), dims.get(), (af_dtype) af::dtype_traits<T>::af_type));
+                dims.ndims(), dims.get(), (af_dtype) dtype_traits<T>::af_type));
 
     ASSERT_EQ(AF_ERR_ARG, af_medfilt2(&outArray, inArray, 3, 3, af_border_type(3)));
 
@@ -323,10 +323,10 @@ void medfilt1d_PadTest(void)
     vector<T>   in(100, 1);
 
     // Check for 4D inputs
-    af::dim4 dims(10, 10, 1, 1);
+    dim4 dims(10, 10, 1, 1);
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&inArray, &in.front(),
-                dims.ndims(), dims.get(), (af_dtype) af::dtype_traits<T>::af_type));
+                dims.ndims(), dims.get(), (af_dtype) dtype_traits<T>::af_type));
 
     ASSERT_EQ(AF_ERR_ARG, af_medfilt1(&outArray, inArray, 3, af_border_type(3)));
 
@@ -342,6 +342,9 @@ TYPED_TEST(MedianFilter1d, InvalidPadType)
 
 //////////////////////////////////// CPP ////////////////////////////////////
 //
+
+using af::array;
+
 TEST(MedianFilter, CPP)
 {
     if (noDoubleTests<float>()) return;
@@ -349,28 +352,25 @@ TEST(MedianFilter, CPP)
     const dim_t w_len = 3;
     const dim_t w_wid = 3;
 
-    vector<af::dim4>  numDims;
+    vector<dim4>  numDims;
     vector<vector<float> >      in;
     vector<vector<float> >   tests;
 
     readTests<float,float,int>(string(TEST_DIR"/medianfilter/batch_symmetric_pad_3x3_window.test"),
                                numDims, in, tests);
 
-    af::dim4 dims    = numDims[0];
-    af::array input(dims, &(in[0].front()));
-    af::array output = af::medfilt(input, w_len, w_wid, AF_PAD_SYM);
+    dim4 dims    = numDims[0];
+    array input(dims, &(in[0].front()));
+    array output = medfilt(input, w_len, w_wid, AF_PAD_SYM);
 
-    float *outData = new float[dims.elements()];
-    output.host((void*)outData);
+    vector<float> outData(dims.elements());
+    output.host((void*)outData.data());
 
     vector<float> currGoldBar = tests[0];
     size_t nElems = currGoldBar.size();
     for (size_t elIter=0; elIter<nElems; ++elIter) {
-        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< std::endl;
+        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< endl;
     }
-
-    // cleanup
-    delete[] outData;
 }
 
 TEST(MedianFilter1d, CPP)
@@ -379,35 +379,30 @@ TEST(MedianFilter1d, CPP)
 
     const dim_t w_wid = 3;
 
-    vector<af::dim4>  numDims;
+    vector<dim4>  numDims;
     vector<vector<float> >      in;
     vector<vector<float> >   tests;
 
     readTests<float,float,int>(string(TEST_DIR"/medianfilter/batch_symmetric_pad_3x1_window.test"),
                                numDims, in, tests);
 
-    af::dim4 dims    = numDims[0];
-    af::array input(dims, &(in[0].front()));
-    af::array output = af::medfilt1(input, w_wid, AF_PAD_SYM);
+    dim4 dims    = numDims[0];
+    array input(dims, &(in[0].front()));
+    array output = medfilt1(input, w_wid, AF_PAD_SYM);
 
-    float *outData = new float[dims.elements()];
-    output.host((void*)outData);
+    vector<float> outData(dims.elements());
+    output.host((void*)outData.data());
 
     vector<float> currGoldBar = tests[0];
     size_t nElems = currGoldBar.size();
     for (size_t elIter=0; elIter<nElems; ++elIter) {
-        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< std::endl;
+        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< endl;
     }
-
-    // cleanup
-    delete[] outData;
 }
 
 
 TEST(MedianFilter, Docs)
 {
-    using af::array;
-
     float input[] = {
         1.0000,  2.0000,  3.0000,  4.0000,
         5.0000,  6.0000,  7.0000,  8.0000,
@@ -429,7 +424,7 @@ TEST(MedianFilter, Docs)
     //    2.0000        6.0000       10.0000       14.0000
     //    3.0000        7.0000       11.0000       15.0000
     //    4.0000        8.0000       12.0000       16.0000
-    array b = af::medfilt(a, 3, 3, AF_PAD_ZERO);
+    array b = medfilt(a, 3, 3, AF_PAD_ZERO);
     //af_print(b);
     //b=  0.0000        2.0000        6.0000        0.0000
     //    2.0000        6.0000       10.0000       10.0000
@@ -441,11 +436,17 @@ TEST(MedianFilter, Docs)
     b.host((void*)output);
 
     for (int i=0; i<16; ++i) {
-        ASSERT_EQ(output[i], gold[i]) << "output mismatch at i = " << i << std::endl;
+        ASSERT_EQ(output[i], gold[i]) << "output mismatch at i = " << i << endl;
     }
 }
 
-using namespace af;
+using af::iota;
+using af::constant;
+using af::span;
+using af::seq;
+using af::medfilt;
+using af::medfilt1;
+using af::max;
 
 TEST(MedianFilter, GFOR)
 {

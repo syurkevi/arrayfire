@@ -18,10 +18,16 @@
 #include <testHelpers.hpp>
 #include <typeinfo>
 
+using std::abs;
+using std::endl;
 using std::string;
 using std::vector;
-using std::abs;
+using af::array;
 using af::dim4;
+using af::exception;
+using af::features;
+using af::loadImage;
+using af::randu;
 
 typedef struct
 {
@@ -77,23 +83,24 @@ void susanTest(string pTestFile, float t, float g)
     for (size_t testId=0; testId<testCount; ++testId) {
         inFiles[testId].insert(0, string(TEST_DIR "/susan/"));
 
-        af::array in = af::loadImage(inFiles[testId].c_str(), false);
+        array in = loadImage(inFiles[testId].c_str(), false);
 
-        af::features out = af::susan(in, 3, t, g, 0.05f, 3);
+        features out = susan(in, 3, t, g, 0.05f, 3);
 
-        float * outX           = new float[gold[0].size()];
-        float * outY           = new float[gold[1].size()];
-        float * outScore       = new float[gold[2].size()];
-        float * outOrientation = new float[gold[3].size()];
-        float * outSize        = new float[gold[4].size()];
-        out.getX().host(outX);
-        out.getY().host(outY);
-        out.getScore().host(outScore);
-        out.getOrientation().host(outOrientation);
-        out.getSize().host(outSize);
+        vector<float> outX          (gold[0].size());
+        vector<float> outY          (gold[1].size());
+        vector<float> outScore      (gold[2].size());
+        vector<float> outOrientation(gold[3].size());
+        vector<float> outSize       (gold[4].size());
+        out.getX().host(outX.data());
+        out.getY().host(outY.data());
+        out.getScore().host(outScore.data());
+        out.getOrientation().host(outOrientation.data());
+        out.getSize().host(outSize.data());
 
         vector<feat_t> out_feat;
-        array_to_feat(out_feat, outX, outY, outScore, outOrientation, outSize, out.getNumFeatures());
+        array_to_feat(out_feat, outX.data(), outY.data(), outScore.data(),
+                      outOrientation.data(), outSize.data(), out.getNumFeatures());
 
         vector<feat_t> gold_feat;
         array_to_feat(gold_feat, &gold[0].front(), &gold[1].front(), &gold[2].front(), &gold[3].front(), &gold[4].front(), gold[0].size());
@@ -102,25 +109,19 @@ void susanTest(string pTestFile, float t, float g)
         std::sort(gold_feat.begin(), gold_feat.end(), feat_cmp);
 
         for (int elIter = 0; elIter < (int)out.getNumFeatures(); elIter++) {
-            ASSERT_EQ(out_feat[elIter].f[0], gold_feat[elIter].f[0]) << "at: " << elIter << std::endl;
-            ASSERT_EQ(out_feat[elIter].f[1], gold_feat[elIter].f[1]) << "at: " << elIter << std::endl;
-            ASSERT_LE(fabs(out_feat[elIter].f[2] - gold_feat[elIter].f[2]), 1e2) << "at: " << elIter << std::endl;
-            ASSERT_EQ(out_feat[elIter].f[3], gold_feat[elIter].f[3]) << "at: " << elIter << std::endl;
-            ASSERT_EQ(out_feat[elIter].f[4], gold_feat[elIter].f[4]) << "at: " << elIter << std::endl;
+            ASSERT_EQ(out_feat[elIter].f[0], gold_feat[elIter].f[0]) << "at: " << elIter << endl;
+            ASSERT_EQ(out_feat[elIter].f[1], gold_feat[elIter].f[1]) << "at: " << elIter << endl;
+            ASSERT_LE(fabs(out_feat[elIter].f[2] - gold_feat[elIter].f[2]), 1e2) << "at: " << elIter << endl;
+            ASSERT_EQ(out_feat[elIter].f[3], gold_feat[elIter].f[3]) << "at: " << elIter << endl;
+            ASSERT_EQ(out_feat[elIter].f[4], gold_feat[elIter].f[4]) << "at: " << elIter << endl;
         }
-
-        delete [] outX;
-        delete [] outY;
-        delete [] outScore;
-        delete [] outOrientation;
-        delete [] outSize;
     }
 }
 
-#define SUSAN_TEST(image, tval, gval) \
-    TYPED_TEST(Susan, image) \
-    {   \
-        susanTest<TypeParam>(string(TEST_DIR "/susan/"#image".test"), tval, gval);\
+#define SUSAN_TEST(image, tval, gval)                                   \
+    TYPED_TEST(Susan, image)                                            \
+    {                                                                   \
+        susanTest<TypeParam>(string(TEST_DIR "/susan/"#image".test"), tval, gval); \
     }
 
 SUSAN_TEST(man_t32_g10, 32, 10);
@@ -130,10 +131,10 @@ SUSAN_TEST(square_t32_g20, 32, 20);
 TEST(Susan, InvalidDims)
 {
     try {
-        af::array a = af::randu(256);
-        af::features out = af::susan(a);
+        array a = randu(256);
+        features out = susan(a);
         EXPECT_TRUE(false);
-    } catch (af::exception &e) {
+    } catch (exception &e) {
         EXPECT_TRUE(true);
     }
 }
@@ -141,10 +142,10 @@ TEST(Susan, InvalidDims)
 TEST(Susan, InvalidRadius)
 {
     try {
-        af::array a = af::randu(256);
-        af::features out = af::susan(a, 10);
+        array a = randu(256);
+        features out = susan(a, 10);
         EXPECT_TRUE(false);
-    } catch (af::exception &e) {
+    } catch (exception &e) {
         EXPECT_TRUE(true);
     }
 }
@@ -152,10 +153,10 @@ TEST(Susan, InvalidRadius)
 TEST(Susan, InvalidThreshold)
 {
     try {
-        af::array a = af::randu(256);
-        af::features out = af::susan(a, 3, -32, 10, 0.05f, 3);
+        array a = randu(256);
+        features out = susan(a, 3, -32, 10, 0.05f, 3);
         EXPECT_TRUE(false);
-    } catch (af::exception &e) {
+    } catch (exception &e) {
         EXPECT_TRUE(true);
     }
 }
@@ -163,10 +164,10 @@ TEST(Susan, InvalidThreshold)
 TEST(Susan, InvalidFeatureRatio)
 {
     try {
-        af::array a = af::randu(256);
-        af::features out = af::susan(a, 3, 32, 10, 1.3f, 3);
+        array a = randu(256);
+        features out = susan(a, 3, 32, 10, 1.3f, 3);
         EXPECT_TRUE(false);
-    } catch (af::exception &e) {
+    } catch (exception &e) {
         EXPECT_TRUE(true);
     }
 }
@@ -174,10 +175,10 @@ TEST(Susan, InvalidFeatureRatio)
 TEST(Susan, InvalidEdge)
 {
     try {
-        af::array a = af::randu(128, 128);
-        af::features out = af::susan(a, 3, 32, 10, 1.3f, 129);
+        array a = randu(128, 128);
+        features out = susan(a, 3, 32, 10, 1.3f, 129);
         EXPECT_TRUE(false);
-    } catch (af::exception &e) {
+    } catch (exception &e) {
         EXPECT_TRUE(true);
     }
 }

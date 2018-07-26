@@ -9,8 +9,10 @@
 
 #pragma once
 #include <optypes.hpp>
+#include <array>
 #include <vector>
 #include <memory>
+#include <unordered_map>
 
 namespace cpu
 {
@@ -18,86 +20,87 @@ namespace cpu
 namespace TNJ
 {
 
+    static const int VECTOR_LENGTH = 256;
+    static const int MAX_CHILDREN = 2;
+
+    class Node;
+    using std::shared_ptr;
+    using std::vector;
+    typedef shared_ptr<Node> Node_ptr;
+
+    typedef std::unordered_map<Node *, int> Node_map_t;
+    typedef Node_map_t::iterator Node_map_iter;
+
+    template<typename T>
+    using array = std::array<T, VECTOR_LENGTH>;
+
+
     class Node
     {
 
     protected:
 
         const int m_height;
-        int x, y, z, w;
-        bool m_is_eval;
-        bool m_linear;
-        bool m_set_is_linear;
-
-
-        void resetCommonFlags()
-        {
-            x = -1;
-            y = -1;
-            z = -1;
-            w = -1;
-            m_is_eval = false;
-            m_linear = false;
-            m_set_is_linear = false;
-        }
-
-        bool calcCurrent(int xc)
-        {
-            bool res = (x == xc);
-            x = xc;
-            return !res;
-        }
-
-        bool calcCurrent(int xc, int yc, int zc, int wc)
-        {
-            bool res = (xc == x) && (yc == y) && (zc == z) && (wc == w);
-            x = xc;
-            y = yc;
-            z = zc;
-            w = wc;
-            return !res;
-        }
+        const std::array<Node_ptr, MAX_CHILDREN> m_children;
 
     public:
-        Node(const int height) :
+        Node(const int height, const std::array<Node_ptr, MAX_CHILDREN> children) :
             m_height(height),
-            x(-1),
-            y(-1),
-            z(-1),
-            w(-1),
-            m_is_eval(false),
-            m_linear(false),
-            m_set_is_linear(false)
+            m_children(children)
         {}
+
+        int getNodesMap(Node_map_t &node_map, vector<Node *> &full_nodes)
+        {
+            auto iter = node_map.find(this);
+            if (iter == node_map.end()) {
+                for (const auto &child : m_children) {
+                    if (child == nullptr) break;
+                    child->getNodesMap(node_map, full_nodes);
+                }
+                int id = static_cast<int>(node_map.size());
+                node_map[this] = id;
+                full_nodes.push_back(this);
+                return id;
+            }
+            return iter->second;
+        }
 
         int getHeight() { return m_height; }
 
-        virtual void *calc(int x, int y, int z, int w)
+        virtual void calc(int x, int y, int z, int w, int lim)
         {
-            m_is_eval = true;
-            return NULL;
         }
 
-        virtual void *calc(int idx)
+        virtual void calc(int idx, int lim)
         {
-            m_is_eval = true;
-            return NULL;
         }
 
         virtual void getInfo(unsigned &len, unsigned &buf_count, unsigned &bytes)
         {
-            len = 0;
-            buf_count = 0;
-            bytes = 0;
+            len++;
         }
 
         virtual bool isLinear(const dim_t *dims) { return true; }
-        virtual void reset() { resetCommonFlags(); }
-
+        virtual bool isBuffer() { return false; }
         virtual ~Node() {}
+
     };
 
-    typedef std::shared_ptr<Node> Node_ptr;
+    template<typename T>
+    class TNode : public Node
+    {
+    public:
+        alignas(16) TNJ::array<T> m_val;
+    public:
+        TNode(T val, const int height, const std::array<Node_ptr, MAX_CHILDREN> children) :
+            Node(height, children)
+            {
+                m_val.fill(val);
+            }
+    };
+
+    template<typename T>
+    using TNode_ptr = std::shared_ptr<TNode<T>>;
 }
 
 }

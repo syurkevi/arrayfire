@@ -13,18 +13,23 @@
 #include <af/defines.h>
 #include <af/traits.hpp>
 #include <vector>
-#include <iostream>
 #include <complex>
 #include <string>
 #include <testHelpers.hpp>
 
 using std::vector;
 using std::string;
-using std::cout;
 using std::endl;
 using std::abs;
+using af::array;
 using af::cfloat;
 using af::cdouble;
+using af::dim4;
+using af::dtype;
+using af::dtype_traits;
+using af::identity;
+using af::matmul;
+using af::max;
 
 template<typename T>
 void choleskyTester(const int n, double eps, bool is_upper)
@@ -32,58 +37,98 @@ void choleskyTester(const int n, double eps, bool is_upper)
     if (noDoubleTests<T>()) return;
     if (noLAPACKTests()) return;
 
-    af::dtype ty = (af::dtype)af::dtype_traits<T>::af_type;
+    dtype ty = (dtype)dtype_traits<T>::af_type;
 
     // Prepare positive definite matrix
 #if 1
-    af::array a = cpu_randu<T>(af::dim4(n, n));
+    array a = cpu_randu<T>(dim4(n, n));
 #else
-    af::array a = af::randu(n, n, ty);
+    array a = randu(n, n, ty);
 #endif
-    af::array b = 10 * n * af::identity(n, n, ty);
-    af::array in = matmul(a.H(), a) + b;
+    array b = 10 * n * identity(n, n, ty);
+    array in = matmul(a.H(), a) + b;
 
     //! [ex_chol_reg]
-    af::array out;
+    array out;
     cholesky(out, in, is_upper);
     //! [ex_chol_reg]
 
-    af::array re = is_upper ? matmul(out.H(), out) : matmul(out, out.H());
+    array re = is_upper ? matmul(out.H(), out) : matmul(out, out.H());
 
-    ASSERT_NEAR(0, af::max<double>(af::abs(real(in - re))), eps);
-    ASSERT_NEAR(0, af::max<double>(af::abs(imag(in - re))), eps);
+    ASSERT_NEAR(0, max<typename dtype_traits<T>::base_type>(abs(real(in - re))), eps);
+    ASSERT_NEAR(0, max<typename dtype_traits<T>::base_type>(abs(imag(in - re))), eps);
 
     //! [ex_chol_inplace]
-    af::array in2 = in.copy();
+    array in2 = in.copy();
     choleskyInPlace(in2, is_upper);
     //! [ex_chol_inplace]
 
-    af::array out2 = is_upper ? upper(in2) : lower(in2);
+    array out2 = is_upper ? upper(in2) : lower(in2);
 
-    ASSERT_NEAR(0, af::max<double>(af::abs(real(out2 - out))), eps);
-    ASSERT_NEAR(0, af::max<double>(af::abs(imag(out2 - out))), eps);
+    ASSERT_NEAR(0, max<typename dtype_traits<T>::base_type>(abs(real(out2 - out))), eps);
+    ASSERT_NEAR(0, max<typename dtype_traits<T>::base_type>(abs(imag(out2 - out))), eps);
 }
 
-#define CHOLESKY_BIG_TESTS(T, eps)              \
-    TEST(Cholesky, T##Upper)                    \
-    {                                           \
-        choleskyTester<T>( 500, eps, true );    \
-    }                                           \
-    TEST(Cholesky, T##Lower)                    \
-    {                                           \
-        choleskyTester<T>(1000, eps, false);    \
-    }                                           \
-    TEST(Cholesky, T##UpperMultiple)            \
-    {                                           \
-        choleskyTester<T>(1024, eps, true );    \
-    }                                           \
-    TEST(Cholesky, T##LowerMultiple)            \
-    {                                           \
-        choleskyTester<T>( 512, eps, false);    \
-    }                                           \
+template<typename T>
+class Cholesky : public ::testing::Test
+{
 
+};
 
-CHOLESKY_BIG_TESTS(float, 0.05)
-CHOLESKY_BIG_TESTS(double, 1E-8)
-CHOLESKY_BIG_TESTS(cfloat, 0.05)
-CHOLESKY_BIG_TESTS(cdouble, 1E-8)
+typedef ::testing::Types<float, cfloat, double, cdouble> TestTypes;
+TYPED_TEST_CASE(Cholesky, TestTypes);
+
+template<typename T>
+double eps();
+
+template<>
+double eps<float>() {
+    return 0.05f;
+}
+
+template<>
+double eps<double>() {
+    return 1e-8;
+}
+
+template<>
+double eps<cfloat>() {
+    return 0.05f;
+}
+
+template<>
+double eps<cdouble>() {
+    return 1e-8;
+}
+
+TYPED_TEST(Cholesky, Upper) {
+    choleskyTester<TypeParam>( 500, eps<TypeParam>(), true );
+}
+
+TYPED_TEST(Cholesky, UpperLarge) {
+    choleskyTester<TypeParam>( 1000, eps<TypeParam>(), true );
+}
+
+TYPED_TEST(Cholesky, UpperMultipleOfTwo) {
+    choleskyTester<TypeParam>( 512, eps<TypeParam>(), true );
+}
+
+TYPED_TEST(Cholesky, UpperMultipleOfTwoLarge) {
+    choleskyTester<TypeParam>( 1024, eps<TypeParam>(), true );
+}
+
+TYPED_TEST(Cholesky, Lower) {
+    choleskyTester<TypeParam>( 500, eps<TypeParam>(), false );
+}
+
+TYPED_TEST(Cholesky, LowerLarge) {
+    choleskyTester<TypeParam>( 1000, eps<TypeParam>(), false );
+}
+
+TYPED_TEST(Cholesky, LowerMultipleOfTwo) {
+    choleskyTester<TypeParam>( 512, eps<TypeParam>(), false );
+}
+
+TYPED_TEST(Cholesky, LowerMultipleOfTwoLarge) {
+    choleskyTester<TypeParam>( 1024, eps<TypeParam>(), false );
+}

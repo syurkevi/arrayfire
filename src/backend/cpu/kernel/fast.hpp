@@ -8,8 +8,8 @@
  ********************************************************/
 
 #pragma once
-#include <Array.hpp>
-#include <utility.hpp>
+#include <Param.hpp>
+#include <math.hpp>
 
 namespace cpu
 {
@@ -41,14 +41,14 @@ inline int idx(int y, int x, unsigned idim0)
 // Tests if a pixel x > p + thr
 inline int test_greater(float x, float p, float thr)
 {
-    return (x >= p + thr);
+    return (x > p + thr);
 }
 
 // test_smaller()
 // Tests if a pixel x < p - thr
 inline int test_smaller(float x, float p, float thr)
 {
-    return (x <= p - thr);
+    return (x < p - thr);
 }
 
 // test_pixel()
@@ -58,7 +58,7 @@ inline int test_smaller(float x, float p, float thr)
 template<typename T>
 inline int test_pixel(const T* image, const float p, float thr, int y, int x, unsigned idim0)
 {
-    return -test_smaller((float)image[idx(y,x,idim0)], p, thr) | test_greater((float)image[idx(y,x,idim0)], p, thr);
+    return -test_smaller((float)image[idx(y,x,idim0)], p, thr) + test_greater((float)image[idx(y,x,idim0)], p, thr);
 }
 
 // abs_diff()
@@ -81,9 +81,9 @@ inline double abs_diff(double x, double y)
 }
 
 template<typename T>
-void locate_features(Array<T> const & in, Array<float> & score,
-                     Array<float> & x_out, Array<float> & y_out,
-                     Array<float> & score_out, unsigned* count, float const thr,
+void locate_features(CParam<T> in, Param<float> score,
+                     Param<float> x_out, Param<float> y_out,
+                     Param<float> score_out, unsigned* count, float const thr,
                      unsigned const arc_length, unsigned const nonmax,
                      unsigned const max_feat, unsigned const edge)
 {
@@ -174,8 +174,8 @@ void locate_features(Array<T> const & in, Array<float> & score,
     }
 }
 
-void non_maximal(Array<float> const & score, const Array<float> & x_in, const Array<float> & y_in,
-                 Array<float> & x_out, Array<float> & y_out, Array<float> & score_out,
+void non_maximal(CParam<float> score, CParam<float> x_in, CParam<float> y_in,
+                 Param<float> x_out, Param<float> y_out, Param<float> score_out,
                  unsigned* count, unsigned const total_feat, unsigned const edge)
 {
     float const * score_ptr = score.get();

@@ -13,13 +13,18 @@
 #include <af/traits.hpp>
 #include <string>
 #include <vector>
+#include <cmath>
 #include <testHelpers.hpp>
 
-using std::vector;
-using std::string;
 using std::abs;
+using std::endl;
+using std::string;
+using std::vector;
+using af::array;
 using af::cfloat;
 using af::cdouble;
+using af::dim4;
+using af::dtype_traits;
 
 template<typename T>
 class Convolve : public ::testing::Test
@@ -39,8 +44,6 @@ void convolveTest(string pTestFile, int baseDim, bool expand)
 {
     if (noDoubleTests<T>()) return;
 
-    using af::dim4;
-
     vector<dim4>      numDims;
     vector<vector<T> >      in;
     vector<vector<T> >   tests;
@@ -54,9 +57,9 @@ void convolveTest(string pTestFile, int baseDim, bool expand)
     af_array outArray = 0;
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&signal, &(in[0].front()),
-                sDims.ndims(), sDims.get(), (af_dtype)af::dtype_traits<T>::af_type));
+                sDims.ndims(), sDims.get(), (af_dtype)dtype_traits<T>::af_type));
     ASSERT_EQ(AF_SUCCESS, af_create_array(&filter, &(in[1].front()),
-                fDims.ndims(), fDims.get(), (af_dtype)af::dtype_traits<T>::af_type));
+                fDims.ndims(), fDims.get(), (af_dtype)dtype_traits<T>::af_type));
 
     af_conv_mode mode = expand ? AF_CONV_EXPAND : AF_CONV_DEFAULT;
     switch(baseDim) {
@@ -67,15 +70,14 @@ void convolveTest(string pTestFile, int baseDim, bool expand)
 
     vector<T> currGoldBar = tests[0];
     size_t nElems         = currGoldBar.size();
-    T *outData            = new T[nElems];
+    vector<T> outData(nElems);
 
-    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)outData, outArray));
+    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)&outData.front(), outArray));
 
     for (size_t elIter=0; elIter<nElems; ++elIter) {
-        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< std::endl;
+        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< endl;
     }
 
-    delete[] outData;
     ASSERT_EQ(AF_SUCCESS, af_release_array(outArray));
     ASSERT_EQ(AF_SUCCESS, af_release_array(signal));
     ASSERT_EQ(AF_SUCCESS, af_release_array(filter));
@@ -206,8 +208,6 @@ void sepConvolveTest(string pTestFile, bool expand)
 {
     if (noDoubleTests<T>()) return;
 
-    using af::dim4;
-
     vector<dim4>      numDims;
     vector<vector<T> >      in;
     vector<vector<T> >   tests;
@@ -223,26 +223,25 @@ void sepConvolveTest(string pTestFile, bool expand)
     af_array outArray = 0;
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&signal, &(in[0].front()),
-                sDims.ndims(), sDims.get(), (af_dtype)af::dtype_traits<T>::af_type));
+                sDims.ndims(), sDims.get(), (af_dtype)dtype_traits<T>::af_type));
     ASSERT_EQ(AF_SUCCESS, af_create_array(&c_filter, &(in[1].front()),
-                cfDims.ndims(), cfDims.get(), (af_dtype)af::dtype_traits<T>::af_type));
+                cfDims.ndims(), cfDims.get(), (af_dtype)dtype_traits<T>::af_type));
     ASSERT_EQ(AF_SUCCESS, af_create_array(&r_filter, &(in[2].front()),
-                rfDims.ndims(), rfDims.get(), (af_dtype)af::dtype_traits<T>::af_type));
+                rfDims.ndims(), rfDims.get(), (af_dtype)dtype_traits<T>::af_type));
 
     af_conv_mode  mode = expand ? AF_CONV_EXPAND : AF_CONV_DEFAULT;
     ASSERT_EQ(AF_SUCCESS, af_convolve2_sep(&outArray, c_filter, r_filter, signal, mode));
 
     vector<T> currGoldBar = tests[0];
     size_t nElems         = currGoldBar.size();
-    T *outData            = new T[nElems];
+    vector<T> outData(nElems);
 
-    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)outData, outArray));
+    ASSERT_EQ(AF_SUCCESS, af_get_data_ptr((void*)&outData.front(), outArray));
 
     for (size_t elIter=0; elIter<nElems; ++elIter) {
-        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< std::endl;
+        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< endl;
     }
 
-    delete[] outData;
     ASSERT_EQ(AF_SUCCESS, af_release_array(outArray));
     ASSERT_EQ(AF_SUCCESS, af_release_array(signal));
     ASSERT_EQ(AF_SUCCESS, af_release_array(c_filter));
@@ -293,7 +292,6 @@ TEST(Convolve, Separable_TypeCheck)
 {
     if (noDoubleTests<float>()) return;
     if (noDoubleTests<int>()) return;
-    using af::dim4;
 
     dim4 sDims(10, 1, 1, 1);
     dim4 fDims(4, 1, 1, 1);
@@ -307,11 +305,11 @@ TEST(Convolve, Separable_TypeCheck)
     af_array outArray = 0;
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&signal, &(in.front()),
-                sDims.ndims(), sDims.get(), (af_dtype)af::dtype_traits<float>::af_type));
+                sDims.ndims(), sDims.get(), (af_dtype)dtype_traits<float>::af_type));
     ASSERT_EQ(AF_SUCCESS, af_create_array(&c_filter, &(filt.front()),
-                fDims.ndims(), fDims.get(), (af_dtype)af::dtype_traits<int>::af_type));
+                fDims.ndims(), fDims.get(), (af_dtype)dtype_traits<int>::af_type));
     ASSERT_EQ(AF_SUCCESS, af_create_array(&r_filter, &(filt.front()),
-                fDims.ndims(), fDims.get(), (af_dtype)af::dtype_traits<int>::af_type));
+                fDims.ndims(), fDims.get(), (af_dtype)dtype_traits<int>::af_type));
 
     ASSERT_EQ(AF_ERR_ARG, af_convolve2_sep(&outArray, c_filter, r_filter, signal, AF_CONV_EXPAND));
 
@@ -325,8 +323,6 @@ TEST(Convolve, Separable_DimCheck)
     if (noDoubleTests<float>()) return;
     if (noDoubleTests<int>()) return;
 
-    using af::dim4;
-
     dim4 sDims(10, 1, 1, 1);
     dim4 fDims(4, 1, 1, 1);
 
@@ -339,11 +335,11 @@ TEST(Convolve, Separable_DimCheck)
     af_array outArray = 0;
 
     ASSERT_EQ(AF_SUCCESS, af_create_array(&signal, &(in.front()),
-                sDims.ndims(), sDims.get(), (af_dtype)af::dtype_traits<float>::af_type));
+                sDims.ndims(), sDims.get(), (af_dtype)dtype_traits<float>::af_type));
     ASSERT_EQ(AF_SUCCESS, af_create_array(&c_filter, &(filt.front()),
-                fDims.ndims(), fDims.get(), (af_dtype)af::dtype_traits<int>::af_type));
+                fDims.ndims(), fDims.get(), (af_dtype)dtype_traits<int>::af_type));
     ASSERT_EQ(AF_SUCCESS, af_create_array(&r_filter, &(filt.front()),
-                fDims.ndims(), fDims.get(), (af_dtype)af::dtype_traits<int>::af_type));
+                fDims.ndims(), fDims.get(), (af_dtype)dtype_traits<int>::af_type));
 
     ASSERT_EQ(AF_ERR_ARG, af_convolve2_sep(&outArray, c_filter, r_filter, signal, AF_CONV_EXPAND));
 
@@ -352,11 +348,19 @@ TEST(Convolve, Separable_DimCheck)
     ASSERT_EQ(AF_SUCCESS, af_release_array(signal));
 }
 
+///////////////////////////////////// CPP ////////////////////////////////
+//
+using af::constant;
+using af::max;
+using af::product;
+using af::randu;
+using af::seq;
+using af::span;
+using af::sum;
+
 TEST(Convolve1, CPP)
 {
     if (noDoubleTests<float>()) return;
-
-    using af::dim4;
 
     vector<dim4>      numDims;
     vector<vector<float> >      in;
@@ -367,33 +371,30 @@ TEST(Convolve1, CPP)
     //![ex_image_convolve1]
     //vector<dim4> numDims;
     //vector<vector<float> > in;
-    af::array signal(numDims[0], &(in[0].front()));
+    array signal(numDims[0], &(in[0].front()));
     //signal dims = [32 1 1 1]
-    af::array filter(numDims[1], &(in[1].front()));
+    array filter(numDims[1], &(in[1].front()));
     //filter dims = [4 1 1 1]
 
-    af::array output = convolve1(signal, filter, AF_CONV_DEFAULT);
+    array output = convolve1(signal, filter, AF_CONV_DEFAULT);
     //output dims = [32 1 1 1] - same as input since expand(3rd argument is false)
     //None of the dimensions > 1 has lenght > 1, so no batch mode is activated.
     //![ex_image_convolve1]
 
     vector<float> currGoldBar = tests[0];
     size_t nElems  = output.elements();
-    float *outData = new float[nElems];
-    output.host(outData);
+    vector<float> outData(nElems);
+    output.host(&outData.front());
 
     for (size_t elIter=0; elIter<nElems; ++elIter) {
-        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< std::endl;
+        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< endl;
     }
 
-    delete[] outData;
 }
 
 TEST(Convolve2, CPP)
 {
     if (noDoubleTests<float>()) return;
-
-    using af::dim4;
 
     vector<dim4>      numDims;
     vector<vector<float> >      in;
@@ -404,12 +405,12 @@ TEST(Convolve2, CPP)
     //![ex_image_convolve2]
     //vector<dim4> numDims;
     //vector<vector<float> > in;
-    af::array signal(numDims[0], &(in[0].front()));
+    array signal(numDims[0], &(in[0].front()));
     //signal dims = [15 17 1 1]
-    af::array filter(numDims[1], &(in[1].front()));
+    array filter(numDims[1], &(in[1].front()));
     //filter dims = [5 5 2 1]
 
-    af::array output = convolve2(signal, filter, AF_CONV_DEFAULT);
+    array output = convolve2(signal, filter, AF_CONV_DEFAULT);
     //output dims = [15 17 1 1] - same as input since expand(3rd argument is false)
     //however, notice that the 3rd dimension of filter is > 1.
     //So, one to many batch mode will be activated automatically
@@ -419,21 +420,18 @@ TEST(Convolve2, CPP)
 
     vector<float> currGoldBar = tests[0];
     size_t nElems  = output.elements();
-    float *outData = new float[nElems];
-    output.host(outData);
+    vector<float> outData(nElems);
+    output.host(&outData.front());
 
     for (size_t elIter=0; elIter<nElems; ++elIter) {
-        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< std::endl;
+        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< endl;
     }
 
-    delete[] outData;
 }
 
 TEST(Convolve3, CPP)
 {
     if (noDoubleTests<float>()) return;
-
-    using af::dim4;
 
     vector<dim4>      numDims;
     vector<vector<float> >      in;
@@ -444,12 +442,12 @@ TEST(Convolve3, CPP)
     //![ex_image_convolve3]
     //vector<dim4> numDims;
     //vector<vector<float> > in;
-    af::array signal(numDims[0], &(in[0].front()));
+    array signal(numDims[0], &(in[0].front()));
     //signal dims = [10 11 2 2]
-    af::array filter(numDims[1], &(in[1].front()));
+    array filter(numDims[1], &(in[1].front()));
     //filter dims = [4 2 3 2]
 
-    af::array output = convolve3(signal, filter, AF_CONV_DEFAULT);
+    array output = convolve3(signal, filter, AF_CONV_DEFAULT);
     //output dims = [10 11 2 2] - same as input since expand(3rd argument is false)
     //however, notice that the 4th dimension is > 1 for both signal
     //and the filter, therefore many to many batch mode will be
@@ -458,21 +456,17 @@ TEST(Convolve3, CPP)
 
     vector<float> currGoldBar = tests[0];
     size_t nElems  = output.elements();
-    float *outData = new float[nElems];
-    output.host(outData);
+    vector<float> outData(nElems);
+    output.host(&outData.front());
 
     for (size_t elIter=0; elIter<nElems; ++elIter) {
-        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< std::endl;
+        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< endl;
     }
-
-    delete[] outData;
 }
 
 TEST(Convolve, separable_CPP)
 {
     if (noDoubleTests<float>()) return;
-
-    using af::dim4;
 
     vector<dim4>      numDims;
     vector<vector<float> >      in;
@@ -484,14 +478,14 @@ TEST(Convolve, separable_CPP)
     //![ex_image_conv2_sep]
     //vector<dim4> numDims;
     //vector<vector<float> > in;
-    af::array signal(numDims[0], &(in[0].front()));
+    array signal(numDims[0], &(in[0].front()));
     //signal dims = [3 4 2 1]
-    af::array cFilter(numDims[1], &(in[1].front()));
+    array cFilter(numDims[1], &(in[1].front()));
     //coloumn filter dims = [2 1 1 1]
-    af::array rFilter(numDims[2], &(in[2].front()));
+    array rFilter(numDims[2], &(in[2].front()));
     //row filter dims = [3 1 1 1]
 
-    af::array output = convolve(cFilter, rFilter, signal, AF_CONV_DEFAULT);
+    array output = convolve(cFilter, rFilter, signal, AF_CONV_DEFAULT);
     //output signal dims = [3 4 2 1] - same as input since 'expand = false'
     //notice that the input signal is 3d array, therefore
     //batch mode will be automatically activated.
@@ -501,27 +495,20 @@ TEST(Convolve, separable_CPP)
 
     vector<float> currGoldBar = tests[0];
     size_t nElems  = output.elements();
-    float *outData = new float[nElems];
+    vector<float> outData(nElems);
 
-    output.host((void*)outData);
+    output.host((void*)&outData.front());
 
     for (size_t elIter=0; elIter<nElems; ++elIter) {
-        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< std::endl;
+        ASSERT_EQ(currGoldBar[elIter], outData[elIter])<< "at: " << elIter<< endl;
     }
-
-    delete[] outData;
 }
 
 TEST(Convolve, Docs_Unified_Wrapper)
 {
     // This unit test doesn't necessarily need to function
-    // accuracy as af::convolve is merely a wrapper to
-    // af::convolve[1|2|3]
-    using af::array;
-    using af::dim4;
-    using af::randu;
-    using af::constant;
-    using af::convolve;
+    // accuracy as convolve is merely a wrapper to
+    // convolve[1|2|3]
 
     //![ex_image_convolve_1d]
     array a = randu(10);
@@ -616,8 +603,6 @@ TEST(Convolve, Docs_Unified_Wrapper)
     //![ex_image_convolve_3d]
 }
 
-using namespace af;
-
 TEST(GFOR, convolve2_MO)
 {
     array A = randu(5, 5, 3);
@@ -667,4 +652,169 @@ TEST(GFOR, convolve2_MM)
         array b_ii = B(span, span, ii);
         ASSERT_EQ(max<double>(abs(c_ii - b_ii)) < 1E-5, true);
     }
+}
+
+TEST(Convolve, 1D_C32)
+{
+    array A = randu(10, c32);
+    array B = randu( 3, c32);
+
+    array out = convolve1(A, B);
+    array gld = fftConvolve1(A, B);
+
+    cfloat acc = sum<cfloat>(out-gld);
+
+    EXPECT_EQ(std::abs(real(acc))< 1E-3, true);
+    EXPECT_EQ(std::abs(imag(acc))< 1E-3, true);
+}
+
+TEST(Convolve, 2D_C32)
+{
+    array A = randu(10, 10, c32);
+    array B = randu( 3,  3, c32);
+
+    array out = convolve2(A, B);
+    array gld = fftConvolve2(A, B);
+
+    cfloat acc = sum<cfloat>(out-gld);
+
+    EXPECT_EQ(std::abs(real(acc))< 1E-3, true);
+    EXPECT_EQ(std::abs(imag(acc))< 1E-3, true);
+}
+
+TEST(Convolve, 3D_C32)
+{
+    array A = randu(10, 10, 3, c32);
+    array B = randu( 3,  3, 3, c32);
+
+    array out = convolve3(A, B);
+    array gld = fftConvolve3(A, B);
+
+    cfloat acc = sum<cfloat>(out-gld);
+
+    EXPECT_EQ(std::abs(real(acc))< 1E-3, true);
+    EXPECT_EQ(std::abs(imag(acc))< 1E-3, true);
+}
+
+TEST(Convolve, 1D_C64)
+{
+    if (noDoubleTests<double>()) return;
+
+    array A = randu(10, c64);
+    array B = randu( 3, c64);
+
+    array out = convolve1(A, B);
+    array gld = fftConvolve1(A, B);
+
+    cdouble acc = sum<cdouble>(out-gld);
+
+    EXPECT_EQ(std::abs(real(acc))< 1E-3, true);
+    EXPECT_EQ(std::abs(imag(acc))< 1E-3, true);
+}
+
+TEST(Convolve, 2D_C64)
+{
+    if (noDoubleTests<double>()) return;
+
+    array A = randu(10, 10, c64);
+    array B = randu( 3,  3, c64);
+
+    array out = convolve2(A, B);
+    array gld = fftConvolve2(A, B);
+
+    cdouble acc = sum<cdouble>(out-gld);
+
+    EXPECT_EQ(std::abs(real(acc))< 1E-3, true);
+    EXPECT_EQ(std::abs(imag(acc))< 1E-3, true);
+}
+
+TEST(Convolve, 3D_C64)
+{
+    if (noDoubleTests<double>()) return;
+
+    array A = randu(10, 10, 3, c64);
+    array B = randu( 3,  3, 3, c64);
+
+    array out = convolve3(A, B);
+    array gld = fftConvolve3(A, B);
+
+    cdouble acc = sum<cdouble>(out-gld);
+
+    EXPECT_EQ(std::abs(real(acc))< 1E-3, true);
+    EXPECT_EQ(std::abs(imag(acc))< 1E-3, true);
+}
+
+TEST(ConvolveLargeDim1D, CPP)
+{
+    if (noDoubleTests<float>()) return;
+
+    const size_t n = 10;
+    const size_t largeDim = 65535 + 1;
+
+    float h_filter[] = {0.f, 1.f, 0.f};
+    array identity_filter(3, h_filter);
+    array signal = constant(1, n, 1, largeDim);
+
+    array output = convolve1(signal, identity_filter, AF_CONV_DEFAULT);
+    array output2 = output;
+    ASSERT_EQ(largeDim * n, sum<float>(output2));
+
+    signal = constant(1, n, 1, 1, largeDim);
+
+    output = convolve1(signal, identity_filter, AF_CONV_DEFAULT);
+    ASSERT_EQ(largeDim * n, sum<float>(output));
+}
+
+TEST(ConvolveLargeDim2D, CPP)
+{
+    if (noDoubleTests<float>()) return;
+
+    const size_t n = 10;
+    const size_t largeDim = 65535 + 1;
+
+    float h_filter[] = {0.f, 0.f, 0.f,
+                        0.f, 1.f, 0.f,
+                        0.f, 0.f, 0.f};
+    array identity_filter(3, 3, h_filter);
+    array signal = constant(1, n, n, largeDim);
+
+    array output = convolve2(signal, identity_filter, AF_CONV_DEFAULT);
+    ASSERT_EQ(largeDim * n * n, sum<float>(output));
+
+    signal = constant(1, n, n, 1, largeDim);
+
+    output = convolve2(signal, identity_filter, AF_CONV_DEFAULT);
+    ASSERT_EQ(largeDim * n * n, sum<float>(output));
+}
+
+TEST(DISABLED_ConvolveLargeDim3D, CPP)
+{
+    if (noDoubleTests<float>()) return;
+
+    const size_t n = 3;
+    const size_t largeDim = 65535 * 16 + 1;
+
+    float h_filter[] = {0.f, 0.f, 0.f,
+                        0.f, 0.f, 0.f,
+                        0.f, 0.f, 0.f,
+
+                        0.f, 0.f, 0.f,
+                        0.f, 1.f, 0.f,
+                        0.f, 0.f, 0.f,
+
+                        0.f, 0.f, 0.f,
+                        0.f, 0.f, 0.f,
+                        0.f, 0.f, 0.f};
+
+    array identity_filter(3, 3, 3, h_filter);
+    array signal = constant(1, n, largeDim, n);
+
+    array output = convolve3(signal, identity_filter, AF_CONV_DEFAULT);
+    ASSERT_EQ(1.f, product<float>(output));
+
+    signal = constant(1, n, n, largeDim);
+
+    output = convolve3(signal, identity_filter, AF_CONV_EXPAND);
+    //TODO: fix product by indexing
+    //ASSERT_EQ(1.f, product<float>(output));
 }

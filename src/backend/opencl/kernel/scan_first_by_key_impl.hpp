@@ -15,7 +15,7 @@
 #include <kernel_headers/ops.hpp>
 #include <program.hpp>
 #include <traits.hpp>
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <Param.hpp>
 #include <debug_opencl.hpp>
 #include <type_util.hpp>
@@ -58,15 +58,13 @@ namespace kernel
             std::to_string(int(inclusive_scan));
 
         int device = getActiveDeviceId();
-        kc_t::iterator idx = kernelCaches[device].find(ref_name);
+        kc_entry_t entry = kernelCache(device, ref_name);
 
-        kc_entry_t entry;
-        if (idx == kernelCaches[device].end()) {
+        if (entry.prog==0 && entry.ker==0) {
 
             const uint threads_y = THREADS_PER_GROUP / threads_x;
             const uint SHARED_MEM_SIZE = THREADS_PER_GROUP;
 
-            Binary<To, op> scan;
             ToNumStr<To> toNumStr;
 
             std::ostringstream options;
@@ -77,7 +75,7 @@ namespace kernel
                     << " -D DIMX=" << threads_x
                     << " -D DIMY=" << threads_y
                     << " -D SHARED_MEM_SIZE=" << SHARED_MEM_SIZE
-                    << " -D init=" << toNumStr(scan.init())
+                    << " -D init=" << toNumStr(Binary<To, op>::init())
                     << " -D " << binOpName<op>()
                     << " -D CPLX=" << af::iscplx<Ti>()
                     << " -D calculateFlags=" << calculateFlags
@@ -99,10 +97,7 @@ namespace kernel
             entry.ker[1] = Kernel(*entry.prog, "scan_first_by_key_nonfinal_kernel");
             entry.ker[2] = Kernel(*entry.prog, "bcast_first_kernel");
 
-            kernelCaches[device][ref_name] = entry;
-
-        } else {
-            entry = idx->second;
+            addKernelToCache(device, ref_name, entry);
         }
 
         return entry.ker[kerIdx];

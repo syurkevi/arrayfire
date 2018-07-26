@@ -8,10 +8,13 @@
  ********************************************************/
 
 #pragma once
-#include <Array.hpp>
+#include <Param.hpp>
 #include <math.hpp>
 #include <err_cpu.hpp>
 #include "interp.hpp"
+#include <af/traits.hpp>
+
+using af::dtype_traits;
 
 namespace cpu
 {
@@ -19,7 +22,7 @@ namespace kernel
 {
 
 template<typename T, int order>
-void rotate(Array<T> output, const Array<T> input,
+void rotate(Param<T> output, CParam<T> input,
             const float theta, af_interp_type method)
 {
     typedef typename dtype_traits<T>::base_type BT;

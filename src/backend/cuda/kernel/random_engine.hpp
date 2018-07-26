@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include <dispatch.hpp>
+#include <common/dispatch.hpp>
 #include <err_cuda.hpp>
 #include <debug_cuda.hpp>
 #include <af/defines.h>
@@ -25,19 +25,28 @@ namespace kernel
     //Utils
 
     static const int THREADS = 256;
-    #define UINTMAXFLOAT 4294967296.0f
-    #define UINTLMAXDOUBLE (4294967296.0*4294967296.0)
     #define PI_VAL 3.1415926535897932384626433832795028841971693993751058209749445923078164
 
+    //Conversion to floats adapted from Random123
+    #define UINTMAX 0xffffffff
+    #define FLT_FACTOR ((1.0f)/(UINTMAX + (1.0f)))
+    #define HALF_FLT_FACTOR ((0.5f)*FLT_FACTOR)
+
+    #define UINTLMAX 0xffffffffffffffff
+    #define DBL_FACTOR ((1.0)/(UINTLMAX + (1.0)))
+    #define HALF_DBL_FACTOR ((0.5)*DBL_FACTOR)
+
+    //Generates rationals in (0, 1]
     __device__ static float getFloat(const uint &num)
     {
-        return float(num)/UINTMAXFLOAT;
+        return (num*FLT_FACTOR + HALF_FLT_FACTOR);
     }
 
+    //Generates rationals in (0, 1]
     __device__ static double getDouble(const uint &num1, const uint &num2)
     {
         uintl num = (((uintl)num1)<<32) | ((uintl)num2);
-        return double(num)/UINTLMAXDOUBLE;
+        return (num*DBL_FACTOR + HALF_DBL_FACTOR);
     }
 
     template <typename T>
@@ -150,33 +159,33 @@ namespace kernel
     __device__ static void writeOut128Bytes(float *out, const uint &index,
             const uint &r1, const uint &r2, const uint &r3, const uint &r4)
     {
-        out[index]                = getFloat(r1);
-        out[index +   blockDim.x] = getFloat(r2);
-        out[index + 2*blockDim.x] = getFloat(r3);
-        out[index + 3*blockDim.x] = getFloat(r4);
+        out[index]                = 1.f - getFloat(r1);
+        out[index +   blockDim.x] = 1.f - getFloat(r2);
+        out[index + 2*blockDim.x] = 1.f - getFloat(r3);
+        out[index + 3*blockDim.x] = 1.f - getFloat(r4);
     }
 
     __device__ static void writeOut128Bytes(cfloat *out, const uint &index,
             const uint &r1, const uint &r2, const uint &r3, const uint &r4)
     {
-        out[index].x              = getFloat(r1);
-        out[index].y              = getFloat(r2);
-        out[index + blockDim.x].x = getFloat(r3);
-        out[index + blockDim.x].y = getFloat(r4);
+        out[index].x              = 1.f - getFloat(r1);
+        out[index].y              = 1.f - getFloat(r2);
+        out[index + blockDim.x].x = 1.f - getFloat(r3);
+        out[index + blockDim.x].y = 1.f - getFloat(r4);
     }
 
     __device__ static void writeOut128Bytes(double *out, const uint &index,
             const uint &r1, const uint &r2, const uint &r3, const uint &r4)
     {
-        out[index]              = getDouble(r1, r2);
-        out[index + blockDim.x] = getDouble(r3, r4);
+        out[index]              = 1.0 - getDouble(r1, r2);
+        out[index + blockDim.x] = 1.0 - getDouble(r3, r4);
     }
 
     __device__ static void writeOut128Bytes(cdouble *out, const uint &index,
             const uint &r1, const uint &r2, const uint &r3, const uint &r4)
     {
-        out[index].x = getDouble(r1, r2);
-        out[index].y = getDouble(r3, r4);
+        out[index].x = 1.0 - getDouble(r1, r2);
+        out[index].y = 1.0 - getDouble(r3, r4);
     }
 
     //Normalized writes without boundary checking
@@ -305,38 +314,38 @@ namespace kernel
     __device__ static void partialWriteOut128Bytes(float *out, const uint &index,
             const uint &r1, const uint &r2, const uint &r3, const uint &r4, const uint &elements)
     {
-        if (index                < elements) {out[index]                = getFloat(r1);}
-        if (index +   blockDim.x < elements) {out[index +   blockDim.x] = getFloat(r2);}
-        if (index + 2*blockDim.x < elements) {out[index + 2*blockDim.x] = getFloat(r3);}
-        if (index + 3*blockDim.x < elements) {out[index + 3*blockDim.x] = getFloat(r4);}
+        if (index                < elements) {out[index]                = 1.f - getFloat(r1);}
+        if (index +   blockDim.x < elements) {out[index +   blockDim.x] = 1.f - getFloat(r2);}
+        if (index + 2*blockDim.x < elements) {out[index + 2*blockDim.x] = 1.f - getFloat(r3);}
+        if (index + 3*blockDim.x < elements) {out[index + 3*blockDim.x] = 1.f - getFloat(r4);}
     }
 
     __device__ static void partialWriteOut128Bytes(cfloat *out, const uint &index,
             const uint &r1, const uint &r2, const uint &r3, const uint &r4, const uint &elements)
     {
         if (index              < elements) {
-            out[index].x              = getFloat(r1);
-            out[index].y              = getFloat(r2);
+            out[index].x              = 1.f - getFloat(r1);
+            out[index].y              = 1.f - getFloat(r2);
         }
         if (index + blockDim.x < elements) {
-            out[index + blockDim.x].x = getFloat(r3);
-            out[index + blockDim.x].y = getFloat(r4);
+            out[index + blockDim.x].x = 1.f - getFloat(r3);
+            out[index + blockDim.x].y = 1.f - getFloat(r4);
         }
     }
 
     __device__ static void partialWriteOut128Bytes(double *out, const uint &index,
             const uint &r1, const uint &r2, const uint &r3, const uint &r4, const uint &elements)
     {
-        if (index              < elements) {out[index]              = getDouble(r1, r2);}
-        if (index + blockDim.x < elements) {out[index + blockDim.x] = getDouble(r3, r4);}
+        if (index              < elements) {out[index]              = 1.0 - getDouble(r1, r2);}
+        if (index + blockDim.x < elements) {out[index + blockDim.x] = 1.0 - getDouble(r3, r4);}
     }
 
     __device__ static void partialWriteOut128Bytes(cdouble *out, const uint &index,
             const uint &r1, const uint &r2, const uint &r3, const uint &r4, const uint &elements)
     {
         if (index < elements) {
-            out[index].x = getDouble(r1, r2);
-            out[index].y = getDouble(r3, r4);
+            out[index].x = 1.0 - getDouble(r1, r2);
+            out[index].y = 1.0 - getDouble(r3, r4);
         }
     }
 
@@ -391,11 +400,14 @@ namespace kernel
     }
 
     template <typename T>
-    __global__ void uniformPhilox(T *out, uint hi, uint lo, uint counter, uint elementsPerBlock, uint elements)
+    __global__ void uniformPhilox(T *out, uint hi, uint lo, uint hic, uint loc, uint elementsPerBlock, uint elements)
     {
         uint index = blockIdx.x*elementsPerBlock + threadIdx.x;
-        uint key[2] = {index+counter, hi};
-        uint ctr[4] = {index+counter, 0, 0, lo};
+        uint key[2] = {lo, hi};
+        uint ctr[4] = {loc, hic, 0, 0};
+        ctr[0] += index;
+        ctr[1] += (ctr[0] < loc);
+        ctr[2] += (ctr[1] < hic);
         if (blockIdx.x != (gridDim.x - 1)) {
             philox(key, ctr);
             writeOut128Bytes(out, index, ctr[0], ctr[1], ctr[2], ctr[3]);
@@ -406,21 +418,24 @@ namespace kernel
     }
 
     template <typename T>
-    __global__ void uniformThreefry(T *out, uint hi, uint lo, uint counter, uint elementsPerBlock, uint elements)
+    __global__ void uniformThreefry(T *out, uint hi, uint lo, uint hic, uint loc, uint elementsPerBlock, uint elements)
     {
         uint index = blockIdx.x*elementsPerBlock + threadIdx.x;
-        uint key[2] = {index+counter, hi};
-        uint ctr[2] = {index+counter, lo};
+        uint key[2] = {lo, hi};
+        uint ctr[2] = {loc, hic};
+        ctr[0] += index;
+        ctr[1] += (ctr[0] < loc);
         uint o[4];
+
+	threefry(key, ctr, o);
+	uint step = elementsPerBlock / 2;
+	ctr[0] += step;
+	ctr[1] += (ctr[0] < step);
+	threefry(key, ctr, o + 2);
+
         if (blockIdx.x != (gridDim.x - 1)) {
-            threefry(key, ctr, o);
-            ctr[0] += elements;
-            threefry(key, ctr, o + 2);
             writeOut128Bytes(out, index, o[0], o[1], o[2], o[3]);
         } else {
-            threefry(key, ctr, o);
-            ctr[0] += elements;
-            threefry(key, ctr, o + 2);
             partialWriteOut128Bytes(out, index, o[0], o[1], o[2], o[3], elements);
         }
     }
@@ -487,11 +502,14 @@ namespace kernel
     }
 
     template <typename T>
-    __global__ void normalPhilox(T *out, uint hi, uint lo, uint counter, uint elementsPerBlock, uint elements)
+    __global__ void normalPhilox(T *out, uint hi, uint lo, uint hic, uint loc, uint elementsPerBlock, uint elements)
     {
         uint index = blockIdx.x*elementsPerBlock + threadIdx.x;
-        uint key[2] = {index+counter, hi};
-        uint ctr[4] = {index+counter, 0, 0, lo};
+        uint key[2] = {lo, hi};
+        uint ctr[4] = {loc, hic, 0, 0};
+        ctr[0] += index;
+        ctr[1] += (ctr[0] < loc);
+        ctr[2] += (ctr[1] < hic);
         if (blockIdx.x != (gridDim.x - 1)) {
             philox(key, ctr);
             boxMullerWriteOut128Bytes(out, index, ctr[0], ctr[1], ctr[2], ctr[3]);
@@ -502,21 +520,24 @@ namespace kernel
     }
 
     template <typename T>
-    __global__ void normalThreefry(T *out, uint hi, uint lo, uint counter, uint elementsPerBlock, uint elements)
+    __global__ void normalThreefry(T *out, uint hi, uint lo, uint hic, uint loc, uint elementsPerBlock, uint elements)
     {
         uint index = blockIdx.x*elementsPerBlock + threadIdx.x;
-        uint key[2] = {index+counter, hi};
-        uint ctr[2] = {index+counter, lo};
+        uint key[2] = {lo, hi};
+        uint ctr[2] = {loc, hic};
+        ctr[0] += index;
+        ctr[1] += (ctr[0] < loc);
         uint o[4];
-        if (blockIdx.x != (gridDim.x - 1)) {
-            threefry(key, ctr, o);
-            ctr[0] += elements;
-            threefry(key, ctr, o + 2);
+
+	threefry(key, ctr, o);
+	uint step = elementsPerBlock / 2;
+	ctr[0] += step;
+	ctr[1] += (ctr[0] < step);
+	threefry(key, ctr, o + 2);
+
+	if (blockIdx.x != (gridDim.x - 1)) {
             boxMullerWriteOut128Bytes(out, index, o[0], o[1], o[2], o[3]);
         } else {
-            threefry(key, ctr, o);
-            ctr[0] += elements;
-            threefry(key, ctr, o + 2);
             partialBoxMullerWriteOut128Bytes(out, index, o[0], o[1], o[2], o[3], elements);
         }
     }
@@ -627,11 +648,13 @@ namespace kernel
         int blocks = divup(elements, elementsPerBlock);
         uint hi = seed>>32;
         uint lo = seed;
+        uint hic = counter>>32;
+        uint loc = counter;
         switch (type) {
         case AF_RANDOM_ENGINE_PHILOX_4X32_10   :
-            CUDA_LAUNCH(uniformPhilox, blocks, threads, out, hi, lo, counter, elementsPerBlock, elements); break;
+            CUDA_LAUNCH(uniformPhilox, blocks, threads, out, hi, lo, hic, loc, elementsPerBlock, elements); break;
         case AF_RANDOM_ENGINE_THREEFRY_2X32_16 :
-            CUDA_LAUNCH(uniformThreefry, blocks, threads, out, hi, lo, counter, elementsPerBlock, elements); break;
+            CUDA_LAUNCH(uniformThreefry, blocks, threads, out, hi, lo, hic, loc, elementsPerBlock, elements); break;
         default : AF_ERROR("Random Engine Type Not Supported", AF_ERR_NOT_SUPPORTED);
         }
         counter += elements;
@@ -645,11 +668,13 @@ namespace kernel
         int blocks = divup(elements, elementsPerBlock);
         uint hi = seed>>32;
         uint lo = seed;
+        uint hic = counter>>32;
+        uint loc = counter;
         switch (type) {
         case AF_RANDOM_ENGINE_PHILOX_4X32_10   :
-            CUDA_LAUNCH(normalPhilox, blocks, threads, out, hi, lo, counter, elementsPerBlock, elements); break;
+            CUDA_LAUNCH(normalPhilox, blocks, threads, out, hi, lo, hic, loc, elementsPerBlock, elements); break;
         case AF_RANDOM_ENGINE_THREEFRY_2X32_16 :
-            CUDA_LAUNCH(normalThreefry, blocks, threads, out, hi, lo, counter, elementsPerBlock, elements); break;
+            CUDA_LAUNCH(normalThreefry, blocks, threads, out, hi, lo, hic, loc, elementsPerBlock, elements); break;
         default : AF_ERROR("Random Engine Type Not Supported", AF_ERR_NOT_SUPPORTED);
         }
         counter += elements;

@@ -8,15 +8,15 @@
  ********************************************************/
 
 #include <cholesky.hpp>
-#include <err_common.hpp>
 
-#if defined(WITH_CPU_LINEAR_ALGEBRA)
+#if defined(WITH_LINEAR_ALGEBRA)
+
+#include <Array.hpp>
+#include <Param.hpp>
+#include <copy.hpp>
+#include <types.hpp>
 
 #include <af/dim4.hpp>
-#include <handle.hpp>
-#include <iostream>
-#include <cassert>
-#include <err_cpu.hpp>
 #include <triangle.hpp>
 #include <lapack_helper.hpp>
 #include <platform.hpp>
@@ -71,11 +71,12 @@ int cholesky_inplace(Array<T> &in, const bool is_upper)
         uplo = 'U';
 
     int info = 0;
-    auto func = [&] (int& info, Array<T>& in) {
-        info = potrf_func<T>()(AF_LAPACK_COL_MAJOR, uplo, N, in.get(), in.strides()[1]);
+    auto func = [&] (int *info, Param<T> in) {
+        *info = potrf_func<T>()(AF_LAPACK_COL_MAJOR, uplo, N, in.get(), in.strides(1));
     };
 
-    getQueue().enqueue(func, info, in);
+    getQueue().enqueue(func, &info, in);
+    // Ensure the value of info has been written into info.
     getQueue().sync();
 
     return info;
@@ -93,7 +94,7 @@ INSTANTIATE_CH(cdouble)
 
 }
 
-#else
+#else  // WITH_LINEAR_ALGEBRA
 
 namespace cpu
 {
@@ -122,4 +123,4 @@ INSTANTIATE_CH(cdouble)
 
 }
 
-#endif
+#endif  // WITH_LINEAR_ALGEBRA

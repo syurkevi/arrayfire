@@ -16,7 +16,7 @@
 #include <Array.hpp>
 #include <handle.hpp>
 #include <sparse_handle.hpp>
-#include "err_common.hpp"
+#include <common/err_common.hpp>
 #include <cstring>
 
 using namespace detail;
@@ -74,11 +74,10 @@ af_err af_get_active_backend(af_backend *result)
 af_err af_init()
 {
     try {
-        static bool first = true;
-        if(first) {
-            getDeviceInfo();
-            first = false;
-        }
+        thread_local std::once_flag flag;
+        std::call_once(flag, []() {
+                getDeviceInfo();
+            });
     } CATCHALL;
     return AF_SUCCESS;
 }

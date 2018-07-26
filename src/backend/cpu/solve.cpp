@@ -8,9 +8,9 @@
  ********************************************************/
 
 #include <solve.hpp>
-#include <err_common.hpp>
+#include <common/err_common.hpp>
 
-#if defined(WITH_CPU_LINEAR_ALGEBRA)
+#if defined(WITH_LINEAR_ALGEBRA)
 #include <af/dim4.hpp>
 #include <handle.hpp>
 #include <cassert>
@@ -84,10 +84,10 @@ Array<T> solveLU(const Array<T> &A, const Array<int> &pivot,
     int NRHS     = b.dims()[1];
     Array< T > B = copyArray<T>(b);
 
-    auto func = [=] (Array<T> A, Array<T> B, Array<int> pivot, int N, int NRHS) {
+    auto func = [=] (Param<T> A, Param<T> B, Param<int> pivot, int N, int NRHS) {
         getrs_func<T>()(AF_LAPACK_COL_MAJOR, 'N',
-                        N, NRHS, A.get(), A.strides()[1],
-                        pivot.get(), B.get(), B.strides()[1]);
+                        N, NRHS, A.get(), A.strides(1),
+                        pivot.get(), B.get(), B.strides(1));
     };
     getQueue().enqueue(func, A, B, pivot, N, NRHS);
 
@@ -104,14 +104,14 @@ Array<T> triangleSolve(const Array<T> &A, const Array<T> &b, const af_mat_prop o
     int N      = B.dims()[0];
     int NRHS   = B.dims()[1];
 
-    auto func = [=] (Array<T> A, Array<T> B, int N, int NRHS, const af_mat_prop options) {
+    auto func = [=] (Param<T> A, Param<T> B, int N, int NRHS, const af_mat_prop options) {
         trtrs_func<T>()(AF_LAPACK_COL_MAJOR,
                         options & AF_MAT_UPPER ? 'U' : 'L',
                         'N', // transpose flag
                         options & AF_MAT_DIAG_UNIT ? 'U' : 'N',
                         N, NRHS,
-                        A.get(), A.strides()[1],
-                        B.get(), B.strides()[1]);
+                        A.get(), A.strides(1),
+                        B.get(), B.strides(1));
     };
     getQueue().enqueue(func, A, B, N, NRHS, options);
 
@@ -139,19 +139,19 @@ Array<T> solve(const Array<T> &a, const Array<T> &b, const af_mat_prop options)
     if(M == N) {
         Array<int> pivot = createEmptyArray<int>(dim4(N, 1, 1));
 
-        auto func = [=] (Array<T> A, Array<T> B, Array<int> pivot, int N, int K) {
-            gesv_func<T>()(AF_LAPACK_COL_MAJOR, N, K, A.get(), A.strides()[1],
-                           pivot.get(), B.get(), B.strides()[1]);
+        auto func = [=] (Param<T> A, Param<T> B, Param<int> pivot, int N, int K) {
+            gesv_func<T>()(AF_LAPACK_COL_MAJOR, N, K, A.get(), A.strides(1),
+                           pivot.get(), B.get(), B.strides(1));
         };
         getQueue().enqueue(func, A, B, pivot, N, K);
     } else {
-        auto func = [=] (Array<T> A, Array<T> B, int M, int N, int K) {
-            int sM = A.strides()[1];
-            int sN = A.strides()[2] / sM;
+        auto func = [=] (Param<T> A, Param<T> B, int M, int N, int K) {
+            int sM = A.strides(1);
+            int sN = A.strides(2) / sM;
 
             gels_func<T>()(AF_LAPACK_COL_MAJOR, 'N',
                     M, N, K,
-                    A.get(), A.strides()[1],
+                    A.get(), A.strides(1),
                     B.get(), max(sM, sN));
         };
         B.resetDims(dim4(N, K));
@@ -163,7 +163,7 @@ Array<T> solve(const Array<T> &a, const Array<T> &b, const af_mat_prop options)
 
 }
 
-#else
+#else  // WITH_LINEAR_ALGEBRA
 
 namespace cpu
 {
@@ -172,18 +172,18 @@ template<typename T>
 Array<T> solveLU(const Array<T> &A, const Array<int> &pivot,
                  const Array<T> &b, const af_mat_prop options)
 {
-    AF_ERROR("Linear Algebra is diabled on CPU", AF_ERR_NOT_CONFIGURED);
+    AF_ERROR("Linear Algebra is disabled on CPU", AF_ERR_NOT_CONFIGURED);
 }
 
 template<typename T>
 Array<T> solve(const Array<T> &a, const Array<T> &b, const af_mat_prop options)
 {
-    AF_ERROR("Linear Algebra is diabled on CPU", AF_ERR_NOT_CONFIGURED);
+    AF_ERROR("Linear Algebra is disabled on CPU", AF_ERR_NOT_CONFIGURED);
 }
 
 }
 
-#endif
+#endif  // WITH_LINEAR_ALGEBRA
 
 namespace cpu
 {

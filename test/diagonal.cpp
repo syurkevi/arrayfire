@@ -10,11 +10,20 @@
 #include <gtest/gtest.h>
 #include <testHelpers.hpp>
 #include <arrayfire.h>
-#include <iostream>
 
-using namespace af;
-using std::vector;
 using std::abs;
+using std::endl;
+using std::vector;
+using af::array;
+using af::constant;
+using af::deviceGC;
+using af::diag;
+using af::dim4;
+using af::exception;
+using af::max;
+using af::seq;
+using af::span;
+using af::sum;
 
 template<typename T>
 class Diagonal : public ::testing::Test
@@ -49,8 +58,25 @@ TYPED_TEST(Diagonal, Create)
                 }
             }
         }
-    } catch (const af::exception& ex) {
-        FAIL() << ex.what() << std::endl;
+    } catch (const exception& ex) {
+        FAIL() << ex.what() << endl;
+    }
+}
+
+TYPED_TEST(Diagonal, DISABLED_CreateLargeDim)
+{
+    if (noDoubleTests<TypeParam>()) return;
+    try {
+        deviceGC();
+        {
+            static const size_t largeDim = 65535 + 1;
+            array diagvals = constant(1, largeDim);
+            array out = diag(diagvals,  0, false);
+
+            ASSERT_EQ(largeDim, sum<float>(out));
+        }
+    } catch (const exception& ex) {
+        FAIL() << ex.what() << endl;
     }
 }
 
@@ -75,8 +101,31 @@ TYPED_TEST(Diagonal, Extract)
                 ASSERT_EQ(input[i * data.dims(0) + i], h_out[i]);
             }
         }
-    } catch (const af::exception& ex) {
-        FAIL() << ex.what() << std::endl;
+    } catch (const exception& ex) {
+        FAIL() << ex.what() << endl;
+    }
+}
+
+TYPED_TEST(Diagonal, ExtractLargeDim)
+{
+    if (noDoubleTests<TypeParam>()) return;
+
+    try {
+        static const size_t n = 10;
+        static const size_t largeDim = 65535 + 1;
+
+        array largedata = constant(1, n, n, largeDim);
+        array out = diag(largedata, 0);
+
+        ASSERT_EQ(n * largeDim, sum<float>(out));
+
+        largedata  = constant(1, n, n, 1, largeDim);
+        array out1 = diag(largedata, 0);
+
+        ASSERT_EQ(n * largeDim, sum<float>(out1));
+
+    } catch (const exception& ex) {
+        FAIL() << ex.what() << endl;
     }
 }
 
@@ -106,8 +155,8 @@ TYPED_TEST(Diagonal, ExtractRect)
                 }
             }
         }
-    } catch (const af::exception& ex) {
-        FAIL() << ex.what() << std::endl;
+    } catch (const exception& ex) {
+        FAIL() << ex.what() << endl;
     }
 }
 
