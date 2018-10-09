@@ -12,6 +12,7 @@ dependency_check(CUDA_FOUND "CUDA not found.")
 
 find_cuda_helper_libs(nvrtc)
 find_cuda_helper_libs(nvrtc-builtins)
+find_cuda_helper_libs(cudnn)
 
 get_filename_component(CUDA_LIBRARIES_PATH ${CUDA_cudart_static_LIBRARY} DIRECTORY CACHE)
 
@@ -299,6 +300,8 @@ cuda_add_library(afcuda
     copy.hpp
     cublas.cpp
     cublas.hpp
+    cudnn.cpp
+    cudnn.hpp
     cufft.cpp
     cufft.hpp
     cusolverDn.cpp
@@ -465,6 +468,7 @@ target_link_libraries(afcuda
     ${CUDA_CUFFT_LIBRARIES}
     ${CUDA_cusolver_LIBRARY}
     ${CUDA_cusparse_LIBRARY}
+    ${CUDA_cudnn_LIBRARY}
   )
 
 # If the driver is not found the cuda driver api need to be linked against the

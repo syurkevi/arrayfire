@@ -513,6 +513,15 @@ typedef enum {
 } af_var_bias;
 #endif
 
+#if AF_API_VERSION >= 37
+typedef enum {
+    AF_CONV_GRADIENT_DEFAULT = 0,
+    AF_CONV_GRADIENT_FILTER  = 1,
+    AF_CONV_GRADIENT_DATA    = 2,
+    AF_CONV_GRADIENT_BIAS    = 3
+} af_conv_gradient_type;
+#endif
+
 #ifdef __cplusplus
 namespace af
 {

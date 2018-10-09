@@ -15,6 +15,7 @@
 #include <GraphicsResourceManager.hpp>
 #include <cufft.hpp>
 #include <cublas.hpp>
+#include <cudnn.hpp>
 #include <cusolverDn.hpp>
 #include <cusparse.hpp>
 
@@ -91,6 +92,8 @@ GraphicsResourceManager& interopManager();
 PlanCache& fftManager();
 
 BlasHandle blasHandle();
+
+NNHandle nnHandle();
 
 SolveHandle solverDnHandle();
 
