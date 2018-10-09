@@ -511,6 +511,13 @@ typedef enum {
 } af_var_bias;
 #endif
 
+#if AF_API_VERSION >= 37
+typedef enum {
+    AF_POOLING_MAX = 1,  ///< Top k min values
+    AF_POOLING_AVG = 2,  ///< Top k max values
+} af_pooling_type;
+#endif
+
 #ifdef __cplusplus
 namespace af
 {

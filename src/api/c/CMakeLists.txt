@@ -32,6 +32,7 @@ target_sources(c_api_interface
   ${ArrayFire_SOURCE_DIR}/include/af/internal.h
   ${ArrayFire_SOURCE_DIR}/include/af/lapack.h
   ${ArrayFire_SOURCE_DIR}/include/af/macros.h
+  ${ArrayFire_SOURCE_DIR}/include/af/ml.h
   ${ArrayFire_SOURCE_DIR}/include/af/opencl.h
   ${ArrayFire_SOURCE_DIR}/include/af/random.h
   ${ArrayFire_SOURCE_DIR}/include/af/seq.h
@@ -115,6 +116,7 @@ target_sources(c_api_interface
     ${CMAKE_CURRENT_SOURCE_DIR}/orb.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/pinverse.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/plot.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/pool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/print.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/qr.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/random.cpp

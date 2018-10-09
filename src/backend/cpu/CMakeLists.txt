@@ -103,6 +103,8 @@ target_sources(afcpu
     padarray.cpp
     platform.cpp
     platform.hpp
+    pool.hpp
+    pool.cpp
     print.hpp
     qr.cpp
     qr.hpp

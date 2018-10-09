@@ -237,6 +237,7 @@ endif()
 
 make_test(SRC orb.cpp)
 make_test(SRC pinverse.cpp)
+make_test(SRC pool.cpp)
 make_test(SRC qr_dense.cpp)
 make_test(SRC random.cpp)
 make_test(SRC range.cpp)
