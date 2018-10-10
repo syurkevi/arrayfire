@@ -22,16 +22,16 @@ using af::dim4;
 using namespace detail;
 
 template<typename T>
-af_array poolCall(const Array<float>& in,
+af_array poolCall(const Array<T>& in,
                   const dim_t pool_width, const dim_t pool_height,
                   const dim_t padding_width, const dim_t padding_height,
                   const int stride_width, const int stride_height,
                   af_pooling_type pool_type)
 {
-    return getHandle(detail::pool2(in, pool_width, pool_height,
-                           padding_width, padding_height,
-                           stride_width, stride_height,
-                           pool_type));
+    return getHandle(detail::pool2<T>(in, pool_width, pool_height,
+                                      padding_width, padding_height,
+                                      stride_width, stride_height,
+                                      pool_type));
 }
 
 af_err af_pool2(af_array *out, const af_array in,
@@ -52,16 +52,33 @@ af_err af_pool2(af_array *out, const af_array in,
         af_dtype type  = info.getType();
         switch(type) {
             case f32:
-                output = poolCall<float>(getArray<float >(in), pool_width, pool_height,
+                output = poolCall<float> (getArray<float>(in), pool_width, pool_height,
+                                          padding_width, padding_height, stride_width, stride_height,
+                                          pool_type); break;
+            case f64:
+                output = poolCall<double>(getArray<double>(in), pool_width, pool_height,
+                                          padding_width, padding_height, stride_width, stride_height,
+                                          pool_type); break;
+            case s32:
+                output = poolCall<int>(getArray<int>(in), pool_width, pool_height,
+                                       padding_width, padding_height, stride_width, stride_height,
+                                       pool_type); break;
+            case u32:
+                output = poolCall<uint>(getArray<uint>(in), pool_width, pool_height,
                                         padding_width, padding_height, stride_width, stride_height,
-                                        pool_type);
-                break;
-            //case f64: output = cannyHelper<double>(getArray<double>(in), t1, ct, t2, sw, isf); break;
-            //case s32: output = cannyHelper<int   >(getArray<int   >(in), t1, ct, t2, sw, isf); break;
-            //case u32: output = cannyHelper<uint  >(getArray<uint  >(in), t1, ct, t2, sw, isf); break;
-            //case s16: output = cannyHelper<short >(getArray<short >(in), t1, ct, t2, sw, isf); break;
-            //case u16: output = cannyHelper<ushort>(getArray<ushort>(in), t1, ct, t2, sw, isf); break;
-            //case u8:  output = cannyHelper<uchar >(getArray<uchar >(in), t1, ct, t2, sw, isf); break;
+                                        pool_type); break;
+            case s16:
+                output = poolCall<short>(getArray<short>(in), pool_width, pool_height,
+                                        padding_width, padding_height, stride_width, stride_height,
+                                        pool_type); break;
+            case u16:
+                output = poolCall<ushort>(getArray<ushort>(in), pool_width, pool_height,
+                                          padding_width, padding_height, stride_width, stride_height,
+                                          pool_type); break;
+            case u8:
+                output = poolCall<uchar>(getArray<uchar>(in), pool_width, pool_height,
+                                         padding_width, padding_height, stride_width, stride_height,
+                                         pool_type); break;
             default : TYPE_ERROR(1, type);
         }
         // output array is pooled array

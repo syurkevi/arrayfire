@@ -56,6 +56,8 @@ TEST(Pool2, SNIPPET_pool2) {
                             4, 4, 4, 4};
     array input(4, 4, input_vals);
 
+    //input = input.as(f64);
+    //input = input.as(u32);
     const int win_sz  = 2;
     const int padding = 1;
     const int stride  = 2;

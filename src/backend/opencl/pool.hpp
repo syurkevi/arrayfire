@@ -11,10 +11,11 @@
 
 namespace opencl
 {
-Array<float> pool2(const Array<float>& in,
-                   const dim_t pool_width, const dim_t pool_height,
-                   const dim_t padding_width, const dim_t padding_height,
-                   const dim_t stride_width, const dim_t stride_height,
-                   af_pooling_type pool_type);
+template<typename T>
+Array<T> pool2(const Array<T>& in,
+               const dim_t pool_width, const dim_t pool_height,
+               const dim_t padding_width, const dim_t padding_height,
+               const dim_t stride_width, const dim_t stride_height,
+               af_pooling_type pool_type);
 
 }
