@@ -29,4 +29,24 @@ array pool2(const array& in,
     return array(temp_out);
 }
 
+array pool2Gradient(const array &incoming_gradient,
+                    const array& original_input,const array& pooled_output,
+                    const dim_t pool_width,     const dim_t pool_height,
+                    const dim_t padding_width,  const dim_t padding_height,
+                    const dim_t stride_width,   const dim_t stride_height,
+                    af_pooling_type pool_type) {
+
+    af_array temp_out = 0;
+    AF_THROW(af_pool2Gradient(&temp_out,
+                              incoming_gradient.get(),
+                              original_input.get(),
+                              pooled_output.get(),
+                              pool_width, pool_height,
+                              padding_width, padding_height,
+                              stride_width, stride_height,
+                              pool_type));
+    return array(temp_out);
+
+}
+
 }

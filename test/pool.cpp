@@ -58,6 +58,7 @@ TEST(Pool2, SNIPPET_pool2) {
 
     //input = input.as(f64);
     //input = input.as(u32);
+    //input = input.as(s32);
     const int win_sz  = 2;
     const int padding = 1;
     const int stride  = 2;
@@ -66,6 +67,17 @@ TEST(Pool2, SNIPPET_pool2) {
                          padding, padding,
                          stride, stride);
     af_print(pooled);
+
+
+    array gradient = pool2Gradient(af::constant(0, input.dims()),
+                                   input, pooled,
+                                   win_sz, win_sz,
+                                   padding, padding,
+                                   stride, stride);
+    af_print(gradient);
+    /*
+    */
+
     // pooled == {{
     //              }}
 

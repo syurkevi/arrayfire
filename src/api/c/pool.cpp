@@ -88,3 +88,94 @@ af_err af_pool2(af_array *out, const af_array in,
 
     return AF_SUCCESS;
 }
+
+template<typename T>
+af_array poolGradCall(const Array<T>& incoming_gradient,
+                      const Array<T>& original_input,
+                      const Array<T>& pooled_output,
+                      const dim_t pool_width, const dim_t pool_height,
+                      const dim_t padding_width, const dim_t padding_height,
+                      const int stride_width, const int stride_height,
+                      af_pooling_type pool_type)
+{
+    return getHandle(detail::pool2Gradient<T>(incoming_gradient,
+                                              original_input,
+                                              pooled_output,
+                                              pool_width, pool_height,
+                                              padding_width, padding_height,
+                                              stride_width, stride_height,
+                                              pool_type));
+}
+
+af_err af_pool2Gradient(af_array *out,
+                        const af_array incoming_gradient,
+                        const af_array original_input,
+                        const af_array pooled_output,
+                        const dim_t pool_width,    const dim_t pool_height,
+                        const dim_t padding_width, const dim_t padding_height,
+                        const dim_t stride_width,  const dim_t stride_height,
+                        af_pooling_type pool_type) {
+    try {
+        //TODO: check all incoming dimensions match
+
+        const ArrayInfo& info = getInfo(original_input);
+        af::dim4 dims  = info.dims();
+
+        DIM_ASSERT(1, (dims.ndims() >= 2));
+        DIM_ASSERT(1, (dims[2] == 3 || dims[2] == 1)); //# channels should be 1 or 3
+
+        af_array output;
+
+        af_dtype type  = info.getType();
+        switch(type) {
+            case f32:
+                output = poolGradCall<float>(getArray<float>(incoming_gradient),
+                                             getArray<float>(original_input), getArray<float>(pooled_output),
+                                             pool_width, pool_height,
+                                             padding_width, padding_height, stride_width, stride_height,
+                                             pool_type); break;
+            case f64:
+                output = poolGradCall<double>(getArray<double>(incoming_gradient),
+                                              getArray<double>(original_input), getArray<double>(pooled_output),
+                                              pool_width, pool_height,
+                                              padding_width, padding_height, stride_width, stride_height,
+                                              pool_type); break;
+            case s32:
+                output = poolGradCall<int>(getArray<int>(incoming_gradient),
+                                           getArray<int>(original_input), getArray<int>(pooled_output),
+                                           pool_width, pool_height,
+                                           padding_width, padding_height, stride_width, stride_height,
+                                           pool_type); break;
+            case u32:
+                output = poolGradCall<uint>(getArray<uint>(incoming_gradient),
+                                            getArray<uint>(original_input), getArray<uint>(pooled_output),
+                                            pool_width, pool_height,
+                                            padding_width, padding_height, stride_width, stride_height,
+                                            pool_type); break;
+            case s16:
+                output = poolGradCall<short>(getArray<short>(incoming_gradient),
+                                             getArray<short>(original_input), getArray<short>(pooled_output),
+                                             pool_width, pool_height,
+                                             padding_width, padding_height, stride_width, stride_height,
+                                             pool_type); break;
+            case u16:
+                output = poolGradCall<ushort>(getArray<ushort>(incoming_gradient),
+                                             getArray<ushort>(original_input), getArray<ushort>(pooled_output),
+                                             pool_width, pool_height,
+                                             padding_width, padding_height, stride_width, stride_height,
+                                             pool_type); break;
+            case u8:
+                output = poolGradCall<uchar>(getArray<uchar>(incoming_gradient),
+                                             getArray<uchar>(original_input), getArray<uchar>(pooled_output),
+                                             pool_width, pool_height,
+                                             padding_width, padding_height, stride_width, stride_height,
+                                             pool_type); break;
+            default : TYPE_ERROR(1, type);
+        }
+        // output array is pooled array
+        std::swap(output, *out);
+    }
+    CATCHALL;
+
+    return AF_SUCCESS;
+}
