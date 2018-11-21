@@ -167,7 +167,6 @@ cuda_add_library(afcuda
     nearest_neighbour.cu
     orb.cu
     pad_array_borders.cu
-    pool.cu
     product.cu
     qr.cu
     random_engine.cu
@@ -350,7 +349,6 @@ cuda_add_library(afcuda
     orb.hpp
     platform.cpp
     platform.hpp
-    pool.hpp
     print.hpp
     qr.hpp
     random_engine.hpp
