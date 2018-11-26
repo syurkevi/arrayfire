@@ -14,10 +14,6 @@
 #include <common/dispatch.hpp>
 #include <math.hpp>
 #include <kernel/wrap.hpp>
-#include <iostream>
-
-using std::cout;
-using std::endl;
 
 namespace opencl
 {

@@ -108,13 +108,13 @@ Array<T> convolve2_unwrap(const Array<T>& signal,
 
     dim_t outputWidth  = 1 + (sDims[0] + 2 * padding[0] - (((fDims[0] - 1) * dilation[0]) + 1)) / stride[0];
     dim_t outputHeight = 1 + (sDims[1] + 2 * padding[1] - (((fDims[1] - 1) * dilation[1]) + 1)) / stride[1];
-    Array<T> out = createValueArray<T>(dim4(outputWidth, outputHeight, fDims[3], sDims[3]), scalar<T>(0));
+    dim4 oDims = dim4(outputWidth, outputHeight, fDims[3], sDims[3]);
 
     const bool retCols = false;
     Array<accT> unwrapped = unwrap_dilated(cast<accT>(signal), fDims[0], fDims[1],
-                                                             stride[0], stride[1],
-                                                           padding[0], padding[1],
-                                                         dilation[0], dilation[1], retCols);
+                                                              stride[0], stride[1],
+                                                             padding[0], padding[1],
+                                                            dilation[0], dilation[1], retCols);
 
     unwrapped = reorder(unwrapped, dim4(1, 2, 0, 3));
     dim4 uDims = unwrapped.dims();
@@ -134,8 +134,8 @@ Array<T> convolve2_unwrap(const Array<T>& signal,
     collapsedFilter.modDims(dim4(fDims[0] * fDims[1] * fDims[2], fDims[3]));
 
     Array<accT> res = matmul(collapsedFilter, unwrapped, AF_MAT_TRANS, AF_MAT_NONE);
-    res.modDims(dim4(collapsedFilter.dims()[1], out.dims()[0], out.dims()[1], signal.dims()[3]));
-    out = cast<T>(reorder(res, dim4(1, 2, 0, 3)));
+    res.modDims(dim4(collapsedFilter.dims()[1], oDims[0], oDims[1], signal.dims()[3]));
+    Array<T> out = cast<T>(reorder(res, dim4(1, 2, 0, 3)));
 
     return out;
 }
@@ -147,8 +147,7 @@ Array<T> convolve2(Array<T> const& signal, Array<accT> const& filter,
     signal.eval();
     filter.eval();
 
-    Array<T> out  = createEmptyArray<T>(dim4());
-    out = convolve2_unwrap<T, accT>(signal, filter, stride, padding, dilation);
+    Array<T> out  = convolve2_unwrap<T, accT>(signal, filter, stride, padding, dilation);
 
     return out;
 }

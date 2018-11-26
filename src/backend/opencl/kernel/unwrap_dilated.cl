@@ -26,11 +26,11 @@ void unwrap_dilated_kernel(__global T *d_out, const KParam out,
     const int cIn  = w *  in.strides[3] + z *  in.strides[2];
 
     // Compute the output column index
-    const int id = is_column ?
+    const int id = IS_COLUMN ?
         (get_group_id(0) * get_local_size(1) + get_local_id(1)) :
         get_global_id(0);
 
-    if (id >= (is_column ? out.dims[1] : out.dims[0])) return;
+    if (id >= (IS_COLUMN ? out.dims[1] : out.dims[0])) return;
 
     // Compute the starting index of window in x and y of input
     const int startx = (id % nx) * sx;
@@ -40,7 +40,7 @@ void unwrap_dilated_kernel(__global T *d_out, const KParam out,
     const int spy = starty - py;
 
     // Offset the global pointers to the respective starting indices
-    __global       T* optr = d_out + cOut + id * (is_column ? out.strides[1] : 1);
+    __global       T* optr = d_out + cOut + id * (IS_COLUMN ? out.strides[1] : 1);
     __global const T* iptr = d_in  + cIn + in.offset;
 
     bool cond = (spx >= 0 && spx + (wx * dx) < in.dims[0] &&
@@ -49,11 +49,11 @@ void unwrap_dilated_kernel(__global T *d_out, const KParam out,
     for(int i = 0; i < reps; i++) {
 
         // Compute output index local to column
-        const int outIdx = is_column ?
+        const int outIdx = IS_COLUMN ?
             (i * get_local_size(0) + get_local_id(0)) :
             (i * get_local_size(1) + get_local_id(1));
 
-        if(outIdx >= (is_column ? out.dims[0] : out.dims[1]))
+        if(outIdx >= (IS_COLUMN ? out.dims[0] : out.dims[1]))
             return;
 
         // Compute input index local to window
@@ -70,7 +70,7 @@ void unwrap_dilated_kernel(__global T *d_out, const KParam out,
             val = iptr[inIdx];
         }
 
-        if (is_column) {
+        if (IS_COLUMN) {
             optr[outIdx] = val;
         } else {
             optr[outIdx * out.strides[1]] = val;

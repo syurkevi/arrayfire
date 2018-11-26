@@ -11,14 +11,12 @@
 #include <arrayfire.h>
 #include <af/dim4.hpp>
 #include <af/traits.hpp>
-#include <iostream>
 #include <string>
 #include <vector>
 #include <cmath>
 #include <testHelpers.hpp>
 
 using std::abs;
-using std::cout;
 using std::endl;
 using std::string;
 using std::vector;
@@ -827,7 +825,7 @@ struct conv2_strided_params {
     dim4 signal_sz_, filt_sz_, stride_, padding_, dilation_;
 
     conv2_strided_params(string testname, dim4 signal_sz, dim4 filt_sz, dim4 stride, dim4 padding, dim4 dilation)
-    : testname_(testname), signal_sz_(signal_sz), filt_sz_(filt_sz), padding_(padding), dilation_(dilation)
+    : testname_(testname), signal_sz_(signal_sz), filt_sz_(filt_sz), stride_(stride), padding_(padding), dilation_(dilation)
     { }
 };
 

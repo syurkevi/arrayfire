@@ -18,9 +18,9 @@
 #define CUDNN(call) do {                                \
         cudnnStatus_t s = (call);                       \
         if (s == CUDNN_STATUS_SUCCESS) break;           \
-        fprintf(stderr, __FILE__": %d: %s (%d)\n",      \
+        printf(__FILE__": %d: %s (%d)\n",               \
                __LINE__, cudnnGetErrorString(s), s);    \
-        exit(1);                                        \
+        throw;                                          \
     } while(0);
 
 

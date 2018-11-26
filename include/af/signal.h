@@ -520,12 +520,9 @@ AFAPI array convolve2(const array& signal, const array& filter, const convMode m
 
    \param[in]  signal is the input signal
    \param[in]  filter is the filter that will be used for the convolution operation
-   \param[in]  stride specifies the filter strides along each dimension through the dim4 type
-               if a single number is passed in it will be used as the stride for all dimensions
-   \param[in]  padding specifies the padding along each dimension through the dim4 type
-               if a single number is passed in it will be used as padding for all dimensions
-   \param[in]  dilation specifies the amount to dilate the filter before convolution 
-               if a single number is passed in it will be used as the dilation for all dimensions
+   \param[in]  stride specifies the filter strides along each dimension
+   \param[in]  padding specifies the padding along each dimension
+   \param[in]  dilation specifies the amount to dilate the filter before convolution
    \return     the convolved array
 
    \ingroup signal_func_convolve2

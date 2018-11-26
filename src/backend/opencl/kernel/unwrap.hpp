@@ -128,7 +128,7 @@ namespace opencl
             if (entry.prog==0 && entry.ker==0) {
                 ToNumStr<T> toNumStr;
                 std::ostringstream options;
-                options << " -D is_column=" << is_column
+                options << " -D IS_COLUMN=" << is_column
                         << " -D ZERO=" << toNumStr(scalar<T>(0))
                         << " -D T="    << dtype_traits<T>::getName();
 

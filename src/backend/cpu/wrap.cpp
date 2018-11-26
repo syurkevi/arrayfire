@@ -80,11 +80,8 @@ Array<T> wrap_dilated(const Array<T> &in,
     out.eval();
     in.eval();
 
-    if (is_column) {
-        getQueue().enqueue(kernel::wrap_dim_dilated<T, 1>, out, in, wx, wy, sx, sy, px, py, dx, dy);
-    } else {
-        getQueue().enqueue(kernel::wrap_dim_dilated<T, 0>, out, in, wx, wy, sx, sy, px, py, dx, dy);
-    }
+    const int d = (is_column) ? 1 : 0;
+    getQueue().enqueue(kernel::wrap_dim_dilated<T>, out, in, wx, wy, sx, sy, px, py, dx, dy, d);
 
     return out;
 }

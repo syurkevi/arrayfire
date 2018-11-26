@@ -87,11 +87,8 @@ Array<T> unwrap_dilated(const Array<T> &in,
 
     Array<T> outArray = createEmptyArray<T>(odims);
 
-    if (is_column) {
-        getQueue().enqueue(kernel::unwrap_dim_dilated<T, 1>, outArray, in, wx, wy, sx, sy, px, py, dx, dy);
-    } else {
-        getQueue().enqueue(kernel::unwrap_dim_dilated<T, 0>, outArray, in, wx, wy, sx, sy, px, py, dx, dy);
-    }
+    const int d = (is_column) ? 1 : 0;
+    getQueue().enqueue(kernel::unwrap_dim_dilated<T>, outArray, in, wx, wy, sx, sy, px, py, dx, dy, d);
 
     return outArray;
 }

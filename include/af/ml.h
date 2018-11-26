@@ -26,11 +26,11 @@ class dim4;
         \param[in]  original_filter input filter to forward pass of convolution
                     assumed structure of input is ( W x H x C x N )
         \param[in]  convolved_output output from forward pass of convolution
-        \param[in]  stride specifies width of pooling window
-        \param[in]  padding specifies width of pooling window
-        \param[in]  dilation specifies amount of padding added to width of image
-        \param[in]  gradType specifies which gradient to return
-        \return     gradient wrt/gradType
+        \param[in]  stride specifies strides along each dimension for original convolution
+        \param[in]  padding specifies padding width along each dimension for original convolution
+        \param[in]  dilation specifies filter dilation along each dimension for original convolution
+        \param[in]  grad_type specifies which gradient to return
+        \return     gradient wrt/grad_type
 
         \ingroup ml_convolution
     */
@@ -39,7 +39,7 @@ class dim4;
                                   const array& original_filter,
                                   const array& convolved_output,
                                   const dim4 stride, const dim4 padding, const dim4 dilation,
-                                  af_conv_gradient_type gradType);
+                                  af_conv_gradient_type grad_type);
 
 #endif
 
@@ -61,16 +61,13 @@ extern "C" {
         \param[in]  original_filter input filter to forward pass of convolution
                     assumed structure of input is ( W x H x C x N )
         \param[in]  convolved_output output from forward pass of convolution
-        \param[in]  stride_dims specifies number of stride dimensions. A single value
-                    will use the same value for the stride in both x,y directions
+        \param[in]  stride_dims specifies number of stride dimensions
         \param[in]  strides array of stride values
-        \param[in]  padding_dims number of padding dimensions. A single value
-                    will use the same value for the stride in both x,y directions
+        \param[in]  padding_dims number of padding dimensions
         \param[in]  paddings array of padding values
-        \param[in]  dilation_dims number of dilation dimensions. A single value
-                    will use the same value for the stride in both x,y directions
+        \param[in]  dilation_dims number of dilation dimensions
         \param[in]  dilations array of dilation values
-        \param[in]  gradType specifies which gradient to return
+        \param[in]  grad_type specifies which gradient to return
         \return     \ref AF_SUCCESS if the execution completes properly
 
         \ingroup ml_convolution
@@ -83,7 +80,7 @@ extern "C" {
                                       const unsigned stride_dims,   const dim_t *strides,
                                       const unsigned padding_dims,  const dim_t *paddings,
                                       const unsigned dilation_dims, const dim_t *dilations,
-                                      af_conv_gradient_type gradType);
+                                      af_conv_gradient_type grad_type);
 #endif
 
 

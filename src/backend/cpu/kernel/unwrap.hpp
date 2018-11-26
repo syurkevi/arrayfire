@@ -76,10 +76,10 @@ void unwrap_dim(Param<T> out, CParam<T> in, const dim_t wx, const dim_t wy,
     }
 }
 
-template<typename T, int d>
+template<typename T>
 void unwrap_dim_dilated(Param<T> out, CParam<T> in, const dim_t wx, const dim_t wy,
                         const dim_t sx, const dim_t sy, const dim_t px, const dim_t py,
-                        const dim_t dx, const dim_t dy)
+                        const dim_t dx, const dim_t dy, const int d)
 {
     const T *inPtr = in.get();
     T *outPtr      = out.get();

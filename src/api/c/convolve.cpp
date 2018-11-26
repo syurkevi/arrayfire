@@ -230,12 +230,17 @@ af_err af_convolve2(af_array *out, const af_array signal, const af_array filter,
 }
 
 template<typename T, typename accT>
-inline static af_array convolve2Strided(const af_array &s, const af_array &f, const dim4 stride, const dim4 padding, const dim4 dilation)
+inline static af_array convolve2Strided(const af_array &s, const af_array &f,
+                                                           const dim4 stride,
+                                                           const dim4 padding,
+                                                           const dim4 dilation)
 {
-    return getHandle(convolve2<T, accT>(getArray<T>(s), castArray<accT>(f), stride, padding, dilation));
+    return getHandle(convolve2<T, accT>(getArray<T>(s), castArray<accT>(f),
+                                                   stride, padding, dilation));
 }
 
-af_err af_convolve2_strided(af_array *out, const af_array signal, const af_array filter,
+af_err af_convolve2_strided(af_array *out,
+                            const af_array signal, const af_array filter,
                             const unsigned stride_dims,   const dim_t *strides,
                             const unsigned padding_dims,  const dim_t *paddings,
                             const unsigned dilation_dims, const dim_t *dilations)
@@ -249,9 +254,16 @@ af_err af_convolve2_strided(af_array *out, const af_array signal, const af_array
 
         const af_dtype signalType  = sInfo.getType();
 
+        ARG_ASSERT(3, stride_dims   > 0 && stride_dims   <= 2);
+        ARG_ASSERT(5, padding_dims  > 0 && padding_dims  <= 2);
+        ARG_ASSERT(7, dilation_dims > 0 && dilation_dims <= 2);
+
         dim4 stride(stride_dims, strides);
         dim4 padding(padding_dims, paddings);
         dim4 dilation(dilation_dims, dilations);
+
+        //assert number of features matches between signal and filter
+        DIM_ASSERT(1, sDims[2] == fDims[2]);
 
         af_array output;
         switch(signalType) {
@@ -301,15 +313,17 @@ af_err af_convolve2_sep(af_array *out, const af_array signal, const af_array col
     } CATCHALL;
 }
 
-template<typename T, typename accT>
+template<typename T>
 af_array conv2GradCall(const af_array incoming_gradient,
                        const af_array original_signal,
                        const af_array original_filter,
                        const af_array convolved_output,
                        af::dim4 stride, af::dim4 padding, af::dim4 dilation,
-                       af_conv_gradient_type gradType)
+                       af_conv_gradient_type grad_type)
 {
-    if(gradType == AF_CONV_GRADIENT_FILTER) {
+    using accT = typename std::conditional<std::is_same<T, double>::value, double, float>::type;
+
+    if(grad_type == AF_CONV_GRADIENT_FILTER) {
         return getHandle(detail::conv2FilterGradient<T, accT>(getArray<T>(incoming_gradient),
                                                         getArray<T>(original_signal),
                                                         castArray<accT>(original_filter),
@@ -332,72 +346,87 @@ af_err af_convolve2Gradient(af_array *out,
                             const unsigned stride_dims,   const dim_t *strides,
                             const unsigned padding_dims,  const dim_t *paddings,
                             const unsigned dilation_dims, const dim_t *dilations,
-                            af_conv_gradient_type gradType) {
+                            af_conv_gradient_type grad_type) {
     try {
 
-        const ArrayInfo& info = getInfo(original_signal);
-        af::dim4 dims  = info.dims();
+        const ArrayInfo& iinfo = getInfo(incoming_gradient);
+        af::dim4 iDims  = iinfo.dims();
 
-        //TODO: check all incoming dimensions match(feature maps signal,filter are equal)
-        DIM_ASSERT(1, (dims.ndims() >= 2));
+        const ArrayInfo& sinfo = getInfo(original_signal);
+        af::dim4 sDims  = sinfo.dims();
+
+        const ArrayInfo& finfo = getInfo(original_filter);
+        af::dim4 fDims  = finfo.dims();
+
+        const ArrayInfo& oinfo = getInfo(convolved_output);
+        af::dim4 oDims  = oinfo.dims();
+
+        DIM_ASSERT(1, iDims == oDims);
+        DIM_ASSERT(3, oDims[2] = fDims[3]);
+        DIM_ASSERT(3, oDims[3] = sDims[3]);
+        DIM_ASSERT(2, sDims[2] = fDims[2]);
 
         af_array output;
+
+        ARG_ASSERT(3, stride_dims   > 0 && stride_dims   <= 2);
+        ARG_ASSERT(5, padding_dims  > 0 && padding_dims  <= 2);
+        ARG_ASSERT(7, dilation_dims > 0 && dilation_dims <= 2);
 
         af::dim4 stride(stride_dims, strides);
         af::dim4 padding(padding_dims, paddings);
         af::dim4 dilation(dilation_dims, dilations);
 
-        af_dtype type  = info.getType();
+        af_dtype type  = oinfo.getType();
         switch(type) {
             case f32:
-                output = conv2GradCall<float, float>(incoming_gradient,
-                                                     original_signal,
-                                                     original_filter,
-                                                     convolved_output,
-                                                     stride, padding, dilation,
-                                                     gradType); break;
+                output = conv2GradCall<float>(incoming_gradient,
+                                              original_signal,
+                                              original_filter,
+                                              convolved_output,
+                                              stride, padding, dilation,
+                                              grad_type); break;
             case f64:
-                output = conv2GradCall<double, double>(incoming_gradient,
-                                                     original_signal,
-                                                     original_filter,
-                                                     convolved_output,
-                                                     stride, padding, dilation,
-                                                     gradType); break;
+                output = conv2GradCall<double>(incoming_gradient,
+                                               original_signal,
+                                               original_filter,
+                                               convolved_output,
+                                               stride, padding, dilation,
+                                               grad_type); break;
             case s32:
-                output = conv2GradCall<int,    float>(incoming_gradient,
-                                                     original_signal,
-                                                     original_filter,
-                                                     convolved_output,
-                                                     stride, padding, dilation,
-                                                     gradType); break;
+                output = conv2GradCall<int>(incoming_gradient,
+                                            original_signal,
+                                            original_filter,
+                                            convolved_output,
+                                            stride, padding, dilation,
+                                            grad_type); break;
             case u32:
-                output = conv2GradCall<uint,   float>(incoming_gradient,
-                                                     original_signal,
-                                                     original_filter,
-                                                     convolved_output,
-                                                     stride, padding, dilation,
-                                                     gradType); break;
+                output = conv2GradCall<uint>(incoming_gradient,
+                                             original_signal,
+                                             original_filter,
+                                             convolved_output,
+                                             stride, padding, dilation,
+                                             grad_type); break;
             case s16:
-                output = conv2GradCall<short,  float>(incoming_gradient,
-                                                     original_signal,
-                                                     original_filter,
-                                                     convolved_output,
-                                                     stride, padding, dilation,
-                                                     gradType); break;
+                output = conv2GradCall<short>(incoming_gradient,
+                                              original_signal,
+                                              original_filter,
+                                              convolved_output,
+                                              stride, padding, dilation,
+                                              grad_type); break;
             case u16:
-                output = conv2GradCall<ushort, float>(incoming_gradient,
-                                                     original_signal,
-                                                     original_filter,
-                                                     convolved_output,
-                                                     stride, padding, dilation,
-                                                     gradType); break;
+                output = conv2GradCall<ushort>(incoming_gradient,
+                                               original_signal,
+                                               original_filter,
+                                               convolved_output,
+                                               stride, padding, dilation,
+                                               grad_type); break;
             case u8:
-                output = conv2GradCall<uchar,  float>(incoming_gradient,
-                                                     original_signal,
-                                                     original_filter,
-                                                     convolved_output,
-                                                     stride, padding, dilation,
-                                                     gradType); break;
+                output = conv2GradCall<uchar>(incoming_gradient,
+                                              original_signal,
+                                              original_filter,
+                                              convolved_output,
+                                              stride, padding, dilation,
+                                              grad_type); break;
             default : TYPE_ERROR(1, type);
         }
         // output array is pooled array
