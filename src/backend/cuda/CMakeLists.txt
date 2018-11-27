@@ -300,6 +300,8 @@ cuda_add_library(afcuda
     copy.hpp
     cublas.cpp
     cublas.hpp
+    cudnn.cpp
+    cudnn.hpp
     cufft.cpp
     cufft.hpp
     cusolverDn.cpp
