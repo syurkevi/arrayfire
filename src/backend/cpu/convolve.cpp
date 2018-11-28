@@ -23,7 +23,6 @@
 #include <wrap.hpp>
 #include <arith.hpp>
 
-
 #include <af/defines.h>
 #include <af/dim4.hpp>
 
@@ -133,7 +132,6 @@ Array<T> convolve2_unwrap(const Array<T>& signal,
 
     dim_t outputWidth  = 1 + (sDims[0] + 2 * padding[0] - (((fDims[0] - 1) * dilation[0]) + 1)) / stride[0];
     dim_t outputHeight = 1 + (sDims[1] + 2 * padding[1] - (((fDims[1] - 1) * dilation[1]) + 1)) / stride[1];
-    Array<T> out = createValueArray<T>(dim4(outputWidth, outputHeight, fDims[3], sDims[3]), 0);
 
     const bool retCols = false;
     Array<accT> unwrapped = unwrap_dilated(cast<accT>(signal), fDims[0], fDims[1],
@@ -157,9 +155,9 @@ Array<T> convolve2_unwrap(const Array<T>& signal,
     Array<accT> collapsedFilter = createSubArray(filter, flip_index);
     collapsedFilter.modDims(dim4(fDims[0] * fDims[1] * fDims[2], fDims[3]));
 
-    Array<accT> res = matmul(collapsedFilter, unwrapped, AF_MAT_TRANS, AF_MAT_NONE);
-    res.modDims(dim4(collapsedFilter.dims()[1], out.dims()[0], out.dims()[1], signal.dims()[3]));
-    out = cast<T>(reorder(res, dim4(1, 2, 0, 3)));
+    Array<accT> res = matmul(unwrapped, collapsedFilter, AF_MAT_TRANS, AF_MAT_NONE);
+    res.modDims(dim4(outputWidth, outputHeight, signal.dims()[3], collapsedFilter.dims()[1]));
+    Array<T> out = cast<T>(reorder(res, dim4(0, 1, 3, 2)));
 
     return out;
 }
@@ -199,14 +197,10 @@ Array<T> conv2DataGradient(const Array<T>& incoming_gradient,
                            const Array<accT>& original_filter,
                            const Array<T>& convolved_output,
                            af::dim4 stride, af::dim4 padding, af::dim4 dilation) {
-    original_signal.eval();
-    original_filter.eval();
 
     const dim4 cDims = incoming_gradient.dims();
     const dim4 sDims = original_signal.dims();
     const dim4 fDims = original_filter.dims();
-
-    Array<accT> collapsed_filter = original_filter;
 
     vector<af_seq> flip_index(4);
     af_seq s = {(double)(fDims[0] - 1), 0, -1};
@@ -216,7 +210,7 @@ Array<T> conv2DataGradient(const Array<T>& incoming_gradient,
     flip_index[2] = af_span;
     flip_index[3] = af_span;
 
-    collapsed_filter = createSubArray(collapsed_filter, flip_index);
+    Array<accT> collapsed_filter = createSubArray(original_filter, flip_index);
     collapsed_filter.modDims(dim4(fDims[0] * fDims[1] * fDims[2], fDims[3]));
 
     Array<accT> collapsed_gradient = cast<accT>(incoming_gradient);
@@ -244,11 +238,7 @@ Array<T> conv2FilterGradient(const Array<T>& incoming_gradient,
                              const Array<T>& convolved_output,
                              af::dim4 stride, af::dim4 padding, af::dim4 dilation) {
 
-    original_signal.eval();
-    original_filter.eval();
-
     const dim4 cDims = incoming_gradient.dims();
-    const dim4 sDims = original_signal.dims();
     const dim4 fDims = original_filter.dims();
 
     const bool retCols = false;

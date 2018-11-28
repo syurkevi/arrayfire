@@ -133,9 +133,9 @@ Array<T> convolve2_unwrap(const Array<T>& signal,
     collapsedFilter = createSubArray(collapsedFilter, flip_index);
     collapsedFilter.modDims(dim4(fDims[0] * fDims[1] * fDims[2], fDims[3]));
 
-    Array<accT> res = matmul(collapsedFilter, unwrapped, AF_MAT_TRANS, AF_MAT_NONE);
-    res.modDims(dim4(collapsedFilter.dims()[1], oDims[0], oDims[1], signal.dims()[3]));
-    Array<T> out = cast<T>(reorder(res, dim4(1, 2, 0, 3)));
+    Array<accT> res = matmul(unwrapped, collapsedFilter, AF_MAT_TRANS, AF_MAT_NONE);
+    res.modDims(dim4(outputWidth, outputHeight, signal.dims()[3], collapsedFilter.dims()[1]));
+    Array<T> out = cast<T>(reorder(res, dim4(0, 1, 3, 2)));
 
     return out;
 }
