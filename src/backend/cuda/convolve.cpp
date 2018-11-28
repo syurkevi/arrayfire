@@ -138,6 +138,9 @@ Array<T> convolve2_cudnn(const Array<T>& signal,
                          const dim4 padding,
                          const dim4 dilation)
 {
+
+    cudnnHandle_t cudnn = nnHandle();
+
     dim4 sDims = signal.dims();
     dim4 fDims = filter.dims();
 
@@ -206,7 +209,7 @@ Array<T> convolve2_cudnn(const Array<T>& signal,
     // get convolution algorithm
     const int memory_limit = 0; //TODO: set to remaining space in memory manager?
     cudnnConvolutionFwdAlgo_t convolution_algorithm;
-    CUDNN_CHECK(cudnnGetConvolutionForwardAlgorithm(nnHandle(),
+    CUDNN_CHECK(cudnnGetConvolutionForwardAlgorithm(cudnn,
                                                     input_descriptor,
                                                     filter_descriptor,
                                                     convolution_descriptor,
@@ -217,7 +220,7 @@ Array<T> convolve2_cudnn(const Array<T>& signal,
 
     // figure out scratch space memory requirements
     size_t workspace_bytes;
-    CUDNN_CHECK(cudnnGetConvolutionForwardWorkspaceSize(nnHandle(),
+    CUDNN_CHECK(cudnnGetConvolutionForwardWorkspaceSize(cudnn,
                                                         input_descriptor,
                                                         filter_descriptor,
                                                         convolution_descriptor,
@@ -234,7 +237,7 @@ Array<T> convolve2_cudnn(const Array<T>& signal,
     // perform convolution
     accT alpha = scalar<accT>(1.0);
     accT beta  = scalar<accT>(0.0);
-    CUDNN_CHECK(cudnnConvolutionForward(nnHandle(),
+    CUDNN_CHECK(cudnnConvolutionForward(cudnn,
                                         &alpha,
                                         input_descriptor,
                                         cast<accT>(signal).device(),
@@ -302,6 +305,8 @@ Array<T> conv2FilterGradient(const Array<T>& incoming_gradient,
                              const Array<T>& convolved_output,
                              af::dim4 stride, af::dim4 padding, af::dim4 dilation) {
 
+    cudnnHandle_t cudnn = nnHandle();
+
     dim4 iDims = incoming_gradient.dims();
     dim4 sDims = original_signal.dims();
     dim4 fDims = original_filter.dims();
@@ -347,7 +352,7 @@ Array<T> conv2FilterGradient(const Array<T>& incoming_gradient,
 
     // determine algorithm to use
     cudnnConvolutionBwdFilterAlgo_t bwd_filt_convolution_algorithm;
-    CUDNN_CHECK(cudnnGetConvolutionBackwardFilterAlgorithm(nnHandle(),
+    CUDNN_CHECK(cudnnGetConvolutionBackwardFilterAlgorithm(cudnn,
                                                            x_descriptor,
                                                            dy_descriptor,
                                                            convolution_descriptor,
@@ -358,7 +363,7 @@ Array<T> conv2FilterGradient(const Array<T>& incoming_gradient,
 
     // figure out scratch space memory requirements
     size_t workspace_bytes;
-    CUDNN_CHECK(cudnnGetConvolutionBackwardFilterWorkspaceSize(nnHandle(),
+    CUDNN_CHECK(cudnnGetConvolutionBackwardFilterWorkspaceSize(cudnn,
                                                                x_descriptor,
                                                                dy_descriptor,
                                                                convolution_descriptor,
@@ -374,7 +379,7 @@ Array<T> conv2FilterGradient(const Array<T>& incoming_gradient,
     // perform convolution
     accT alpha = scalar<accT>(1.0);
     accT beta  = scalar<accT>(0.0);
-    CUDNN_CHECK(cudnnConvolutionBackwardFilter(nnHandle(),
+    CUDNN_CHECK(cudnnConvolutionBackwardFilter(cudnn,
                                                &alpha,
                                                x_descriptor,
                                                cast<accT>(original_signal).device(),
@@ -403,6 +408,8 @@ Array<T> conv2DataGradient(const Array<T>& incoming_gradient,
                            const Array<accT>& original_filter,
                            const Array<T>& convolved_output,
                            af::dim4 stride, af::dim4 padding, af::dim4 dilation) {
+
+    cudnnHandle_t cudnn = nnHandle();
 
     dim4 iDims = incoming_gradient.dims();
     dim4 sDims = original_signal.dims();
@@ -455,7 +462,7 @@ Array<T> conv2DataGradient(const Array<T>& incoming_gradient,
 
     // figure out scratch space memory requirements
     size_t workspace_bytes;
-    CUDNN_CHECK(cudnnGetConvolutionBackwardDataWorkspaceSize(nnHandle(),
+    CUDNN_CHECK(cudnnGetConvolutionBackwardDataWorkspaceSize(cudnn,
                                                              w_descriptor,
                                                              dy_descriptor,
                                                              convolution_descriptor,
@@ -471,7 +478,7 @@ Array<T> conv2DataGradient(const Array<T>& incoming_gradient,
     accT alpha = scalar<accT>(1.0);
     accT beta  = scalar<accT>(0.0);
 
-    CUDNN_CHECK(cudnnConvolutionBackwardData(nnHandle(),
+    CUDNN_CHECK(cudnnConvolutionBackwardData(cudnn,
                                              &alpha,
                                              w_descriptor,
                                              cast<accT>(original_filter).device(),
