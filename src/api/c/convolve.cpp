@@ -267,16 +267,12 @@ af_err af_convolve2_strided(af_array *out,
 
         af_array output;
         switch(signalType) {
-            case c32: output = convolve2Strided<cfloat ,  cfloat>(signal, filter, stride, padding, dilation); break;
-            case c64: output = convolve2Strided<cdouble, cdouble>(signal, filter, stride, padding, dilation); break;
             case f32: output = convolve2Strided<float  ,   float>(signal, filter, stride, padding, dilation); break;
             case f64: output = convolve2Strided<double ,  double>(signal, filter, stride, padding, dilation); break;
             case u32: output = convolve2Strided<uint   ,   float>(signal, filter, stride, padding, dilation); break;
             case s32: output = convolve2Strided<int    ,   float>(signal, filter, stride, padding, dilation); break;
             case u16: output = convolve2Strided<ushort ,   float>(signal, filter, stride, padding, dilation); break;
             case s16: output = convolve2Strided<short  ,   float>(signal, filter, stride, padding, dilation); break;
-            case u64: output = convolve2Strided<uintl  ,   float>(signal, filter, stride, padding, dilation); break;
-            case s64: output = convolve2Strided<intl   ,   float>(signal, filter, stride, padding, dilation); break;
             case u8:  output = convolve2Strided<uchar  ,   float>(signal, filter, stride, padding, dilation); break;
             case b8:  output = convolve2Strided<char   ,   float>(signal, filter, stride, padding, dilation); break;
             default: TYPE_ERROR(1, signalType);
@@ -362,9 +358,9 @@ af_err af_convolve2Gradient(af_array *out,
         af::dim4 oDims  = oinfo.dims();
 
         DIM_ASSERT(1, iDims == oDims);
-        DIM_ASSERT(3, oDims[2] = fDims[3]);
-        DIM_ASSERT(3, oDims[3] = sDims[3]);
-        DIM_ASSERT(2, sDims[2] = fDims[2]);
+        DIM_ASSERT(3, oDims[2] == fDims[3]);
+        DIM_ASSERT(3, oDims[3] == sDims[3]);
+        DIM_ASSERT(2, sDims[2] == fDims[2]);
 
         af_array output;
 

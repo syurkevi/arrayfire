@@ -285,8 +285,6 @@ Array<T> conv2FilterGradient(const Array<T>& incoming_gradient,
                                              const dim4 padding,                      \
                                              const dim4 dilation);
 
-INSTANTIATE(cdouble, cdouble)
-INSTANTIATE(cfloat ,  cfloat)
 INSTANTIATE(double ,  double)
 INSTANTIATE(float  ,   float)
 INSTANTIATE(uint   ,   float)
@@ -295,8 +293,6 @@ INSTANTIATE(uchar  ,   float)
 INSTANTIATE(char   ,   float)
 INSTANTIATE(ushort ,   float)
 INSTANTIATE(short  ,   float)
-INSTANTIATE(uintl  ,   float)
-INSTANTIATE(intl   ,   float)
 #undef INSTANTIATE
 
 }

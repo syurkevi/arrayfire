@@ -46,13 +46,11 @@ void unwrap_dilated_kernel(__global T *d_out, const KParam out,
     bool cond = (spx >= 0 && spx + (wx * dx) < in.dims[0] &&
                  spy >= 0 && spy + (wy * dy) < in.dims[1]);
 
+    // Compute output index local to column
+    int outIdx = IS_COLUMN ? get_local_id(0) : get_local_id(1);
+    const int oStride = IS_COLUMN ? get_local_size(0) : get_local_size(1);
+
     for(int i = 0; i < reps; i++) {
-
-        // Compute output index local to column
-        const int outIdx = IS_COLUMN ?
-            (i * get_local_size(0) + get_local_id(0)) :
-            (i * get_local_size(1) + get_local_id(1));
-
         if(outIdx >= (IS_COLUMN ? out.dims[0] : out.dims[1]))
             return;
 
@@ -75,5 +73,7 @@ void unwrap_dilated_kernel(__global T *d_out, const KParam out,
         } else {
             optr[outIdx * out.strides[1]] = val;
         }
+
+        outIdx += oStride;
     }
 }

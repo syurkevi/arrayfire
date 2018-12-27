@@ -15,6 +15,7 @@
 #include <cudnn.hpp>
 #include <kernel/convolve.hpp>
 #include <err_cuda.hpp>
+#include <type_traits>
 
 using af::dim4;
 
@@ -24,26 +25,16 @@ namespace cuda
 /////
 /// cuDNN helper functions
 /////
-template<typename T>
-cudnnDataType_t getCudnnDataType() {
-    switch((af_dtype) dtype_traits<T>::af_type) {
-        case f32:
-            return CUDNN_DATA_FLOAT; break;
-        case f64:
-            return CUDNN_DATA_DOUBLE; break;
-        case s32:
-            return CUDNN_DATA_INT32; break;
-        case u8:
-            return CUDNN_DATA_UINT8; break;
-        default:
-            return CUDNN_DATA_FLOAT;
-    }
-}
+template<typename T> cudnnDataType_t getCudnnDataType() { static_assert("no matching cudnnDataType_t"); return CUDNN_DATA_FLOAT; }
+template<> cudnnDataType_t getCudnnDataType<float>() {  return CUDNN_DATA_FLOAT; }
+template<> cudnnDataType_t getCudnnDataType<double>() {  return CUDNN_DATA_DOUBLE; }
+template<> cudnnDataType_t getCudnnDataType<int>() {  return CUDNN_DATA_INT32; }
+template<> cudnnDataType_t getCudnnDataType<unsigned char>() {  return CUDNN_DATA_UINT8; }
 
 template<typename T>
 bool supported_cudnn_type() {
-    af_dtype dtype = ((af_dtype) dtype_traits<T>::af_type);
-    if(dtype == f32 || dtype == f64 || dtype == s16 || dtype == u8) {
+    if(std::is_same<float, T>::value || std::is_same<double, T>::value ||
+         std::is_same<int, T>::value || std::is_same<unsigned char, T>::value) {
         return true;
     }
     return false;
@@ -518,8 +509,6 @@ Array<T> conv2DataGradient(const Array<T>& incoming_gradient,
                                              const dim4 dilation);
 
 
-INSTANTIATE(cdouble, cdouble)
-INSTANTIATE(cfloat ,  cfloat)
 INSTANTIATE(double ,  double)
 INSTANTIATE(float  ,   float)
 INSTANTIATE(uint   ,   float)
@@ -528,8 +517,6 @@ INSTANTIATE(uchar  ,   float)
 INSTANTIATE(char   ,   float)
 INSTANTIATE(ushort ,   float)
 INSTANTIATE(short  ,   float)
-INSTANTIATE(uintl  ,   float)
-INSTANTIATE(intl   ,   float)
 #undef INSTANTIATE
 
 
