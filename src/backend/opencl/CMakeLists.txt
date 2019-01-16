@@ -150,6 +150,8 @@ target_sources(afopencl
     orb.hpp
     platform.cpp
     platform.hpp
+    pool.hpp
+    pool.cpp
     print.hpp
     product.cpp
     program.cpp

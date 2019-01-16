@@ -52,6 +52,7 @@ target_sources(cpp_api_interface
     ${CMAKE_CURRENT_SOURCE_DIR}/morph.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/nearest_neighbour.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/orb.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/pool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/random.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/reduce.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/regions.cpp

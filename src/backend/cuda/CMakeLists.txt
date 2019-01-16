@@ -170,6 +170,7 @@ cuda_add_library(afcuda
     nearest_neighbour.cu
     orb.cu
     pad_array_borders.cu
+    pool.cu
     product.cu
     qr.cu
     random_engine.cu

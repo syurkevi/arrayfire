@@ -116,6 +116,7 @@ target_sources(c_api_interface
     ${CMAKE_CURRENT_SOURCE_DIR}/orb.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/pinverse.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/plot.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/pool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/print.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/qr.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/random.cpp

@@ -27,7 +27,7 @@ af_err af_pool2Gradient(af_array *out,
                         const dim_t pool_width,    const dim_t pool_height,
                         const dim_t padding_width, const dim_t padding_height,
                         const dim_t stride_width,  const dim_t stride_height,
-                        af_pooling_type pool_type=af_pooling_max) {
+                        af_pooling_type pool_type=AF_POOLING_MAX) {
 
     CHECK_ARRAYS(incoming_gradient);
     CHECK_ARRAYS(original_input);

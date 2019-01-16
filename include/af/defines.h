@@ -515,6 +515,13 @@ typedef enum {
 
 #if AF_API_VERSION >= 37
 typedef enum {
+    AF_POOLING_MAX = 1,
+    AF_POOLING_AVG = 2,
+} af_pooling_type;
+#endif
+
+#if AF_API_VERSION >= 37
+typedef enum {
     AF_CONV_GRADIENT_DEFAULT = 0,
     AF_CONV_GRADIENT_FILTER  = 1,
     AF_CONV_GRADIENT_DATA    = 2,

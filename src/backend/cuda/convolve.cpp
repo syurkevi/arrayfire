@@ -19,26 +19,29 @@
 
 using af::dim4;
 
-namespace cuda
-{
-
 /////
 /// cuDNN helper functions
 /////
-template<typename T> cudnnDataType_t getCudnnDataType() { static_assert("no matching cudnnDataType_t"); return CUDNN_DATA_FLOAT; }
+template<typename T> static cudnnDataType_t getCudnnDataType();
+template<typename T> static cudnnDataType_t getCudnnDataType() { static_assert("no matching cudnnDataType_t"); return CUDNN_DATA_FLOAT; }
 template<> cudnnDataType_t getCudnnDataType<float>() {  return CUDNN_DATA_FLOAT; }
 template<> cudnnDataType_t getCudnnDataType<double>() {  return CUDNN_DATA_DOUBLE; }
 template<> cudnnDataType_t getCudnnDataType<int>() {  return CUDNN_DATA_INT32; }
 template<> cudnnDataType_t getCudnnDataType<unsigned char>() {  return CUDNN_DATA_UINT8; }
 
+template<typename T> static bool supported_cudnn_type();
 template<typename T>
-bool supported_cudnn_type() {
+static bool supported_cudnn_type() {
     if(std::is_same<float, T>::value || std::is_same<double, T>::value ||
          std::is_same<int, T>::value || std::is_same<unsigned char, T>::value) {
         return true;
     }
     return false;
 }
+
+namespace cuda
+{
+
 
 template<typename T, typename accT, dim_t baseDim, bool expand>
 Array<T> convolve(Array<T> const& signal, Array<accT> const& filter, AF_BATCH_KIND kind)

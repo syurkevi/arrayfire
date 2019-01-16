@@ -104,6 +104,8 @@ target_sources(afcpu
     ParamIterator.hpp
     platform.cpp
     platform.hpp
+    pool.cpp
+    pool.hpp
     print.hpp
     qr.cpp
     qr.hpp
