@@ -105,5 +105,13 @@ void generateShiftNodeRead(std::stringstream& kerStream, int id,
               << "];\n";
 }
 
+void generateReduceNodeRead(std::stringstream& kerStream, int id, af::dim4 idims, int axis) {
+    if(axis == 0) {
+        kerStream << "atomicAdd(out" << id << ".ptr + (idx / shape.dims[0]), val" << id << ");\n";
+    } else if(axis == 1) {
+        kerStream << "atomicAdd(out" << id << ".ptr + (idx % shape.dims[0]), val" << id << ");\n";
+    }
+}
+
 }  // namespace
 }  // namespace cuda

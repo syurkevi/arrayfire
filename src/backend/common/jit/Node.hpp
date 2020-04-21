@@ -15,6 +15,7 @@
 #include <array>
 #include <functional>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -81,7 +82,7 @@ class Node {
 
     /// Generates the code for the operation of the node.
     ///
-    /// Generates the soruce code of the operation that the node needs to
+    /// Generates the source code of the operation that the node needs to
     /// perform. For example this function will create the string
     /// "val2 = __add(val1, val2);" for the addition node.
     ///
@@ -90,6 +91,18 @@ class Node {
     /// \param[in]     is_linear  True if the kernel is a linear kernel
     virtual void genFuncs(std::stringstream &kerStream,
                           const Node_ids &ids) const = 0;
+
+    /// Generates the code for writing output to global memory
+    ///
+    /// Generates the source code to perform a global memory write
+    /// for output nodes.
+    ///
+    /// \param[in/out] kerStream  The string will be written to this stream
+    /// \param[in]     id         The integer id of the node
+    virtual void genGlobalWrite(std::stringstream &kerStream,
+                                const int &id) const {
+        kerStream << std::string("out") << id << ".ptr[idx] = val" << id << ";\n";
+    }
 
     /// Calls the setArg function on each of the arguments passed into the
     /// kernel

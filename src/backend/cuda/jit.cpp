@@ -11,6 +11,7 @@
 #include <common/dispatch.hpp>
 #include <common/half.hpp>
 #include <common/jit/Node.hpp>
+#include <common/jit/ReduceNode.hpp>
 #include <copy.hpp>
 #include <debug_cuda.hpp>
 #include <device_manager.hpp>
@@ -27,6 +28,7 @@
 #include <stdexcept>
 #include <thread>
 #include <vector>
+#include <iostream> //TMP
 
 using common::half;
 using common::Node;
@@ -74,6 +76,11 @@ static string getKernelString(const string funcName,
     const std::string includeFileStr(jit_cuh, jit_cuh_len);
 
     const std::string paramTStr = R"JIT(
+
+struct InputShape {
+    dim_t dims[4];
+};
+
 template<typename T>
 struct Param {
     dim_t dims[4];
@@ -92,7 +99,7 @@ struct Param {
 
     static const char *kernelVoid = "extern \"C\" __global__ void\n";
     static const char *dimParams =
-        "uint blocks_x, uint blocks_y, uint blocks_x_total, uint num_odims";
+        "uint blocks_x, uint blocks_y, uint blocks_x_total, uint num_odims, InputShape shape";
 
     static const char *loopStart = R"JIT(
     for (int blockIdx_x = blockIdx.x; blockIdx_x < blocks_x_total; blockIdx_x += gridDim.x) {
@@ -105,9 +112,11 @@ struct Param {
     static const char *linearIndex = R"JIT(
         uint threadId = threadIdx.x;
         long long idx = blockIdx_x * blockDim.x * blockDim.y + threadId;
-        if (idx >= outref.dims[3] * outref.strides[3]) return;
+        uint elements = shape.dims[0] * shape.dims[1] * shape.dims[2] * shape.dims[3];
+        if (idx >= elements) return;
         )JIT";
 
+    //TODO: update output size wrt/elements
     static const char *generalIndex = R"JIT(
         long long id0 = 0, id1 = 0, id2 = 0, id3 = 0;
         long blockIdx_y = blockIdx.z * gridDim.y + blockIdx.y;
@@ -168,7 +177,7 @@ struct Param {
         outParamStream << "Param<" << full_nodes[id]->getTypeStr() << "> out"
                        << id << ", \n";
         // Generate code to write the output
-        outWriteStream << "out" << id << ".ptr[idx] = val" << id << ";\n";
+        full_nodes[id]->genGlobalWrite(outWriteStream, id);
     }
 
     // Put various blocks into a single stream
@@ -279,12 +288,19 @@ void evalNodes(vector<Param<T>> &outputs, vector<Node *> output_nodes) {
             break;
     }
 
+    dim4 launch_dims(4, outputs[0].dims);
+
+    // if reduction node
+    if (output_nodes.back()->getNameStr().find("Rd") == 0) { //TODO: back? search all
+        launch_dims = static_cast<common::ReduceNode*>(output_nodes.back())->getInputSize();
+        std::cout << "inputsize()" << launch_dims << std::endl;
+    }
     if (is_linear) {
         threads_x = 256;
         threads_y = 1;
 
-        blocks_x_total = divup((outputs[0].dims[0] * outputs[0].dims[1] *
-                                outputs[0].dims[2] * outputs[0].dims[3]),
+        blocks_x_total = divup((launch_dims[0] * launch_dims[1] *
+                                launch_dims[2] * launch_dims[3]),
                                threads_x);
 
         int repeat_x = divup(blocks_x_total, max_blocks_x);
@@ -293,11 +309,11 @@ void evalNodes(vector<Param<T>> &outputs, vector<Node *> output_nodes) {
         threads_x = 32;
         threads_y = 8;
 
-        blocks_x_ = divup(outputs[0].dims[0], threads_x);
-        blocks_y_ = divup(outputs[0].dims[1], threads_y);
+        blocks_x_ = divup(launch_dims[0], threads_x);
+        blocks_y_ = divup(launch_dims[1], threads_y);
 
-        blocks_x = blocks_x_ * outputs[0].dims[2];
-        blocks_y = blocks_y_ * outputs[0].dims[3];
+        blocks_x = blocks_x_ * launch_dims[2];
+        blocks_y = blocks_y_ * launch_dims[3];
 
         blocks_z = divup(blocks_y, max_blocks_y);
         blocks_y = divup(blocks_y, blocks_z);
@@ -306,6 +322,7 @@ void evalNodes(vector<Param<T>> &outputs, vector<Node *> output_nodes) {
         int repeat_x   = divup(blocks_x_total, max_blocks_x);
         blocks_x       = divup(blocks_x_total, repeat_x);
     }
+    std::cout << "threads/blocks" <<  threads_x << " " << threads_y <<  " " <<blocks_x <<  " " <<blocks_y << std::endl;
 
     vector<void *> args;
 
@@ -324,6 +341,8 @@ void evalNodes(vector<Param<T>> &outputs, vector<Node *> output_nodes) {
     args.push_back((void *)&blocks_y_);
     args.push_back((void *)&blocks_x_total);
     args.push_back((void *)&num_odims);
+    InputShape launch_shape(launch_dims.get());
+    args.push_back((void *)&launch_shape);
 
     CU_CHECK(cuLaunchKernel(ker, blocks_x, blocks_y, blocks_z, threads_x,
                             threads_y, 1, 0, getActiveStream(), args.data(),

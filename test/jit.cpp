@@ -791,3 +791,65 @@ TEST(JIT, DISABLED_ManyConstants) {
     eval(res2, res4, res6);//, res8);
     af::sync();
 }
+
+struct reduce_jit_params {
+    dim4 dims_;
+    int axis_;
+    reduce_jit_params(dim4 d, int axis)
+      : dims_(d)
+      , axis_(axis) {
+    }
+};
+
+std::ostream& operator<<(std::ostream& os, const reduce_jit_params& rjp) {
+    os << "in_dim: " << rjp.dims_ << "; tile axis: " << rjp.axis_;
+    return os;
+}
+
+class JITReduce : public ::testing::TestWithParam<reduce_jit_params> {
+   protected:
+    array a, b, c, gold;
+    void SetUp() {
+        dim4 d = GetParam().dims_;
+        a = constant(1, d);
+        b = constant(2, d);
+        c = a + b;
+
+        dim4 goldd = d;
+        goldd[GetParam().axis_] = 1;
+        gold = constant((float)3 * d[GetParam().axis_], goldd);
+    }
+};
+
+std::string reduce_jit_info(
+    const ::testing::TestParamInfo<reduce_jit_params> info) {
+    return "dims_" + (concat_dim4(info.param.dims_)) + "_axis_" +
+           to_string((info.param.axis_));
+}
+
+// clang-format off
+INSTANTIATE_TEST_CASE_P(
+                        JitReduce, JITReduce,
+                                                   //  input_dim            axis
+                        ::testing::Values(
+                            reduce_jit_params( dim4(10),         0   ),
+                            reduce_jit_params( dim4(10, 10),     0   ),
+                            reduce_jit_params( dim4(10, 10),     1   )
+                            //reduce_jit_params( dim4(10, 10, 10),     0   ),
+                            //reduce_jit_params( dim4(10, 10, 10),     1   ),
+                            //reduce_jit_params( dim4(10, 10, 10),     2   ),
+                            //reduce_jit_params( dim4(10, 10, 10, 10),     0   ),
+                            //reduce_jit_params( dim4(10, 10, 10, 10),     1   ),
+                            //reduce_jit_params( dim4(10, 10, 10, 10),     2   ),
+                            //reduce_jit_params( dim4(10, 10, 10, 10),     3   )
+                            ), reduce_jit_info);
+
+TEST_P(JITReduce, Reduce) {
+    array d = sum(c, GetParam().axis_);
+    printf("axis%d \n", GetParam().axis_);
+    //af_print(c);
+    //af_print(d);
+
+    ASSERT_ARRAYS_EQ(gold, d);
+}
+

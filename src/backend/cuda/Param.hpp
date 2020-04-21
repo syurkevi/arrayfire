@@ -15,6 +15,14 @@
 
 namespace cuda {
 
+struct InputShape {
+    dim_t dims[4];
+
+    __DH__
+    InputShape(const dim_t *idims) noexcept
+        : dims{idims[0], idims[1], idims[2], idims[3]} {}
+};
+
 template<typename T>
 class Param {
    public:
