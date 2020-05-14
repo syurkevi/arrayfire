@@ -584,14 +584,15 @@ TEST(Array, InitializerListAndDim4) {
 }
 
 TEST(Broadcast, Simple1) {
-    array A = range(dim4(32, 32, 3), 2);
+    dim_t s = 10;
+    array A = range(dim4(s, s, 3), 2);
     array B = -range(dim4(3));
 
     array C = A + B;
-    ASSERT_ARRAYS_EQ(C, constant(0, dim4(32, 32, 3)));
+    ASSERT_ARRAYS_EQ(C, constant(0, dim4(s, s, 3)));
 
     C = B + A;
-    ASSERT_ARRAYS_EQ(C, constant(0, dim4(32, 32, 3)));
+    ASSERT_ARRAYS_EQ(C, constant(0, dim4(s, s, 3)));
 }
 
 TEST(Broadcast, Simple3) {
@@ -620,11 +621,7 @@ TEST(Broadcast, Simple5) {
     array A = range(dim4(15, 3, 5), 1);
     array B = -range(dim4(3, 5), 0);
 
-    array C = A + B;
-    ASSERT_ARRAYS_EQ(C, constant(0, dim4(15, 3, 5)));
-
-    C = B + A;
-    ASSERT_ARRAYS_EQ(C, constant(0, dim4(15, 3, 5)));
+    EXPECT_THROW(A + B, af::exception);
 }
 
 TEST(Broadcast, Simple6) {
@@ -639,7 +636,7 @@ TEST(Broadcast, Simple6) {
 }
 
 TEST(Broadcast, Simple7) {
-    array A = range(dim4(3, 2, 2, 4), 2);
+    array A = range(dim4(3, 2, 2, 4), 1);
     array B = -range(dim4(2));
 
     array C = A + B;
@@ -647,4 +644,15 @@ TEST(Broadcast, Simple7) {
 
     C = B + A;
     ASSERT_ARRAYS_EQ(C, constant(0, dim4(3, 2, 2, 4)));
+}
+
+TEST(Broadcast, ManySlicesVsOneSlice) {
+    array A = constant(1, dim4(3, 3, 2));
+    array B = constant(2, dim4(3, 3));
+    array C = A + B;
+
+    ASSERT_ARRAYS_EQ(C, constant(3, dim4(3, 3, 2)));
+
+    C = B + A;
+    ASSERT_ARRAYS_EQ(C, constant(3, dim4(3, 3, 2)));
 }
