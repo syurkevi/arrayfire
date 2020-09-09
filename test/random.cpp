@@ -501,3 +501,13 @@ TYPED_TEST(RandomEngine, DISABLED_threefryRandomEngineUniformChi2) {
 TYPED_TEST(RandomEngine, DISABLED_mersenneRandomEngineUniformChi2) {
     testRandomEngineUniformChi2<TypeParam>(AF_RANDOM_ENGINE_MERSENNE_GP11213);
 }
+
+TEST(Random, Shuffle) {
+    //dim4 dims(4, 2, 1, 1);
+    dim4 dims(32, 1, 1, 1);
+    array arr = range(dims);
+    af_print(arr);
+    af::sync();
+    array shuffled = af::shuffle(arr, 0);
+    af_print(shuffled);
+}

@@ -295,6 +295,21 @@ namespace af
     */
     AFAPI unsigned long long getSeed();
 
+
+#if AF_API_VERSION >= 38
+    /**
+        \brief Randomly shuffles array along a specified dimension
+
+        \param[in] in Input array that will be shuffled
+        \param[in] dim Dimension along which array will be shuffled
+
+        \return shuffles array of same size
+
+        \ingroup random_func_randn
+    */
+    AFAPI array shuffle(const array &in, const dim_t dim);
+#endif
+
 }
 #endif
 
@@ -510,6 +525,21 @@ extern "C" {
         \ingroup random_func_get_seed
     */
     AFAPI af_err af_get_seed(unsigned long long *seed);
+
+#if AF_API_VERSION >= 38
+    /**
+        \brief C interface to randomly shuffle an array along a specified dimension
+
+        \param[out] out The shuffled array
+        \param[in] in Input array that will be shuffled
+        \param[in] dim Dimension along which array will be shuffled
+
+        \returns \ref AF_SUCCESS if the execution completes properly
+
+        \ingroup random_func_randn
+    */
+    AFAPI af_err af_shuffle(af_array *out, const af_array in, const dim_t dim);
+#endif
 
 #ifdef __cplusplus
 }

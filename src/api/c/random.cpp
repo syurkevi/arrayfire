@@ -21,6 +21,7 @@
 #include <af/defines.h>
 #include <af/dim4.hpp>
 #include <memory>
+#include <shuffle.hpp>
 
 using af::dim4;
 using common::half;
@@ -40,6 +41,7 @@ using detail::createEmptyArray;
 using detail::createHostDataArray;
 using detail::intl;
 using detail::normalDistribution;
+using detail::shuffle;
 using detail::uchar;
 using detail::uint;
 using detail::uintl;
@@ -405,3 +407,40 @@ af_err af_get_seed(uintl *seed) {
     CATCHALL;
     return AF_SUCCESS;
 }
+
+template<typename T>
+static inline af_array shuffle_(const af_array in, const dim_t dim) {
+    return getHandle(detail::shuffle<T>(getArray<T>(in), dim));
+}
+
+af_err af_shuffle(af_array *out, const af_array in, const dim_t dim) {
+    try {
+        AF_CHECK(af_init());
+        af_array result;
+        const ArrayInfo &in_info = getInfo(in);
+        af_dtype type            = in_info.getType();
+
+        ARG_ASSERT(3, in_info.ndims() > 0);
+
+        switch (type) {
+            case f32: result = shuffle_<float>(in, dim); break;
+            case c32: result = shuffle_<cfloat>(in, dim); break;
+            case f64: result = shuffle_<double>(in, dim); break;
+            case c64: result = shuffle_<cdouble>(in, dim); break;
+            case s32: result = shuffle_<int>(in, dim); break;
+            case u32: result = shuffle_<uint>(in, dim); break;
+            case u8: result = shuffle_<uchar>(in, dim); break;
+            case u64: result = shuffle_<uintl>(in, dim); break;
+            case s64: result = shuffle_<intl>(in, dim); break;
+            case u16: result = shuffle_<ushort>(in, dim); break;
+            case s16: result = shuffle_<short>(in, dim); break;
+            case b8: result = shuffle_<char>(in, dim); break;
+            case f16: result = shuffle_<half>(in, dim); break;
+            default: TYPE_ERROR(1, type);
+        }
+        std::swap(*out, result);
+    }
+    CATCHALL
+    return AF_SUCCESS;
+}
+

@@ -194,6 +194,7 @@ set(nvrtc_src
   ${CMAKE_CURRENT_SOURCE_DIR}/kernel/scan_dim_by_key.cuh
   ${CMAKE_CURRENT_SOURCE_DIR}/kernel/scan_first.cuh
   ${CMAKE_CURRENT_SOURCE_DIR}/kernel/scan_first_by_key.cuh
+  ${CMAKE_CURRENT_SOURCE_DIR}/kernel/shuffle.cuh
   ${CMAKE_CURRENT_SOURCE_DIR}/kernel/sobel.cuh
   ${CMAKE_CURRENT_SOURCE_DIR}/kernel/sparse.cuh
   ${CMAKE_CURRENT_SOURCE_DIR}/kernel/sparse_arith.cuh
@@ -384,6 +385,7 @@ cuda_add_library(afcuda
     resize.cpp
     rotate.cpp
     set.cu
+    shuffle.cu
     sift.cu
     sobel.cpp
     sort.cu
@@ -456,6 +458,7 @@ cuda_add_library(afcuda
     kernel/select.hpp
     kernel/shared.hpp
     kernel/shfl_intrinsics.hpp
+    kernel/shuffle.hpp
     kernel/sift_nonfree.hpp
     kernel/sobel.hpp
     kernel/sort.hpp

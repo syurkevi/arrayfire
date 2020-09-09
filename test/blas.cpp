@@ -799,3 +799,25 @@ TEST(MatrixMultiply, SameInput) {
     array out = matmul(a, a);
     ASSERT_VEC_ARRAY_NEAR(hgold, dim4(dim, dim), out, 1e-4);
 }
+
+af::array get_matmul()
+{
+    int size = 105;  // Note that the bug does not happen with all matrix sizes, the matrix has to be large.
+    af::array x1 = af::constant(2, size, size, f64);
+    af::array x2 = af::constant(1, size, f64);
+    return af::matmul(x1, x2);
+}
+
+
+TEST(MatrixMultiply, ISSUE_2978) {
+    af::info();
+    af::array res1 = get_matmul();
+    while (true) {
+        af::array res2 = get_matmul();
+        if (!af::allTrue<bool>(af::abs(res1 - res2) < 1e-2)) {
+            af::print("res1", res1(0));
+            af::print("res2", res2(0));
+            break;
+        }
+    }
+}
