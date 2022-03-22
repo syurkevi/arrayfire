@@ -295,6 +295,19 @@ namespace af
     */
     AFAPI unsigned long long getSeed();
 
+#if AF_API_VERSION >= 39
+    /**
+       A random shuffle. Reorders the contents
+       of the input array.
+
+       \param[in] in The array to be shuffled
+       \return shuffled array
+
+       \ingroup random_func_shuffle
+    */
+    AFAPI array shuffle(const array &in);
+#endif
+
 }
 #endif
 
@@ -510,6 +523,19 @@ extern "C" {
         \ingroup random_func_get_seed
     */
     AFAPI af_err af_get_seed(unsigned long long *seed);
+
+#if AF_API_VERSION >= 39
+    /**
+       C Interface for a random shuffle. Reorders the contents
+       of the input array.
+
+       \param[out] out The shuffled array
+       \param[in] in The array to be shuffled
+
+       \ingroup random_func_shuffle
+    */
+    AFAPI af_err af_shuffle(af_array *out, const af_array in);
+#endif
 
 #ifdef __cplusplus
 }

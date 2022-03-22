@@ -68,6 +68,14 @@ Array<T> normalDistribution(const af::dim4 &dims, Array<uint> pos,
     return out;
 }
 
+template<typename T>
+Array<T> shuffle(const Array<T> &in, const uintl &seed, const uintl &counter) {
+    Array<T> out = createEmptyArray<T>(in.dims());
+    getQueue().enqueue(kernel::shuffle<T>, out,
+                       in, seed, counter);
+    return out;
+}
+
 #define INSTANTIATE_UNIFORM(T)                                   \
     template Array<T> uniformDistribution<T>(                    \
         const af::dim4 &dims, const af_random_engine_type type,  \
@@ -141,6 +149,10 @@ Array<T> normalDistribution(const af::dim4 &dims, Array<uint> pos,
         return out;                                                            \
     }
 
+#define INSTANTIATE_SHUFFLE(T)                                                 \
+    template Array<T> shuffle(const Array<T> &in, const uintl &seed,           \
+                              const uintl &counter);
+
 INSTANTIATE_UNIFORM(float)
 INSTANTIATE_UNIFORM(double)
 INSTANTIATE_UNIFORM(int)
@@ -162,5 +174,19 @@ COMPLEX_UNIFORM_DISTRIBUTION(cfloat, float)    // NOLINT
 
 COMPLEX_NORMAL_DISTRIBUTION(cdouble, double)  // NOLINT
 COMPLEX_NORMAL_DISTRIBUTION(cfloat, float)    // NOLINT
+
+INSTANTIATE_SHUFFLE(float)
+INSTANTIATE_SHUFFLE(double)
+INSTANTIATE_SHUFFLE(int)
+INSTANTIATE_SHUFFLE(uint)
+INSTANTIATE_SHUFFLE(intl)
+INSTANTIATE_SHUFFLE(uintl)
+INSTANTIATE_SHUFFLE(char)
+INSTANTIATE_SHUFFLE(uchar)
+INSTANTIATE_SHUFFLE(short)
+INSTANTIATE_SHUFFLE(ushort)
+INSTANTIATE_SHUFFLE(half)
+INSTANTIATE_SHUFFLE(cfloat)
+INSTANTIATE_SHUFFLE(cdouble)
 
 }  // namespace cpu

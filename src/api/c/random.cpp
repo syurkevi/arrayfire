@@ -40,6 +40,7 @@ using detail::createEmptyArray;
 using detail::createHostDataArray;
 using detail::intl;
 using detail::normalDistribution;
+using detail::shuffle;
 using detail::uchar;
 using detail::uint;
 using detail::uintl;
@@ -404,4 +405,49 @@ af_err af_get_seed(uintl *seed) {
     }
     CATCHALL;
     return AF_SUCCESS;
+}
+
+template<typename T>
+static inline af_array shuffle(const af_array in, RandomEngine *e) {
+    return getHandle(shuffle<T>(getArray<T>(in), *(e->seed),
+                    *(e->counter)));
+}
+
+af_err af_shuffle(af_array *out, const af_array in) {
+    try {
+        AF_CHECK(af_init());
+        af_array res;
+
+        af_random_engine engine;
+        AF_CHECK(af_get_default_random_engine(&engine));
+        RandomEngine *e = getRandomEngine(engine);
+
+        const ArrayInfo& iinfo = getInfo(in);
+        if (iinfo.elements() == 0) { return af_retain_array(&res, in); }
+        DIM_ASSERT(1, iinfo.elements() > 0);
+
+        const af_dtype type = iinfo.getType();
+
+        switch (type) {
+            case f32: res = shuffle<float>(in, e); break;
+            case f64: res = shuffle<double>(in, e); break;
+            case c32: res = shuffle<cfloat>(in, e); break;
+            case c64: res = shuffle<cdouble>(in, e); break;
+            case s32: res = shuffle<int>(in, e); break;
+            case u32: res = shuffle<uint>(in, e); break;
+            case u8: res = shuffle<uchar>(in, e); break;
+            case b8: res = shuffle<char>(in, e); break;
+            case s64: res = shuffle<intl>(in, e); break;
+            case u64: res = shuffle<uintl>(in, e); break;
+            case s16: res = shuffle<short>(in, e); break;
+            case u16: res = shuffle<ushort>(in, e); break;
+            case f16: res = shuffle<half>(in, e); break;
+            default: TYPE_ERROR(0, type);
+        }
+
+        std::swap(*out, res);
+    }
+    CATCHALL;
+    return AF_SUCCESS;
+
 }

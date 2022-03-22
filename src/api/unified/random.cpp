@@ -79,3 +79,7 @@ af_err af_randn(af_array *out, const unsigned ndims, const dim_t *const dims,
 af_err af_set_seed(const unsigned long long seed) { CALL(af_set_seed, seed); }
 
 af_err af_get_seed(unsigned long long *seed) { CALL(af_get_seed, seed); }
+
+af_err af_shuffle(af_array *out, const af_array in) {
+    CALL(af_shuffle, out, in);
+}

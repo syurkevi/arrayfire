@@ -412,3 +412,17 @@ TYPED_TEST(RandomEngineSeed, threefrySeedUniform) {
 TYPED_TEST(RandomEngineSeed, mersenneSeedUniform) {
     testRandomEngineSeed<TypeParam>(AF_RANDOM_ENGINE_MERSENNE_GP11213);
 }
+
+TEST(Random, Shuffle) {
+    array in = range(af::dim4(10, 1, 1, 1));
+    af_print(in);
+    array out = af::shuffle(in);
+    af_print(out);
+}
+
+TEST(Random, Shuffle2D) {
+    array in = range(af::dim4(10, 4, 1, 1));
+    af_print(in);
+    array out = af::shuffle(in);
+    af_print(out);
+}

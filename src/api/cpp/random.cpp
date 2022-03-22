@@ -137,4 +137,10 @@ unsigned long long getSeed() {
     return seed;
 }
 
+array shuffle(const array &in) {
+    af_array out;
+    AF_THROW(af_shuffle(&out, in.get()));
+    return array(out);
+}
+
 }  // namespace af
