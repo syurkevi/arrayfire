@@ -12,6 +12,7 @@
 #include <Param.hpp>
 #include <common/dispatch.hpp>
 #include <common/half.hpp>
+#include <common/VerPhilox.hpp>
 #include <err_cpu.hpp>
 #include <kernel/random_engine_mersenne.hpp>
 #include <kernel/random_engine_philox.hpp>
@@ -411,20 +412,6 @@ void normalDistributionCBRNG(T *out, size_t elements,
     }
 }
 
-//TODO: move out to common? function re-used across all backends
-uint64_t getCipherBits(uint64_t capacity) {
-    if(capacity == 0) {
-        return 0;
-    }
-    uint64_t i = 0;
-    capacity--;
-    while(capacity != 0) {
-        i++;
-        capacity >>= 1;
-    }
-    return std::max(i, uint64_t(4));
-}
-
 void varPhiloxRound(const uint* const k, uint* const c) {
     uint hi0, lo0, hi1, lo1;
     mulhilo(m4x32_0, c[0], &hi0, &lo0);
@@ -461,7 +448,7 @@ void shufflePhilox(Param<T> out, const CParam<T> in, const uintl seed, uintl cou
     af::dim4 odims    = out.dims();
     af::dim4 ostrides = out.strides();
 
-    uint64_t total_bits = getCipherBits(odims[0]);
+    uint64_t total_bits = common::getVarPhiloxCipherBits(odims[0]);
 
     uint64_t left_side_bits = total_bits / 2;
     uint64_t left_side_mask = (1ull << left_side_bits) - 1;

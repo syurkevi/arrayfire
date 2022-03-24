@@ -11,6 +11,8 @@
 
 #include <common/dispatch.hpp>
 #include <common/half.hpp>
+#include <common/VarPhilox.hpp>
+#include <cub/block/block_scan.cuh>
 #include <debug_cuda.hpp>
 #include <err_cuda.hpp>
 #include <kernel/random_engine_mersenne.hpp>
@@ -20,6 +22,7 @@
 #include <af/defines.h>
 
 #include <limits>
+#include <random>
 
 namespace cuda {
 namespace kernel {
@@ -1099,5 +1102,157 @@ void normalDistributionCBRNG(T *out, size_t elements,
     }
     counter += elements;
 }
+
+
+/*
+template<typename T>
+void shufflePhilox(Param<T> out, const CParam<T> in, const uintl seed, uintl counter) {
+    T *optr = out.get();
+    const T * const iptr = in.get();
+    af::dim4 odims    = out.dims();
+    af::dim4 ostrides = out.strides();
+
+    uint64_t total_bits = common::getVarPhiloxCipherBits(odims[0]);
+
+    uint64_t left_side_bits = total_bits / 2;
+    uint64_t left_side_mask = (1ull << left_side_bits) - 1;
+
+    uint64_t right_side_bits = total_bits - left_side_bits;
+    uint64_t right_side_mask = (1ull << right_side_bits) - 1;
+
+    std::mt19937_64 random_function;
+    uint32_t key;
+    key = seed;
+
+    dim_t oidx = 0;
+
+    dim_t nextpow2 = (1 << total_bits);
+    for(dim_t m=0; m<nextpow2; ++m) {
+        uint32_t state[2] = { uint32_t(counter >> right_side_bits),
+                              uint32_t(counter & right_side_mask) };
+
+        uint64_t ridx = varPhilox(key, state,
+                                  left_side_bits, left_side_mask,
+                                  right_side_bits, right_side_mask);
+
+        if(ridx < odims[0]) {
+            for (dim_t w = 0; w < odims[3]; w++) {
+                dim_t offW = w * ostrides[3];
+                for (dim_t z = 0; z < odims[2]; z++) {
+                    dim_t offWZ = offW + z * ostrides[2];
+                    for (dim_t y = 0; y < odims[1]; y++) {
+                        dim_t offWZY = offWZ + y * ostrides[1];
+
+                        optr[oidx + offWZY] = iptr[ridx + offWZY];
+                    }
+                }
+            }
+            ++oidx;
+        }
+        ++counter;
+    }
+}
+*/
+
+
+struct lookback {
+    size_t localsum;
+    size_t carry;
+    bool local_flag;
+    bool prefix_complete;
+};
+
+template<typename T>
+__global__ void shufflePhilox(T *out, const T *in, lookback *lookback_table, uintl seed,
+                              uintl counter, uint elements, uint nBits,
+                              uint64_t left_side_bits, uint64_t left_side_mask,
+                              uint64_t right_side_bits, uint64_t right_side_mask) {
+    uint index  = blockIdx.x * blockDim.x + threadIdx.x;
+
+    //uint key[2] = {lo, hi};
+    //uint ctr[4] = {loc, hic, 0, 0};
+    //ctr[0] += index;
+    //ctr[1] += (ctr[0] < loc);
+    //ctr[2] += (ctr[1] < hic);
+
+    //if (blockIdx.x != (gridDim.x - 1)) {
+        //writeOut128Bytes(out, index, ctr[0], ctr[1], ctr[2], ctr[3]);
+    //} else {
+
+    uint32_t key;
+    key = seed;
+    uint32_t state[2] = { uint32_t((counter + index) >> right_side_bits),
+                          uint32_t((counter + index) & right_side_mask) };
+
+    uint64_t ridx = varlenPhilox(key, state,
+                                 left_side_bits, left_side_mask,
+                                 right_side_bits, right_side_mask);
+
+    typedef cub::BlockScan<size_t, THREADS> BlockScan;
+    __shared__ typename BlockScan::TempStorage scan_storage;
+
+    size_t readFlag = (ridx < elements);
+    BlockScan(scan_storage).ExclusiveSum(readFlag, readFlag);
+
+
+    if(threadIdx.x == blockDim.x-1) { //last thread of each block will write aggregate
+        lookback_table[blockIdx.x].localsum = readFlag;
+        lookback_table[blockIdx.x].local_flag = true;
+
+        if(blockIdx.x == 0) {
+            lookback_table[blockIdx.x].carry = readFlag;
+            lookback_table[blockIdx.x].prefix_complete = true;
+        }
+    }
+
+    // wait until previous aggregate is ready
+    while(blockIdx.x > 0 && !lookback_table[blockIdx.x - 1].prefix_complete);
+
+    // add aggregate from previous block to current block
+    if(blockIdx.x > 0) {
+        readFlag += lookback_table[blockIdx.x - 1].carry;
+    }
+
+
+    if(ridx < elements) {
+        out[readFlag] = in[ridx];
+    }
+    //printf("%d:%u ", index, ridx);
+}
+
+
+template<typename T>
+void shuffle(Param<T> out, const CParam<T> in, const uintl seed, uintl counter) {
+    uint nBits = common::getVarPhiloxCipherBits(in.dims[0]);
+    uint capacity = (1 << nBits);
+
+    int threads          = THREADS;
+    int nblocks           = divup(capacity, THREADS);
+
+    uint64_t left_side_bits = nBits / 2;
+    uint64_t left_side_mask = (1ull << left_side_bits) - 1;
+
+    uint64_t right_side_bits = nBits - left_side_bits;
+    uint64_t right_side_mask = (1ull << right_side_bits) - 1;
+
+    T *optr;
+    const T *iptr;
+    optr = out.ptr;
+    iptr = in.ptr;
+
+    lookback *lookback_table;
+    CUDA_CHECK(cudaMallocAsync(&lookback_table, nblocks * sizeof(lookback), 
+                               cuda::getActiveStream()));
+    CUDA_CHECK(cudaMemsetAsync(lookback_table, 0, nblocks * sizeof(lookback),
+                               cuda::getActiveStream()));
+
+    CUDA_LAUNCH(shufflePhilox, nblocks, threads, optr, iptr, lookback_table,
+                           seed, counter, in.dims[0], nBits,
+                           left_side_bits, left_side_mask,
+                           right_side_bits, right_side_mask);
+
+    counter += capacity;
+}
+
 }  // namespace kernel
 }  // namespace cuda

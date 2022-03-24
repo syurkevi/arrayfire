@@ -100,5 +100,30 @@ static inline __device__ void philox(uint key[2], uint ctr[4]) {
     philoxBump(key);
     philoxRound(m4x32_0, m4x32_1, key, ctr);
 }
+
+constexpr uint64_t PHILOX_M2_64_0 = 0xD2B74407B1CE6E93;
+
+constexpr static uint rounds = 24;
+static inline uint64_t __device__ varlenPhilox(uint32_t &key, uint32_t *state,
+                                            uint64_t left_side_bits,
+                                            uint64_t left_side_mask,
+                                            uint64_t right_side_bits,
+                                            uint64_t right_side_mask) {
+    for(unsigned r=0; r<rounds; ++r) {
+        uint32_t hi, lo;
+        mulhilo(PHILOX_M2_64_0, state[0], hi, lo);
+        lo = (lo << (right_side_bits - left_side_bits)) |
+             (state[1] >> left_side_bits);
+
+        state[0] = ((hi ^ key) ^ state[1]) & left_side_mask;
+        state[1] = lo & right_side_mask;
+
+        key += w32_0;
+    }
+    return (uint64_t)state[0] << right_side_bits | (uint64_t) state[1];
+}
+
+
+
 }  // namespace kernel
 }  // namespace cuda

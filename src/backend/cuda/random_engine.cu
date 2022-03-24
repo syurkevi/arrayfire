@@ -66,10 +66,9 @@ Array<T> normalDistribution(const af::dim4 &dims, Array<uint> pos,
 }
 
 template<typename T>
-Array<T> shuffle(const Array<T> &in) {
+Array<T> shuffle(const Array<T> &in, const uintl &seed, const uintl &counter) {
     Array<T> out = createEmptyArray<T>(in.dims());
-    //getQueue().enqueue(kernel::shuffle<T>, out.get(),
-                       //in.get(), in.dims());
+    kernel::shuffle<T>(out, in, seed, counter);
     return out;
 }
 
@@ -144,7 +143,8 @@ Array<T> shuffle(const Array<T> &in) {
     }
 
 #define INSTANTIATE_SHUFFLE(T)                                   \
-    template Array<T> shuffle<T>(const Array<T> &in);
+    template Array<T> shuffle(const Array<T> &in,                \
+            const uintl &seed, const uintl &counter);
 
 INSTANTIATE_UNIFORM(float)
 INSTANTIATE_UNIFORM(double)
