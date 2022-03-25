@@ -68,7 +68,8 @@ Array<T> normalDistribution(const af::dim4 &dims, Array<uint> pos,
 template<typename T>
 Array<T> shuffle(const Array<T> &in, const uintl &seed, const uintl &counter) {
     Array<T> out = createEmptyArray<T>(in.dims());
-    kernel::shuffle<T>(out, in, seed, counter);
+    Array<int> block_counter = createValueArray<int>(af::dim4(1), 0);
+    kernel::shuffle<T>(out, in, block_counter, seed, counter);
     return out;
 }
 
@@ -169,17 +170,17 @@ COMPLEX_NORMAL_DISTRIBUTION(cdouble, double)
 COMPLEX_NORMAL_DISTRIBUTION(cfloat, float)
 
 INSTANTIATE_SHUFFLE(float)
-INSTANTIATE_SHUFFLE(double)
-INSTANTIATE_SHUFFLE(int)
-INSTANTIATE_SHUFFLE(uint)
-INSTANTIATE_SHUFFLE(intl)
-INSTANTIATE_SHUFFLE(uintl)
-INSTANTIATE_SHUFFLE(char)
-INSTANTIATE_SHUFFLE(uchar)
-INSTANTIATE_SHUFFLE(short)
-INSTANTIATE_SHUFFLE(ushort)
-INSTANTIATE_SHUFFLE(half)
-INSTANTIATE_SHUFFLE(cfloat)
-INSTANTIATE_SHUFFLE(cdouble)
+//INSTANTIATE_SHUFFLE(double)
+//INSTANTIATE_SHUFFLE(int)
+//INSTANTIATE_SHUFFLE(uint)
+//INSTANTIATE_SHUFFLE(intl)
+//INSTANTIATE_SHUFFLE(uintl)
+//INSTANTIATE_SHUFFLE(char)
+//INSTANTIATE_SHUFFLE(uchar)
+//INSTANTIATE_SHUFFLE(short)
+//INSTANTIATE_SHUFFLE(ushort)
+//INSTANTIATE_SHUFFLE(half)
+//INSTANTIATE_SHUFFLE(cfloat)
+//INSTANTIATE_SHUFFLE(cdouble)
 
 }  // namespace cuda

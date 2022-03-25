@@ -1156,18 +1156,35 @@ void shufflePhilox(Param<T> out, const CParam<T> in, const uintl seed, uintl cou
 
 
 struct lookback {
-    size_t localsum;
-    size_t carry;
-    bool local_flag;
+    uint64_t localsum;
+    uint64_t inclusive_prefix;
+    bool local_complete;
     bool prefix_complete;
 };
 
 template<typename T>
-__global__ void shufflePhilox(T *out, const T *in, lookback *lookback_table, uintl seed,
-                              uintl counter, uint elements, uint nBits,
+__global__ void shufflePhilox(T *out, const T *in, volatile lookback *lookback_table, int *block_counter,
+                              uintl seed, uintl counter, uint elements, uint nBits,
                               uint64_t left_side_bits, uint64_t left_side_mask,
                               uint64_t right_side_bits, uint64_t right_side_mask) {
-    uint index  = blockIdx.x * blockDim.x + threadIdx.x;
+    __shared__ uint partition_id;
+    if(threadIdx.x == 0) {
+        partition_id = atomicAdd(block_counter, 1);
+    }
+    __syncthreads();
+
+    /*
+    if(threadIdx.x == 0) {
+        printf("%d:[%d,%d,%llu,%llu] ", partition_id, lookback_table[partition_id].local_complete,
+                                                  lookback_table[partition_id].prefix_complete,
+                                                  lookback_table[partition_id].localsum,
+                                                  lookback_table[partition_id].inclusive_prefix);
+        printf("\n");
+    }
+    */
+
+    //uint index  = blockIdx.x * blockDim.x + threadIdx.x;
+    uint index  = partition_id * blockDim.x + threadIdx.x;
 
     //uint key[2] = {lo, hi};
     //uint ctr[4] = {loc, hic, 0, 0};
@@ -1187,47 +1204,95 @@ __global__ void shufflePhilox(T *out, const T *in, lookback *lookback_table, uin
     uint64_t ridx = varlenPhilox(key, state,
                                  left_side_bits, left_side_mask,
                                  right_side_bits, right_side_mask);
+    //printf("(%d:%llu) ", index, ridx);
 
     typedef cub::BlockScan<size_t, THREADS> BlockScan;
     __shared__ typename BlockScan::TempStorage scan_storage;
 
+    //local scan
     size_t readFlag = (ridx < elements);
-    BlockScan(scan_storage).ExclusiveSum(readFlag, readFlag);
+    BlockScan(scan_storage).InclusiveSum(readFlag, readFlag);
+
+    // final thread of each block will set local scan
+    if(threadIdx.x == blockDim.x-1) {
+        lookback_table[partition_id].localsum = readFlag;
+        __threadfence();
+        lookback_table[partition_id].local_complete = true;
+
+        // final thread of first block will also set completed
+        // inclusive_prefix for further blocks
+        if(partition_id == 0) {
+            lookback_table[0].inclusive_prefix = readFlag;
+            __threadfence();
+            lookback_table[0].prefix_complete = true;
+        }
+    }
+    __threadfence();
+
+    __shared__ uint64_t running_prefix;
+    if(partition_id > 0) {
+        int lookback_id = partition_id - 1;
+        bool check_prefix_ready = false;
+
+        // traverse lookback table to obtain required ids for exclusive prefix
+        if(threadIdx.x == blockDim.x - 1) {
+            running_prefix = 0;
+            lookback l;
+            do {
+                //l = lookback_table[lookback_id];
+                memcpy((void*)&l, (const void*)&lookback_table[lookback_id], sizeof(lookback));
+                check_prefix_ready = l.prefix_complete;
+                bool check_local_ready  = l.local_complete;
+
+                if(check_local_ready && !check_prefix_ready) {
+                    running_prefix += l.localsum;
+                    lookback_id--;
+                }
+            } while(!check_prefix_ready);
+            running_prefix += l.inclusive_prefix;
+        }
+        __syncthreads();
 
 
-    if(threadIdx.x == blockDim.x-1) { //last thread of each block will write aggregate
-        lookback_table[blockIdx.x].localsum = readFlag;
-        lookback_table[blockIdx.x].local_flag = true;
+        readFlag += running_prefix;
 
-        if(blockIdx.x == 0) {
-            lookback_table[blockIdx.x].carry = readFlag;
-            lookback_table[blockIdx.x].prefix_complete = true;
+        // final thread to update this block's final prefix
+        if(threadIdx.x == blockDim.x - 1) {
+            lookback_table[partition_id].inclusive_prefix = readFlag;
+            __threadfence();
+            lookback_table[partition_id].prefix_complete = true;
         }
     }
 
-    // wait until previous aggregate is ready
-    while(blockIdx.x > 0 && !lookback_table[blockIdx.x - 1].prefix_complete);
-
-    // add aggregate from previous block to current block
-    if(blockIdx.x > 0) {
-        readFlag += lookback_table[blockIdx.x - 1].carry;
+    /*
+    if(threadIdx.x == 0) {
+        for(int i=0; i<elements; ++i) {
+            printf("%d:%d-[%d] ", index, ridx, readFlag);
+        }
     }
-
+    if(threadIdx.x == 0) {
+        printf("%d:[%d,%d,%llu,%llu] ", partition_id, lookback_table[partition_id].local_complete,
+                                                  lookback_table[partition_id].prefix_complete,
+                                                  lookback_table[partition_id].localsum,
+                                                  lookback_table[partition_id].inclusive_prefix);
+    }
+    */
 
     if(ridx < elements) {
-        out[readFlag] = in[ridx];
+        out[readFlag-1] = in[ridx];
     }
     //printf("%d:%u ", index, ridx);
 }
 
 
 template<typename T>
-void shuffle(Param<T> out, const CParam<T> in, const uintl seed, uintl counter) {
+void shuffle(Param<T> out, const CParam<T> in, Param<int> block_counter, const uintl seed, uintl counter) {
     uint nBits = common::getVarPhiloxCipherBits(in.dims[0]);
     uint capacity = (1 << nBits);
 
-    int threads          = THREADS;
-    int nblocks           = divup(capacity, THREADS);
+    //const int threads = THREADS;
+    const int threads = 32;
+    const int nblocks = divup(capacity, threads);
 
     uint64_t left_side_bits = nBits / 2;
     uint64_t left_side_mask = (1ull << left_side_bits) - 1;
@@ -1247,7 +1312,7 @@ void shuffle(Param<T> out, const CParam<T> in, const uintl seed, uintl counter) 
                                cuda::getActiveStream()));
 
     CUDA_LAUNCH(shufflePhilox, nblocks, threads, optr, iptr, lookback_table,
-                           seed, counter, in.dims[0], nBits,
+                           block_counter.ptr, seed, counter, in.dims[0], nBits,
                            left_side_bits, left_side_mask,
                            right_side_bits, right_side_mask);
 
