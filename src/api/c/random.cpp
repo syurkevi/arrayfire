@@ -15,6 +15,7 @@
 #include <common/half.hpp>
 #include <handle.hpp>
 #include <random_engine.hpp>
+#include <shuffle.hpp>
 #include <types.hpp>
 #include <af/array.h>
 #include <af/data.h>
@@ -413,6 +414,7 @@ static inline af_array shuffle(const af_array in, RandomEngine *e) {
                     *(e->counter)));
 }
 
+//TODO move to shuffle
 af_err af_shuffle(af_array *out, const af_array in) {
     try {
         AF_CHECK(af_init());
@@ -430,18 +432,18 @@ af_err af_shuffle(af_array *out, const af_array in) {
 
         switch (type) {
             case f32: res = shuffle<float>(in, e); break;
-            case f64: res = shuffle<double>(in, e); break;
-            case c32: res = shuffle<cfloat>(in, e); break;
-            case c64: res = shuffle<cdouble>(in, e); break;
-            case s32: res = shuffle<int>(in, e); break;
-            case u32: res = shuffle<uint>(in, e); break;
-            case u8: res = shuffle<uchar>(in, e); break;
-            case b8: res = shuffle<char>(in, e); break;
-            case s64: res = shuffle<intl>(in, e); break;
-            case u64: res = shuffle<uintl>(in, e); break;
-            case s16: res = shuffle<short>(in, e); break;
-            case u16: res = shuffle<ushort>(in, e); break;
-            case f16: res = shuffle<half>(in, e); break;
+            //case f64: res = shuffle<double>(in, e); break;
+            //case c32: res = shuffle<cfloat>(in, e); break;
+            //case c64: res = shuffle<cdouble>(in, e); break;
+            //case s32: res = shuffle<int>(in, e); break;
+            //case u32: res = shuffle<uint>(in, e); break;
+            //case u8: res = shuffle<uchar>(in, e); break;
+            //case b8: res = shuffle<char>(in, e); break;
+            //case s64: res = shuffle<intl>(in, e); break;
+            //case u64: res = shuffle<uintl>(in, e); break;
+            //case s16: res = shuffle<short>(in, e); break;
+            //case u16: res = shuffle<ushort>(in, e); break;
+            //case f16: res = shuffle<half>(in, e); break;
             default: TYPE_ERROR(0, type);
         }
 

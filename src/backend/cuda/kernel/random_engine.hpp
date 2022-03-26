@@ -1173,6 +1173,8 @@ __global__ void shufflePhilox(T *out, const T *in, volatile lookback *lookback_t
     }
     __syncthreads();
 
+    //if(partition_id < gridDim.x) {
+
     /*
     if(threadIdx.x == 0) {
         printf("%d:[%d,%d,%llu,%llu] ", partition_id, lookback_table[partition_id].local_complete,
@@ -1277,6 +1279,9 @@ __global__ void shufflePhilox(T *out, const T *in, volatile lookback *lookback_t
                                                   lookback_table[partition_id].inclusive_prefix);
     }
     */
+    //} else {
+        //ridx = //blah
+    //}
 
     if(ridx < elements) {
         out[readFlag-1] = in[ridx];
@@ -1315,6 +1320,7 @@ void shuffle(Param<T> out, const CParam<T> in, Param<int> block_counter, const u
                            block_counter.ptr, seed, counter, in.dims[0], nBits,
                            left_side_bits, left_side_mask,
                            right_side_bits, right_side_mask);
+
 
     counter += capacity;
 }

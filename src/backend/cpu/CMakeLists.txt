@@ -151,6 +151,8 @@ target_sources(afcpu
     set.hpp
     shift.cpp
     shift.hpp
+    shuffle.cpp
+    shuffle.hpp
     sift.cpp
     sift.hpp
     sobel.cpp
@@ -252,6 +254,7 @@ target_sources(afcpu
     kernel/scan_by_key.hpp
     kernel/select.hpp
     kernel/shift.hpp
+    kernel/shuffle.hpp
     kernel/sift.hpp
     kernel/sobel.hpp
     kernel/sort.hpp

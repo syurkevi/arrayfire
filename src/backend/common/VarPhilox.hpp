@@ -4,7 +4,7 @@
 
 namespace common {
 
-uint64_t getVarPhiloxCipherBits(uint64_t capacity) {
+inline uint64_t getVarPhiloxCipherBits(uint64_t capacity) {
     if(capacity == 0) {
         return 0;
     }

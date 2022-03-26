@@ -58,17 +58,17 @@ static const uint m4x32_1 = 0xCD9E8D57;
 static const uint w32_0   = 0x9E3779B9;
 static const uint w32_1   = 0xBB67AE85;
 
-void mulhilo(const uint a, const uint b, uint* const hi, uint* const lo) {
+static void mulhilo(const uint a, const uint b, uint* const hi, uint* const lo) {
     *hi = (((uintl)a) * ((uintl)b)) >> 32;
     *lo = a * b;
 }
 
-void philoxBump(uint* const k) {
+static void philoxBump(uint* const k) {
     k[0] += w32_0;
     k[1] += w32_1;
 }
 
-void philoxRound(const uint* const k, uint* const c) {
+static void philoxRound(const uint* const k, uint* const c) {
     uint hi0, lo0, hi1, lo1;
     mulhilo(m4x32_0, c[0], &hi0, &lo0);
     mulhilo(m4x32_1, c[2], &hi1, &lo1);
@@ -78,7 +78,7 @@ void philoxRound(const uint* const k, uint* const c) {
     c[3] = lo0;
 }
 
-void philox(uint* const key, uint* const ctr) {
+static void philox(uint* const key, uint* const ctr) {
     // 10 Rounds
     philoxRound(key, ctr);
     philoxBump(key);
