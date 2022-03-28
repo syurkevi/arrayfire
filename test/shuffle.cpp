@@ -22,44 +22,36 @@ using af::dtype;
 using af::dtype_traits;
 
 TEST(Shuffle, Basic1D) {
-    array in = range(af::dim4(8192, 1, 1, 1));
-
-
-    array inn = in.copy();
-    af::array tmp = af::randu(8192);
-    af::array val, idx;
-    af::sort(val, idx, tmp);
-    af::array shuffled = inn(idx); // use original(idx, span) for rows
-
+    array in = range(af::dim4(10, 1, 1, 1));
     array out = af::shuffle(in);
-    //af_print(out)
 }
 
 TEST(Shuffle, Basic2D) {
 
-    array in = range(af::dim4(10, 4, 1, 1));
-    af_print(in);
+    array in = range(af::dim4(16536, 4, 1, 1));
     array out = af::shuffle(in);
-    af_print(out);
+}
 
-    af::setSeed(0);
-    //af::setDefaultRandomEngineType(AF_RANDOM_ENGINE_MERSENNE_GP11213);
+TEST(Shuffle, Basic3D) {
 
-    out = af::shuffle(in);
-    af_print(out);
+    array in = range(af::dim4(10, 2, 3, 1));
+    array out = af::shuffle(in);
+}
+
+TEST(Shuffle, Basic4D) {
+
+    //TODO: tests
+    array in = range(af::dim4(10, 4, 5, 6));
+    array out = af::shuffle(in);
 }
 
 TEST(Shuffle, SeedResetEqual) {
     af::setSeed(1);
     array in = range(af::dim4(10, 1, 1, 1));
     array before_seed = af::shuffle(in);
-    af_print(in);
-    af_print(before_seed);
 
     af::setSeed(1);
 
     array after_seed = af::shuffle(in);
-    af_print(in);
-    af_print(after_seed);
     ASSERT_ARRAYS_EQ(before_seed, after_seed);
 }

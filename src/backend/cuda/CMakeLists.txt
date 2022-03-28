@@ -394,6 +394,7 @@ cuda_add_library(afcuda
     resize.cpp
     rotate.cpp
     set.cu
+    shuffle.cu
     sift.cu
     sobel.cpp
     sort.cu
@@ -466,6 +467,7 @@ cuda_add_library(afcuda
     kernel/select.hpp
     kernel/shared.hpp
     kernel/shfl_intrinsics.hpp
+    kernel/shuffle.hpp
     kernel/sift.hpp
     kernel/sobel.hpp
     kernel/sort.hpp
@@ -614,6 +616,7 @@ cuda_add_library(afcuda
     set.hpp
     shift.cpp
     shift.hpp
+    shuffle.hpp
     sift.hpp
     sobel.hpp
     solve.hpp
