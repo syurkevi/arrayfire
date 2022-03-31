@@ -9,8 +9,31 @@
  ********************************************************/
 
 #define PHILOX_M2_64_0 0xD2B74407B1CE6E93
-#define w32_0  0x9E3779B9
+#define w32_0 0x9E3779B9
 #define rounds 24
+
+#if __OPENCL_VERSION__ < 200
+size_t work_group_scan_inclusive_add(local size_t *wg_temp, local size_t *arr) {
+    local int *active_buf;
+
+    const int lid = get_local_id(0);
+    size_t val    = arr[lid];
+    active_buf    = arr;
+
+    bool swap_buffer = false;
+    for (int off = 1; off <= DIMX; off *= 2) {
+        barrier(CLK_LOCAL_MEM_FENCE);
+        if (lid >= off) { val = val + active_buf[lid - off]; }
+        swap_buffer     = !swap_buffer;
+        active_buf      = swap_buffer ? wg_temp : arr;
+        active_buf[lid] = val;
+    }
+
+    size_t res = active_buf[lid];
+    return res;
+}
+#endif  // __OPENCL_VERSION__ < 200
+
 
 inline void mulhilo(const uint a, const uint b, uint *const hi, uint *const lo) {
     *hi = mul_hi(a, b);
@@ -73,8 +96,16 @@ kernel void shufflePhilox1Pass(global T* out, const KParam oinfo,
                                       right_side_bits, right_side_mask);
     size_t readFlag = (ridx < iinfo.dims[0]);
 
-    //TODO: ifdefs for block scan if not supported on card
+#if __OPENCL_VERSION__ < 200
+    local size_t wg_temp[DIMX];
+    local size_t read_flags[DIMX];
+
+    read_flags[get_local_id(0)] = readFlag;
+    readFlag = work_group_scan_inclusive_add(wg_temp, read_flags);
+#else
+    // TODO: ifdefs for block scan, if not supported on card
     readFlag = work_group_scan_inclusive_add(readFlag);
+#endif
 
     local unsigned long running_prefix;
 
@@ -175,8 +206,16 @@ kernel void shufflePhilox2Pass(global T* out,             const KParam oinfo,
                                       right_side_bits, right_side_mask);
     size_t readFlag = (ridx < iinfo.dims[0]);
 
-    //TODO: ifdefs for block scan if not supported on card
+#if __OPENCL_VERSION__ < 200
+    local size_t wg_temp[DIMX];
+    local size_t read_flags[DIMX];
+
+    read_flags[get_local_id(0)] = readFlag;
+    readFlag = work_group_scan_inclusive_add(wg_temp, read_flags);
+#else
+    // TODO: ifdefs for block scan, if not supported on card
     readFlag = work_group_scan_inclusive_add(readFlag);
+#endif
 
     local unsigned long running_prefix;
 

@@ -51,16 +51,17 @@ void shuffle(Param out, const Param in, Param block_counter, const uintl seed, u
     uint64_t right_side_bits = nBits - left_side_bits;
     uint64_t right_side_mask = (1ull << right_side_bits) - 1;
 
-    const int threads = 32;
+    const int threads_x = 32;
 
-    int nblk_x = divup(capacity, threads);
+    int nblk_x = divup(capacity, threads_x);
     int nblk_y = out.info.dims[1];
 
-    cl::NDRange local(threads, 1, 1);
+    cl::NDRange local(threads_x, 1, 1);
 
     std::vector<TemplateArg> targs   = {TemplateTypename<T>()};
     std::vector<std::string> options = {
         DefineKeyValue(T, dtype_traits<T>::getName()),
+        DefineKeyValue(DIMX, threads_x),
     };
     options.emplace_back(getTypeBuildDefinition<T>());
 
