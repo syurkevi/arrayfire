@@ -200,6 +200,8 @@ target_sources(afopencl
     set.hpp
     shift.cpp
     shift.hpp
+    shuffle.cpp
+    shuffle.hpp
     sift.cpp
     sift.hpp
     sobel.cpp
@@ -316,6 +318,7 @@ target_sources(afopencl
     kernel/scan_first_by_key.hpp
     kernel/scan_first_by_key_impl.hpp
     kernel/select.hpp
+    kernel/shuffle.hpp
     kernel/sift.hpp
     kernel/sobel.hpp
     kernel/sort.hpp

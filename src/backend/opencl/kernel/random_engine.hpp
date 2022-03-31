@@ -168,10 +168,5 @@ void initMersenneState(cl::Buffer state, cl::Buffer table, const uintl &seed) {
     CL_DEBUG_FINISH(getQueue());
 }
 
-template<typename T>
-void shuffle(cl::Buffer out, const cl::Buffer in, const uintl seed, const uintl counter) {
-
-}
-
 }  // namespace kernel
 }  // namespace opencl

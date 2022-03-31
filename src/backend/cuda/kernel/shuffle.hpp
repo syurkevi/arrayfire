@@ -96,8 +96,9 @@ __global__ void shufflePhilox1Pass(Param<T> out, CParam<T> in, volatile lookback
     // inclusive prefixes for write indexes
     if(partition_id < gridDim.x) {
 
+        bool amLastInBlock = threadIdx.x == blockDim.x-1;
         // final thread of each block will set local scan
-        if(threadIdx.x == blockDim.x-1) {
+        if(amLastInBlock) {
             lookback_table[partition_id].localsum = readFlag;
             __threadfence();
             lookback_table[partition_id].local_complete = true;
@@ -117,7 +118,7 @@ __global__ void shufflePhilox1Pass(Param<T> out, CParam<T> in, volatile lookback
             bool check_prefix_ready = false;
 
             // traverse lookback table to obtain required ids for exclusive prefix
-            if(threadIdx.x == blockDim.x - 1) {
+            if(amLastInBlock) {
                 running_prefix = 0;
                 lookback l;
                 do {
@@ -139,7 +140,7 @@ __global__ void shufflePhilox1Pass(Param<T> out, CParam<T> in, volatile lookback
             readFlag += running_prefix;
 
             // final thread to update this block's final prefix
-            if(threadIdx.x == blockDim.x - 1) {
+            if(amLastInBlock) {
                 lookback_table[partition_id].inclusive_prefix = readFlag;
                 __threadfence();
                 lookback_table[partition_id].prefix_complete = true;
@@ -193,13 +194,13 @@ __global__ void shufflePhilox2Pass(Param<T> out, CParam<T> in, volatile lookback
 
     __shared__ uint64_t running_prefix;
     if(bxid > 0) {
+        bool amLastInBlock = threadIdx.x == blockDim.x-1;
         running_prefix = 0;
-        bool check_prefix_ready = false;
         lookback l;
-        if(threadIdx.x == blockDim.x - 1) {
+        if(amLastInBlock) {
             memcpy((void*)&l, (const void*)&lookback_table[bxid-1], sizeof(lookback));
+            running_prefix = l.inclusive_prefix;
         }
-        running_prefix += l.inclusive_prefix;
         __syncthreads();
 
         readFlag += running_prefix;
@@ -208,7 +209,7 @@ __global__ void shufflePhilox2Pass(Param<T> out, CParam<T> in, volatile lookback
     uint offYZW =
         bwid * out.strides[3] + bzid * out.strides[2] + byid * out.strides[1];
 
-    if(ridx < out.dims[0] && readFlag < out.dims[0]) {
+    if(ridx < out.dims[0] && (readFlag - 1) < out.dims[0]) {
         out.ptr[offYZW + (readFlag - 1)] = in.ptr[offYZW + ridx];
     }
 }
