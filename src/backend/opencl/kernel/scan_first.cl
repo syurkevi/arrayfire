@@ -115,3 +115,112 @@ kernel void bcastFirst(global To *oData, KParam oInfo, const global To *tData,
         }
     }
 }
+
+To work_group_scan_inclusive_op(local To *wg_temp, local To *arr) {
+}
+
+struct lookback {
+    To localsum;
+    To inclusive_prefix;
+    bool local_complete;
+    bool prefix_complete;
+};
+
+kernel void scan1Pass(global To *oData, KParam oInfo,
+                      const global Ti *iData, KParam iInfo,
+                      global volatile struct lookback *lookback_table,
+                      global uint *block_counter, uint nblk_x, uint nblk_y) {
+
+    local uint partition_id;
+    if(get_local_id(0) == 0) {
+        partition_id = atomic_add(block_counter, 1);
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    uint idx  = partition_id * get_local_size(0) + get_local_id(0);
+
+    bool cond = (idx < iInfo.dims[0]);
+    To val    =  cond ? transform(iData[idx]) : init;
+
+    local To wg_temp[DIMX];
+    local To vals[DIMX];
+
+    vals[get_local_id(0)] = val;
+    To *active_buf   = vals;
+    const int lid = get_local_id(0);
+    bool swap_buffer = false;
+    for (int off = 1; off <= DIMX; off *= 2) {
+        barrier(CLK_LOCAL_MEM_FENCE);
+        if (lid >= off) { val = binOp(val, active_buf[lid - off]); }
+        swap_buffer     = !swap_buffer;
+        active_buf      = swap_buffer ? wg_temp : vals;
+        if(off != DIMX)
+            active_buf[lid] = val;
+    }
+    //val = active_buf[lid];
+    //val = work_group_scan_inclusive_add(val);
+
+    local To running_prefix;
+
+    bool amLastLocalThread = (get_local_id(0) == get_local_size(0) - 1);
+    // final thread of each block will set local scan
+    if(amLastLocalThread) {
+        lookback_table[partition_id].localsum = val;
+        mem_fence(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
+        lookback_table[partition_id].local_complete = true;
+
+        // final thread of first block will also set completed
+        // inclusive_prefix for further blocks
+        if(partition_id == 0) {
+            lookback_table[0].inclusive_prefix = val;
+            mem_fence(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
+            lookback_table[0].prefix_complete = true;
+        }
+    }
+
+    mem_fence(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
+
+    if(partition_id > 0) {
+        int lookback_id = partition_id - 1;
+        bool check_prefix_ready = false;
+
+        // traverse lookback table to obtain required ids for exclusive prefix
+        if(amLastLocalThread) {
+            running_prefix = 0;
+            struct lookback l;
+            do {
+                l = lookback_table[lookback_id];
+                check_prefix_ready = l.prefix_complete;
+                bool check_local_ready  = l.local_complete;
+
+                if(check_local_ready && !check_prefix_ready && lookback_id > 0) {
+                    running_prefix += l.localsum;
+                    lookback_id--;
+                }
+            } while(!check_prefix_ready);
+            running_prefix += l.inclusive_prefix;
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        val += running_prefix;
+
+        // final thread to update this block's final prefix
+        if(amLastLocalThread) {
+            lookback_table[partition_id].inclusive_prefix = val;
+            mem_fence(CLK_LOCAL_MEM_FENCE | CLK_GLOBAL_MEM_FENCE);
+            lookback_table[partition_id].prefix_complete = true;
+        }
+    }
+
+    if (INCLUSIVE_SCAN != 0) {
+        if(idx < oInfo.dims[0]) {
+            oData[idx] = val;
+        }
+    } else {
+        if (idx == (oInfo.dims[0] - 1)) {
+            oData[0] = init;
+        } else if (idx < (oInfo.dims[0] - 1)) {
+            oData[idx + 1] = val;
+        }
+    }
+}

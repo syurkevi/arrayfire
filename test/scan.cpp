@@ -20,6 +20,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <chrono>
+using namespace std::chrono;
 
 using af::allTrue;
 using af::array;
@@ -344,4 +346,39 @@ TEST(Scan, ExclusiveSum2D_Dim3) {
     gold = af::reorder(gold, 2, 3, 1, 0);
 
     ASSERT_ARRAYS_EQ(gold, out);
+}
+
+TEST(Scan, ExclusiveSumSpeed) {
+    af::info();
+    const int in_size = 800000;
+    //const int in_size = 80;
+    vector<int> h_in(in_size, 1);
+    vector<int> h_gold(in_size, 0);
+    for (size_t i = 1; i < h_gold.size(); ++i) {
+        h_gold[i] = h_in[i] + h_gold[i - 1];
+    }
+
+    array in(in_size, &h_in.front());
+    in.eval();
+
+    array out;
+    int nruns = 300;
+    //int nruns = 1;
+
+    auto t0 = high_resolution_clock::now();
+
+    for(int i=0; i<nruns; ++i) {
+        af::sync();
+        out = scan(in, 0, AF_BINARY_ADD, false);
+        out.eval();
+        af::sync();
+    }
+
+    auto t1 = high_resolution_clock::now();
+    auto duration = duration_cast<microseconds>(t1 - t0);
+    cout << "Time taken by function: "
+         << duration.count() / nruns << " microseconds" << endl;
+
+    //af_print(out)
+    ASSERT_VEC_ARRAY_EQ(h_gold, dim4(in_size), out);
 }

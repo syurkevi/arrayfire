@@ -67,6 +67,7 @@ static void scanFirstLauncher(Param &out, Param &tmp, const Param &in,
                               const bool isFinalPass, const uint groups_x,
                               const uint groups_y, const uint threads_x,
                               const bool inclusiveScan = true) {
+    //printf("launcher\n");
     using cl::EnqueueArgs;
     using cl::NDRange;
 
@@ -105,9 +106,18 @@ static void bcastFirstLauncher(Param &out, Param &tmp, const bool isFinalPass,
     CL_DEBUG_FINISH(getQueue());
 }
 
+struct lookback {
+    unsigned long localsum;
+    unsigned long inclusive_prefix;
+    bool local_complete;
+    bool prefix_complete;
+};
+
 template<typename Ti, typename To, af_op_t op>
 static void scanFirst(Param &out, const Param &in,
                       const bool inclusiveScan = true) {
+#if 0
+    //printf("scanFirst\n");
     uint threads_x = nextpow2(std::max(32u, (uint)out.info.dims[0]));
     threads_x      = std::min(threads_x, THREADS_PER_GROUP);
     uint threads_y = THREADS_PER_GROUP / threads_x;
@@ -148,6 +158,63 @@ static void scanFirst(Param &out, const Param &in,
 
         bufferFree(tmp.data);
     }
+#else
+    //const int threads_x = 32;
+    //uint threads_x = nextpow2(std::max(32u, (uint)out.info.dims[0]));
+    //threads_x      = std::min(threads_x, THREADS_PER_GROUP);
+    uint threads_x = 256;
+    //uint threads_y = THREADS_PER_GROUP / threads_x;
+    uint threads_y = 1;
+
+    int nblk_x = divup(out.info.dims[0], threads_x);
+    int nblk_y = out.info.dims[1];
+
+    cl::NDRange local(threads_x, 1, 1);
+
+    std::vector<TemplateArg> tmpltArgs = {
+        TemplateTypename<Ti>(),
+        TemplateTypename<To>(),
+        TemplateArg(op),
+        TemplateArg(inclusiveScan)
+    };
+
+    //TODO: remove extra params once kernel works
+    ToNumStr<To> toNumStr;
+    const uint SHARED_MEM_SIZE = THREADS_PER_GROUP;
+    std::vector<std::string> compileOpts = {
+        DefineKeyValue(Ti, dtype_traits<Ti>::getName()),
+        DefineKeyValue(To, dtype_traits<To>::getName()),
+        DefineKeyValue(T, "To"),
+        DefineKeyValue(DIMX, threads_x),
+        DefineKeyValue(DIMY, threads_y),
+        DefineKeyFromStr(binOpName<op>()),
+        DefineValue(SHARED_MEM_SIZE),
+        DefineKeyValue(init, toNumStr(common::Binary<To, op>::init())),
+        DefineKeyValue(CPLX, af::iscplx<Ti>()),
+        DefineKeyValue(IS_FINAL_PASS, 1),
+        DefineKeyValue(INCLUSIVE_SCAN, inclusiveScan),
+    };
+    compileOpts.emplace_back(getTypeBuildDefinition<Ti>());
+
+
+    auto scanFirst = common::getKernel("scan1Pass", {ops_cl_src, scan_first_cl_src},
+                                       tmpltArgs, compileOpts);
+
+    // create and initialize lookback table to 0
+    auto lookback_table = memAlloc<char>(nblk_x * sizeof(lookback));
+    getQueue().enqueueFillBuffer(*lookback_table, 0, 0, nblk_x * sizeof(lookback));
+
+    auto block_counter = memAlloc<uint>(1);
+    getQueue().enqueueFillBuffer(*block_counter, 0, 0, sizeof(uint));
+
+    cl::NDRange global(local[0] * nblk_x * out.info.dims[2],
+                       local[1] * nblk_y * out.info.dims[3], 1);
+
+    scanFirst(cl::EnqueueArgs(getQueue(), global, local), *out.data, out.info,
+              *in.data, in.info, *lookback_table, *block_counter, nblk_x, nblk_y);
+
+    CL_DEBUG_FINISH(getQueue());
+#endif
 }
 
 }  // namespace kernel
