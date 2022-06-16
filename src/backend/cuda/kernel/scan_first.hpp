@@ -70,8 +70,17 @@ static void bcast_first_launcher(Param<To> out, CParam<To> tmp,
     POST_LAUNCH_CHECK();
 }
 
+struct alignas(64) lookback {
+    uint64_t localsum;
+    uint64_t inclusive_prefix;
+    bool local_complete;
+    bool prefix_complete;
+};
+
 template<typename Ti, typename To, af_op_t op>
 static void scan_first(Param<To> out, CParam<Ti> in, bool inclusive_scan) {
+
+#if 0
     uint threads_x = nextpow2(std::max(32u, (uint)out.dims[0]));
     threads_x      = std::min(threads_x, THREADS_PER_BLOCK);
     uint threads_y = THREADS_PER_BLOCK / threads_x;
@@ -110,6 +119,44 @@ static void scan_first(Param<To> out, CParam<Ti> in, bool inclusive_scan) {
         bcast_first_launcher<To, op>(out, tmp, blocks_x, blocks_y, threads_x,
                                      inclusive_scan);
     }
+
+#else
+
+    uint threads_x = nextpow2(std::max(32u, (uint)out.dims[0]));
+    threads_x      = std::min(threads_x, THREADS_PER_BLOCK);
+
+    int nblk_x = divup(out.dims[0], threads_x);
+    int nblk_y = out.dims[1];
+
+    dim3 blocks(nblk_x * out.dims[2], nblk_y * out.dims[3]);
+
+    const int maxBlocksY =
+        cuda::getDeviceProp(cuda::getActiveDeviceId()).maxGridSize[1];
+    blocks.z = divup(blocks.y, maxBlocksY);
+    blocks.y = divup(blocks.y, blocks.z);
+
+    lookback *lookback_table;
+    CUDA_CHECK(cudaMallocAsync(&lookback_table, nblk_x * sizeof(lookback),
+                               cuda::getActiveStream()));
+    CUDA_CHECK(cudaMemsetAsync(lookback_table, 0, nblk_x * sizeof(lookback),
+                               cuda::getActiveStream()));
+
+    int *block_counter;
+    CUDA_CHECK(cudaMallocAsync(&block_counter, sizeof(int),
+                               cuda::getActiveStream()));
+    CUDA_CHECK(cudaMemsetAsync(block_counter, 0, sizeof(int),
+                               cuda::getActiveStream()));
+
+    auto scan1Pass =
+        common::getKernel("cuda::scan1Pass", {scan_first_cuh_src},
+                          {TemplateTypename<To>(), TemplateTypename<Ti>()});
+
+
+    EnqueueArgs qArgs(blocks, threads_x, getActiveStream());
+    scan1Pass(qArgs, out, in, inclusive_scan,
+              lookback_table, block_counter, nblk_x, nblk_y);
+    POST_LAUNCH_CHECK();
+#endif
 }
 
 }  // namespace kernel

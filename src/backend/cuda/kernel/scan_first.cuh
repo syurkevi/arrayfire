@@ -133,4 +133,103 @@ __global__ void scan_first_bcast(Param<To> out, CParam<To> tmp, uint blocks_x,
     }
 }
 
+template<typename To, typename Ti>
+__global__ void scan1Pass(Param<To> out, CParam<Ti> in, bool inclusive_scan,
+                          volatile lookback *lookback_table, int *block_counter,
+                          int nblk_x, int nblk_y) {
+    __shared__ uint partition_id;
+    if(threadIdx.x == 0) {
+        partition_id = atomicAdd(block_counter, 1);
+    }
+    __syncthreads();
+
+    uint idx  = partition_id * blockDim.x + threadIdx.x;
+
+    common::Transform<Ti, To, op> transform;
+    common::Binary<To, op> binop;
+    const To init = common::Binary<To, op>::init();
+
+    const Ti *iptr = in.ptr;
+    To *optr       = out.ptr;
+
+    typedef cub::BlockScan<size_t, THREADS> BlockScan;
+    __shared__ typename BlockScan::TempStorage scan_storage;
+
+    //local scan
+    bool cond = (idx < in.dims[0]);
+    To scanval    = cond ? transform(iptr[id]) : init;
+    BlockScan(scan_storage).InclusiveSum(scanval, scanval);
+
+    __shared__ uint64_t running_prefix;
+
+    // first blocks to be scheduled will fill in lookback table and determine
+    // inclusive prefixes for write indexes
+    if(partition_id < gridDim.x) {
+
+        bool amLastInBlock = threadIdx.x == blockDim.x-1;
+        // final thread of each block will set local scan
+        if(amLastInBlock) {
+            lookback_table[partition_id].localsum = scanval;
+            __threadfence();
+            lookback_table[partition_id].local_complete = true;
+
+            // final thread of first block will also set completed
+            // inclusive_prefix for further blocks
+            if(partition_id == 0) {
+                lookback_table[0].inclusive_prefix = scanval;
+                __threadfence();
+                lookback_table[0].prefix_complete = true;
+            }
+        }
+        __threadfence();
+
+        if(partition_id > 0) {
+            int lookback_id = partition_id - 1;
+            bool check_prefix_ready = false;
+
+            // traverse lookback table to obtain required ids for exclusive prefix
+            if(amLastInBlock) {
+                running_prefix = 0;
+                lookback l;
+                do {
+                    // l = lookback_table[lookback_id];
+                    memcpy((void*)&l, (const void*)&lookback_table[lookback_id], sizeof(lookback));
+                    check_prefix_ready = l.prefix_complete;
+                    bool check_local_ready  = l.local_complete;
+
+                    if(check_local_ready && !check_prefix_ready && lookback_id > 0) {
+                        running_prefix += l.localsum;
+                        lookback_id--;
+                    }
+                } while(!check_prefix_ready);
+                running_prefix += l.inclusive_prefix;
+            }
+            __syncthreads();
+
+
+            scanval += running_prefix;
+
+            // final thread to update this block's final prefix
+            if(amLastInBlock) {
+                lookback_table[partition_id].inclusive_prefix = scanval;
+                __threadfence();
+                lookback_table[partition_id].prefix_complete = true;
+            }
+        }
+    }
+
+    if (inclusive_scan != 0) {
+        if(idx < out.dims[0]) {
+            optr[idx] = scanval;
+        }
+    } else {
+        if (idx == (out.dims[0] - 1)) {
+            optr[0] = init;
+        } else if(idx < (out.dims[0] - 1)) {
+            optr[idx + 1] = scanval;
+        }
+    }
+}
+
+
 }  // namespace cuda
