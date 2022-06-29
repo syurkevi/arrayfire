@@ -1093,3 +1093,113 @@ TEST_F(Approx1NullArgs, V2UniformNullPosArray) {
     ASSERT_EQ(AF_ERR_ARG, af_approx1_uniform_v2(&this->out, this->in, 0, 0, 0.0,
                                                 1.0, AF_INTERP_LINEAR, 0.f));
 }
+
+TEST(Approx1, NonUniformSimpleNearest) {
+    float h_xi[6]   = { 0.f, 1.f, 2.f, 4.f, 4.9f, 5.f};
+    float h_yi[6]   = { 2.f, 2.f, 2.f, 3.f,  3.f, 3.f};
+    float h_xo[14]  = { -1.f, 0.f, 0.5f, 1.f, 1.5f, 2.f, 2.5f, 3.f, 3.5f, 4.f, 4.5, 5.f, 7.f, -1.f};
+    float h_res[14] = { 0.f, 2.f, 2.f, 2.f, 2.f, 2.f, 2.f, 2.f, 3.f, 3.f, 3.f, 3.f, 0.f, 0.f };
+
+    af::array xi(6, h_xi);
+    af::array yi(6, h_yi);
+    af::array xo(14, h_xo);
+    af_print(xi)
+    af_print(yi)
+    af_print(xo)
+
+    af::array yo = af::approx1(yi, xi, xo, AF_INTERP_NEAREST);
+
+    af::array res(14, h_res);
+    af_print(yo);
+    //af_print(res == yo);
+    ASSERT_TRUE(af::allTrue<bool>(res == yo));
+}
+
+TEST(Approx1, NonUniformSimpleLerp) {
+    float h_xi[6]   = {0.f, 1.f, 2.f, 4.f, 4.9f, 5.f};
+    float h_yi[6]   = {2.f, 2.f, 2.f, 3.f,  3.f, 3.f};
+    float h_xo[14]  = {-1.f, 0.f, 0.5f, 1.f, 1.5f, 2.f, 2.5f, 3.f, 3.5f, 4.f, 4.5, 5.f, 7.f, -1.f};
+    float h_res[14] = {0.f, 2.f, 2.f, 2.f, 2.f, 2.f, 2.25f, 2.50f, 2.75f, 3.f, 3.f, 3.f, 0.f, 0.f};
+
+    af::array xi(6, h_xi);
+    af::array yi(6, h_yi);
+    af::array xo(14, h_xo);
+    af_print(xi)
+    af_print(yi)
+    af_print(xo)
+
+    af::array yo = af::approx1(yi, xi, xo);
+
+    af::array res(14, h_res);
+    //af_print(res == yo);
+    ASSERT_TRUE(af::allTrue<bool>(res == yo));
+}
+
+TEST(Approx1, NonUniformSimpleCubic) {
+    float h_xi[6]   = {0.f, 1.f, 2.f, 4.f, 4.9f, 5.f};
+    float h_yi[6]   = {2.f, 2.f, 2.f, 3.f,  3.f, 3.f};
+    float h_xo[14]  = {-1.f, 0.f, 0.5f, 1.f, 1.5f, 2.f, 2.5f, 3.f, 3.5f, 4.f, 4.5, 5.f, 7.f, -1.f};
+    float h_res[14] = {0.f, 2.f, 2.f, 2.f, 2.f, 2.f, 2.25f, 2.50f, 2.75f, 3.f, 3.f, 3.f, 0.f, 0.f};
+
+    af::array xi(6, h_xi);
+    af::array yi(6, h_yi);
+    af::array xo(14, h_xo);
+    af_print(xi)
+    af_print(yi)
+    af_print(xo)
+
+    af::array yo = af::approx1(yi, xi, xo, AF_INTERP_CUBIC);
+
+    af::array res(14, h_res);
+    af_print(res);
+    //af_print(res == yo);
+    ASSERT_TRUE(af::allTrue<bool>(res == yo));
+}
+
+TEST(Approx1, NonUniformSimpleLerp2) {
+    float h_xi[6]   = { 0.f, 1.f, 2.f, 4.f, 4.9f, 5.f };
+    float h_yi[6]   = { 2.f, 2.f, 2.f, 3.f,  3.f, 3.f };
+    float h_xo[14]  = { -1.f, 0.f, 0.5f, 1.f, 1.5f, 2.f, 2.5f, 3.f, 3.5f, 4.f, 4.5, 5.f, 7.f, -1.f };
+    //float h_res[14] = { 0.f, 2.f, 2.f, 2.f, 2.f, 2.f, 2.25f, 2.50f, 2.75f, 3.f, 3.f, 3.f, 0.f, 0.f };
+    float h_res[42] = {
+        0.f, 2.f, 2.f, 2.f, 2.f, 2.f, 2.25f, 2.50f, 2.75f, 3.f, 3.f, 3.f, 0.f, 0.f,
+        2.f, 2.f, 2.f, 2.f, 2.25, 2.50, 2.75, 3.00, 3.00, 3.f, 0.f, 0.f, 0.f, 2.f,
+        2.f, 2.f, 2.25f, 2.50f, 2.75f, 3.f, 3.f, 3.f, 0.f, 0.f, 0.f, 0.f, 0.f, 2.f 
+    };
+
+    af::array xi(6, h_xi);
+    af::array yi(6, h_yi);
+    af::array xo(14, h_xo);
+    xi = af::tile(xi, 1, 3);
+    yi = af::tile(yi, 1, 3);
+    xo = af::tile(xo, 1, 3);
+    xo(af::span, 1) += 1;
+    xo(af::span, 2) += 2;
+
+    af_print(xi);
+    af_print(yi);
+    af_print(xo);
+
+    af::array yo = af::approx1(yi, xi, xo);
+
+    //af::array res(14, h_res);
+    //res = af::tile(res, 1, 3);
+    af::array res(af::dim4(14, 3), h_res);
+    af_print(yo);
+    af_print(res == yo);
+    ASSERT_TRUE(af::allTrue<bool>(res == yo));
+
+//   af::array yi = af::range(5, 3);
+//   af::array xo = 1 + 0.2 * af::range(6);
+//   //af::array xo = 1 + 0.2 * af::range(6, 3);
+//   //xo(af::span, 1) += 1;
+//   //xo(af::span, 2) += 2;
+//   af_print(yi)
+//   af_print(xo)
+//
+//   af_print(approx1(yi, xo));
+
+}
+
+
+//TODO[STF]: test each assert in approx_nonuniform in separate test

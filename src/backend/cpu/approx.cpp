@@ -38,6 +38,31 @@ void approx1(Array<Ty> &yo, const Array<Ty> &yi, const Array<Tp> &xo,
     }
 }
 
+
+template<typename Ty, typename Tp>
+void approx1(Array<Ty> &yo, const Array<Ty> &yi, const Array<Tp> &xi,
+             const Array<Tp> &xo, const int xdim,
+             const af_interp_type method, const float offGrid) {
+    switch (method) {
+        case AF_INTERP_NEAREST:
+        case AF_INTERP_LOWER:
+            getQueue().enqueue(kernel::approx1_nonuniform<Ty, Tp, 1>, yo, yi, xi, xo,
+                    xdim, offGrid, method);
+            break;
+        case AF_INTERP_LINEAR:
+        case AF_INTERP_LINEAR_COSINE:
+            getQueue().enqueue(kernel::approx1_nonuniform<Ty, Tp, 2>, yo, yi, xi, xo,
+                    xdim, offGrid, method);
+            break;
+        case AF_INTERP_CUBIC:
+        case AF_INTERP_CUBIC_SPLINE:
+            getQueue().enqueue(kernel::approx1_nonuniform<Ty, Tp, 3>, yo, yi, xi, xo,
+                    xdim, offGrid, method);
+            break;
+        default: break;
+    }
+}
+
 template<typename Ty, typename Tp>
 void approx2(Array<Ty> &zo, const Array<Ty> &zi, const Array<Tp> &xo,
              const int xdim, const Tp &xi_beg, const Tp &xi_step,
@@ -80,7 +105,13 @@ void approx2(Array<Ty> &zo, const Array<Ty> &zi, const Array<Tp> &xo,
         Array<Ty> & zo, const Array<Ty> &zi, const Array<Tp> &xo, \
         const int xdim, const Tp &xi_beg, const Tp &xi_step,      \
         const Array<Tp> &yo, const int ydim, const Tp &yi_beg,    \
-        const Tp &yi_step, const af_interp_type method, const float offGrid);
+        const Tp &yi_step, const af_interp_type method,           \
+        const float offGrid);                                     \
+    template void approx1(Array<Ty> &yo, const Array<Ty> &yi,     \
+            const Array<Tp> &xi, const Array<Tp> &xo,             \
+            const int xdim, const af_interp_type method,          \
+            const float offGrid);
+
 
 INSTANTIATE(float, float)
 INSTANTIATE(double, double)

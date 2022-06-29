@@ -45,4 +45,12 @@ array approx2(const array &zi, const array &xo, const int xdim,
                                 offGrid));
     return array(zo);
 }
+
+array approx1(const array &yi, const array &xi, const array &xo,
+              const interpType method, const float off_grid) {
+    af_array yo = 0;
+    AF_THROW(af_approx1_nonuniform(&yo, yi.get(), xi.get(), xo.get(), method, off_grid));
+    return array(yo);
+}
+
 }  // namespace af

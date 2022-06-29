@@ -73,6 +73,95 @@ void approx1(Param<InT> yo, CParam<InT> yi, CParam<LocT> xo, const int xdim,
 }
 
 template<typename InT, typename LocT, int order>
+void approx1_nonuniform(Param<InT> yo, CParam<InT> yi, CParam<LocT> xi, CParam<LocT> xo,
+                        const int xdim, const float offGrid, af_interp_type method) {
+    InT *yo_ptr        = yo.get();
+    const LocT *xi_ptr = xi.get();
+    const LocT *xo_ptr = xo.get();
+
+    const af::dim4 yo_dims = yo.dims();
+    const af::dim4 yi_dims = yi.dims();
+    const af::dim4 xi_dims = xi.dims();
+    const af::dim4 xo_dims = xo.dims();
+
+    const af::dim4 yo_strides = yo.strides();
+    const af::dim4 yi_strides = yi.strides();
+    const af::dim4 xi_strides = xi.strides();
+    const af::dim4 xo_strides = xo.strides();
+
+    Interp1<InT, LocT, order> interp;
+    bool is_xo_off[] = {xo_dims[0] > 1, xo_dims[1] > 1, xo_dims[2] > 1,
+                        xo_dims[3] > 1};
+    bool is_yi_off[] = {true, true, true, true};
+    is_yi_off[xdim]  = false; //is this right for offset?
+    // is_xi_off = is_yi_off
+
+    for (dim_t idw = 0; idw < yo_dims[3]; idw++) {
+        for (dim_t idz = 0; idz < yo_dims[2]; idz++) {
+            dim_t yo_off_zw = idw * yo_strides[3] + idz * yo_strides[2];
+            dim_t yi_off_zw = idw * yi_strides[3] * is_yi_off[3] +
+                              idz * yi_strides[2] * is_yi_off[2];
+            dim_t xi_off_zw = idw * xi_strides[3] * is_yi_off[3] +
+                              idz * xi_strides[2] * is_yi_off[2];
+            dim_t xo_off_zw = idw * xo_strides[3] * is_xo_off[3] +
+                              idz * xo_strides[2] * is_xo_off[2];
+
+            for (dim_t idy = 0; idy < yo_dims[1]; idy++) {
+                dim_t yo_off = yo_off_zw + idy * yo_strides[1];
+                dim_t yi_off = yi_off_zw + idy * yi_strides[1] * is_yi_off[1];
+                dim_t xi_off = xi_off_zw + idy * xi_strides[1] * is_yi_off[1];
+                dim_t xo_off = xo_off_zw + idy * xo_strides[1] * is_xo_off[1];
+
+                for (dim_t idx = 0; idx < yo_dims[0]; idx++) {
+                    LocT qx = xo_ptr[xo_off + idx * is_xo_off[0]];
+
+                    // each query point will need to be checked against all possible input points
+                    dim_t xi_idx = 0;
+                    LocT currentMinLoc = xi_ptr[xi_idx];
+                    do {
+                        if(xi_idx == xi_dims[0] - 1) {
+                            break;
+                        }
+                        if(qx > xi_ptr[xi_off + xi_idx + 1]) {
+                            currentMinLoc = xi_ptr[++xi_idx];
+                        } else{
+                            break;
+                        }
+                    } while(true);
+
+                    // handle oob cases first
+                    if(xi_idx == 0 && qx < xi_ptr[xi_off + xi_idx]) {
+                        yo_ptr[yo_off + idx] = scalar<InT>(offGrid);
+                        continue;
+                    }
+                    if(xi_idx == (xi_dims[0] - 1) && qx > xi_ptr[xi_off + xi_idx]) {
+                        yo_ptr[yo_off + idx] = scalar<InT>(offGrid);
+                        continue;
+                    }
+
+                    const LocT x0 = xi_ptr[xi_off + xi_idx];
+                    const LocT dx = xi_ptr[xi_off + xi_idx + 1] - x0;
+                    const LocT x = (qx - x0) / (dx);
+                    // printf( "x0->x1(%f, %f), dx%f, x:%f \n", x0, xi_ptr[xi_off + xi_idx + 1], dx, x);
+
+                    // FIXME: Only cubic interpolation is doing clamping
+                    // We need to make it consistent across all methods
+                    // Not changing the behavior because tests will fail
+                    bool clamp = order == 3;
+
+
+                    //dim_t yi_idx = xi_idx * is_yi_off[0];
+                    dim_t yi_idx = xi_idx;
+                    //printf("%d: %f\n", yi_idx, yi.get()[yi_off + yi_idx]);
+                    interp(yo, yo_off + idx, yi, yi_off + yi_idx, x, method,
+                           1, clamp, xdim);
+                }
+            }
+        }
+    }
+}
+
+template<typename InT, typename LocT, int order>
 void approx2(Param<InT> zo, CParam<InT> zi, CParam<LocT> xo, const int xdim,
              const LocT &xi_beg, const LocT &xi_step, CParam<LocT> yo,
              const int ydim, const LocT &yi_beg, const LocT &yi_step,

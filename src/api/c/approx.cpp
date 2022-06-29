@@ -32,6 +32,14 @@ inline void approx1(af_array *yo, const af_array yi, const af_array xo,
     approx1<Ty>(getArray<Ty>(*yo), getArray<Ty>(yi), getArray<Tp>(xo), xdim,
                 xi_beg, xi_step, method, offGrid);
 }
+
+template<typename Ty, typename Tp>
+inline void approx1(af_array *yo, const af_array yi, const af_array xi, const af_array xo,
+                    const int xdim, const af_interp_type method, const float offGrid) {
+
+    approx1<Ty, Tp>(getArray<Ty>(*yo), getArray<Ty>(yi), getArray<Tp>(xi),
+                getArray<Tp>(xo), xdim, method, offGrid);
+}
 }  // namespace
 
 template<typename Ty, typename Tp>
@@ -155,6 +163,86 @@ af_err af_approx1_v2(af_array *yo, const af_array yi, const af_array xo,
     try {
         ARG_ASSERT(0, yo != 0);  // need to dereference yo in next call
         af_approx1_common(yo, yi, xo, 0, 0.0, 1.0, method, offGrid, *yo == 0);
+    }
+    CATCHALL;
+
+    return AF_SUCCESS;
+}
+
+af_err af_approx1_nonuniform(af_array *yo, const af_array yi, const af_array xi,
+                             const af_array xo, const af_interp_type method,
+                             const float offGrid) {
+    try {
+        ARG_ASSERT(0, yo != 0);  // *yo (the af_array) can be null, but not yo
+        ARG_ASSERT(1, yi != 0);
+        ARG_ASSERT(2, xi != 0);
+        ARG_ASSERT(3, xo != 0);
+
+        const ArrayInfo &yi_info = getInfo(yi);
+        const ArrayInfo &xi_info = getInfo(xi);
+        const ArrayInfo &xo_info = getInfo(xo);
+
+        const dim4 &yi_dims = yi_info.dims();
+        const dim4 &xi_dims = xi_info.dims();
+        const dim4 &xo_dims = xo_info.dims();
+
+        dim4 yo_dims        = yi_dims;
+        const int xdim = 0; //TODO: add param? or remove? (for 2d approx w/dim param)
+        //ARG_ASSERT(3, xdim >= 0 && xdim < 4);
+        yo_dims[xdim]       = xo_dims[xdim];
+
+        ARG_ASSERT(1, yi_info.isFloating());      // Only floating and complex types
+        ARG_ASSERT(2, xi_info.isRealFloating());  // Only floating types
+
+        ARG_ASSERT(1, yi_dims == xi_dims);
+
+        ARG_ASSERT(3, xo_info.isRealFloating());  // Only floating types
+        ARG_ASSERT(1, yi_info.isSingle() ==
+                          xo_info.isSingle());  // Must have same precision
+        ARG_ASSERT(1, yi_info.isDouble() ==
+                          xo_info.isDouble());  // Must have same precision
+        ARG_ASSERT(2, xi_info.isSingle() ==
+                          xo_info.isSingle());  // Must have same precision
+        ARG_ASSERT(2, xi_info.isDouble() ==
+                          xo_info.isDouble());  // Must have same precision
+
+        // POS should either be (x, 1, 1, 1) or (1, yi_dims[1], yi_dims[2],
+        // yi_dims[3])
+        if (xo_dims[xdim] != xo_dims.elements()) {
+            for (int i = 0; i < 4; i++) {
+                if (xdim != i) { DIM_ASSERT(2, xo_dims[i] == yi_dims[i]); }
+            }
+        }
+        ARG_ASSERT(
+            6, (method == AF_INTERP_CUBIC || method == AF_INTERP_CUBIC_SPLINE ||
+                method == AF_INTERP_LINEAR || method == AF_INTERP_LINEAR_COSINE ||
+                method == AF_INTERP_LOWER || method == AF_INTERP_NEAREST));
+
+        if (yi_dims.ndims() == 0 || xo_dims.ndims() == 0 || xi_dims.ndims() == 0) {
+            af_create_handle(yo, 0, nullptr, yi_info.getType());
+            return AF_SUCCESS;
+        }
+
+        //TODO: allocate optionally? or always accept handle?
+        *yo = createHandle(yo_dims, yi_info.getType());
+
+        DIM_ASSERT(0, getInfo(*yo).dims() == yo_dims);
+
+        switch (yi_info.getType()) {
+            case f32:
+                approx1<float, float>(yo, yi, xi, xo, xdim, method, offGrid);
+                break;
+            case f64:
+                approx1<double, double>(yo, yi, xi, xo, xdim, method, offGrid);
+                break;
+            case c32:
+                approx1<cfloat, float>(yo, yi, xi, xo, xdim, method, offGrid);
+                break;
+            case c64:
+                approx1<cdouble, double>(yo, yi, xi, xo, xdim, method, offGrid);
+                break;
+            default: TYPE_ERROR(1, yi_info.getType());
+        }
     }
     CATCHALL;
 

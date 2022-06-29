@@ -82,6 +82,12 @@ af_err af_set_fft_plan_cache_size(size_t cache_size) {
     CALL(af_set_fft_plan_cache_size, cache_size);
 }
 
+af_err af_approx1_nonuniform(af_array *yo, const af_array yi, const af_array xi,
+                             const af_array xo, const af_interp_type method, const float offGrid) {
+    CHECK_ARRAYS(yo, yi, xo, xi);
+    CALL(af_approx1_nonuniform, yo, yi, xi, xo, method, offGrid);
+}
+
 #define FFT_HAPI_DEF(af_func)                               \
     af_err af_func(af_array in, const double norm_factor) { \
         CHECK_ARRAYS(in);                                   \

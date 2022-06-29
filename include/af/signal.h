@@ -35,6 +35,30 @@ class dim4;
 AFAPI array approx1(const array &in, const array &pos,
                     const interpType method = AF_INTERP_LINEAR, const float off_grid = 0.0f);
 
+#if AF_API_VERSION >= 39
+/**
+   C++ Interface for data interpolation on one-dimensional signals.
+   This function handles non-linear spacing of the input data.
+
+   \param[in]  data      is the multidimensional input array. Values assumed
+                         to lie at locations provided by dataloc
+   \param[in]  dataloc   provides the locations of the input data. data = f(dataloc)
+                         should be monotonically increasing.
+   \param[in]  query_pos positions of the interpolation points along the first
+                         dimension.
+   \param[in]  method    is the interpolation method to be used. The following types (defined in enum \ref af_interp_type)
+                         are supported: nearest neighbor, linear, and cubic.
+   \param[in]  off_grid  is the default value for any indices outside the valid range of indices.
+   \returns    the interpolated array.
+
+   //TODO[STF]: example snippet?
+
+   \ingroup signal_func_approx1
+ */
+AFAPI array approx1(const array &data, const array &dataloc, const array &query_pos,
+                    const interpType method = AF_INTERP_LINEAR, const float off_grid = 0.0f);
+#endif
+
 /**
    C++ Interface for data interpolation on two-dimensional signals.
 
@@ -799,6 +823,33 @@ extern "C" {
  */
 AFAPI af_err af_approx1(af_array *out, const af_array in, const af_array pos,
                         const af_interp_type method, const float off_grid);
+
+#if AF_API_VERSION >= 39
+/**
+   C Interface for data interpolation on one-dimensional signals.
+   This function handles non-linear spacing of the input data.
+
+   \param[out] out       is the interpolated array.
+   \param[in]  data      is the multidimensional input array. Values assumed
+                         to lie at locations provided by dataloc
+   \param[in]  dataloc   provides the locations of the input data. data = f(dataloc)
+                         should be monotonically increasing.
+   \param[in]  query_pos positions of the interpolation points along the first
+                         dimension.
+   \param[in]  method    is the interpolation method to be used. The following
+                         types (defined in enum \ref af_interp_type)
+                         are supported: nearest neighbor, linear, and cubic.
+   \param[in]  off_grid  is the default value for any indices outside the
+                         valid range of indices.
+
+   \return \ref AF_SUCCESS if the interpolation operation is successful,
+           otherwise an appropriate error code is returned.
+
+   \ingroup signal_func_approx1
+ */
+AFAPI af_err af_approx1_nonuniform(af_array *out, const af_array data, const af_array dataloc,
+                                   const af_array query_pos, const af_interp_type method, const float off_grid);
+#endif
 
 #if AF_API_VERSION >= 37
 /**
