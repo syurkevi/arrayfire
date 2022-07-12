@@ -10,7 +10,10 @@
 #include <approx.hpp>
 #include <kernel/approx.hpp>
 #include <platform.hpp>
+#include <solve.hpp>
+#include <blas.hpp>
 #include <af/dim4.hpp>
+#include <common/debug.hpp>
 
 namespace cpu {
 
@@ -31,9 +34,52 @@ void approx1(Array<Ty> &yo, const Array<Ty> &yi, const Array<Tp> &xo,
             break;
         case AF_INTERP_CUBIC:
         case AF_INTERP_CUBIC_SPLINE:
-            getQueue().enqueue(kernel::approx1<Ty, Tp, 3>, yo, yi, xo, xdim,
-                               xi_beg, xi_step, offGrid, method);
-            break;
+            {
+                unsigned minval = 4;
+                Ty lder;
+                Ty rder;
+
+                size_t npts = yi.dims()[xdim];
+                //SHOW(yi.dims(), xdim, npts);
+
+                //TODO: create diff array
+                Array<Ty> diffs = createEmptyArray<Ty>(af::dim4(npts));
+                printf("xdim%d\n",xdim);
+                getQueue().enqueue(kernel::calcDiffs<Ty>, diffs, yi, xdim);
+
+                //TODO: create collocation matrix
+                Array<Ty> collocM = createValueArray<Ty>(af::dim4(npts, npts), (Ty)0);
+                getQueue().enqueue(kernel::fillCollocationMatrix<Ty>, collocM);
+
+                //TODO: transform to upper triangular
+
+                //TODO: transform rhs
+
+                //TODO: solve Ax = b
+                Array<Ty> ders = solve(collocM, diffs);
+                // TODO: Array<T> solve(collocM, diffs, AF_MAT_UPPER);
+                //getQueue().enqueue(kernel::pd<Ty>, ders);
+
+                //TODO: use derivatives to figure out coefficients
+
+                //TODO: pass to cubicInterpFunc to perform actual interp
+                //
+
+                //TODO: test:
+                //      solve vs upper triangle for larger n
+                //      solve vs sparse solve " "
+
+
+                /*
+                Array<Ty> ver = matmul(collocM,  ders, AF_MAT_NONE, AF_MAT_NONE);
+                getQueue().enqueue(kernel::pd<Ty>, ver);
+                */
+
+
+                getQueue().enqueue(kernel::approx1<Ty, Tp>, yo, yi, xo, ders, xdim,
+                                   xi_beg, xi_step, offGrid, method);
+                break;
+            }
         default: break;
     }
 }
