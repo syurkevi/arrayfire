@@ -169,6 +169,8 @@ target_sources(afcpu
     sparse_arith.hpp
     sparse_blas.cpp
     sparse_blas.hpp
+    sparse_solve.cpp
+    sparse_solve.hpp
     surface.cpp
     surface.hpp
     susan.cpp
