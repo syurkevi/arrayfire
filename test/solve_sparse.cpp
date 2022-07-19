@@ -41,7 +41,6 @@ using std::string;
 using std::vector;
 
 
-//TODO: no b for sparse?
 template<typename T>
 void sparseSolveTester(const int m, const int n, const int k, af_storage sstype, double eps,
                        int targetDevice = -1) {
@@ -236,3 +235,40 @@ TYPED_TEST(SparseSolve, LeastSquaresOverDeterminedMultipleOfTwoLarge) {
     sparseSolveOverUnderDeterminedTester<TypeParam>(1536, 1024, 1, AF_STORAGE_CSR, eps<TypeParam>());
 }
 
+//currently unsupported
+TEST(SparseSolve, SquareCOO) {
+    deviceGC();
+    if (noLAPACKTests()) return;
+
+    array A  = cpu_randu<float>(dim4(10, 10));
+    A(A < 0.2f) = 0.f;
+
+    array X0 = cpu_randu<float>(dim4(10));
+    array B0 = matmul(A, X0);
+
+    array A_sparse = af::sparse(A, AF_STORAGE_COO);
+    try {
+        array X1 = solve(A_sparse, B0);
+        FAIL();
+    } catch (af::exception &e) { ASSERT_EQ(e.err(), AF_ERR_ARG); }
+}
+
+//currently unsupported
+TEST(SparseSolve, SquareCSC) {
+    deviceGC();
+
+    if (noLAPACKTests()) return;
+
+    array A     = cpu_randu<float>(dim4(10, 10));
+    A(A < 0.2f) = 0.f;
+
+    array X0 = cpu_randu<float>(dim4(10));
+    array B0 = matmul(A, X0);
+
+    try {
+        //TODO: move outside once conversion is valid
+        array A_sparse = af::sparse(A, AF_STORAGE_CSC);
+        array X1 = solve(A_sparse, B0);
+        FAIL();
+    } catch (af::exception &e) { ASSERT_EQ(e.err(), AF_ERR_ARG); }
+}
