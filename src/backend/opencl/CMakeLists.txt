@@ -218,6 +218,8 @@ target_sources(afopencl
     sparse_arith.hpp
     sparse_blas.cpp
     sparse_blas.hpp
+    sparse_solve.cpp
+    sparse_solve.hpp
     sum.cpp
     surface.cpp
     surface.hpp
@@ -379,6 +381,8 @@ target_sources(afopencl
     cpu/cpu_qr.hpp
     cpu/cpu_solve.cpp
     cpu/cpu_solve.hpp
+    cpu/cpu_sparse_solve.cpp
+    cpu/cpu_sparse_solve.hpp
     cpu/cpu_sparse_blas.cpp
     cpu/cpu_sparse_blas.hpp
     cpu/cpu_svd.cpp

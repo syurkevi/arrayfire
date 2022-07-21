@@ -314,6 +314,8 @@ cuda_add_library(af_cuda_static_cuda_library STATIC
     sparse_arith.hpp
     sparse_blas.cu
     sparse_blas.hpp
+    sparse_solve.cu
+    sparse_solve.hpp
     solve.cu
     solve.hpp
 
@@ -648,6 +650,7 @@ cuda_add_library(afcuda
     sparse.hpp
     sparse_arith.hpp
     sparse_blas.hpp
+    sparse_solve.hpp
     surface.cpp
     surface.hpp
     susan.cpp

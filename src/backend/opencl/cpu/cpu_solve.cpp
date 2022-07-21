@@ -167,13 +167,12 @@ Array<T> solveLU(const Array<T> &A, const Array<int> &pivot, const Array<T> &b,
 
     Array<T> B = copyArray<T>(b);
 
-    mapped_ptr<T> aPtr   = A.getMappedPtr();
-    mapped_ptr<T> bPtr   = B.getMappedPtr();
+    mapped_ptr<T>   aPtr = A.getMappedPtr();
+    mapped_ptr<T>   bPtr = B.getMappedPtr();
     mapped_ptr<int> pPtr = pivot.getMappedPtr();
 
     getrs_func<T>()(AF_LAPACK_COL_MAJOR, 'N', N, NRHS, aPtr.get(),
                     A.strides()[1], pPtr.get(), bPtr.get(), B.strides()[1]);
-
     return B;
 }
 
