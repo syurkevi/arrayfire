@@ -62,18 +62,22 @@ void sparseSolveTester(const int m, const int n, const int k, af_storage sstype,
     array B0 = matmul(A, X0);
 
     array A_sparse = af::sparse(A, sstype);
-    //af_print(A);
-    //af_print(A_sparse);
 
-    array Xsol = solve(A, B0);
+    af_print(A_sparse);
+    af_print(A);
+
+    //array Xsol = solve(A, B0);
     //af_print(Xsol);
 
     cout << A.dims() << " x ";
-    cout << Xsol.dims() << "= ? " << endl;
+    //cout << Xsol.dims() << "= ? " << endl;
     cout << B0.dims() <<endl;
 
+    //af_print(B0);
+    //af_print(dot(B0,B0));
     array X1 = solve(A_sparse, B0);
-    //af_print(X1);
+    af_print(X0);
+    af_print(X1);
 
     array B1 = matmul(A, X1);
 
@@ -175,6 +179,10 @@ TYPED_TEST(SparseSolve, Square) {
     sparseSolveTester<TypeParam>(5, 5, 1, AF_STORAGE_CSR, eps<TypeParam>());
 }
 
+TYPED_TEST(SparseSolve, SquareMultipleRHS) {
+    sparseSolveTester<TypeParam>(5, 5, 4, AF_STORAGE_CSR, eps<TypeParam>());
+}
+
 TYPED_TEST(SparseSolve, SquareMultipleOfTwo) {
     sparseSolveTester<TypeParam>(96, 96, 16, AF_STORAGE_CSR, eps<TypeParam>());
 }
@@ -272,3 +280,6 @@ TEST(SparseSolve, SquareCSC) {
         FAIL();
     } catch (af::exception &e) { ASSERT_EQ(e.err(), AF_ERR_ARG); }
 }
+
+//TODO: test different sparsity percentages
+//

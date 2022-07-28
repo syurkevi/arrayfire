@@ -326,6 +326,7 @@ target_sources(afopencl
     kernel/sort_helper.hpp
     kernel/sparse.hpp
     kernel/sparse_arith.hpp
+    kernel/sparse_diag.hpp
     kernel/susan.hpp
     kernel/swapdblk.hpp
     kernel/tile.hpp
