@@ -545,6 +545,8 @@ cuda_add_library(afcuda
     cufft.hpp
     cusolverDn.cpp
     cusolverDn.hpp
+    cusolverSp.cpp
+    cusolverSp.hpp
     cusparse.cpp
     cusparse.hpp
     cusparseModule.cpp

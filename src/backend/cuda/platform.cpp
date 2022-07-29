@@ -28,6 +28,7 @@
 #include <cublas.hpp>
 #include <cufft.hpp>
 #include <cusolverDn.hpp>
+#include <cusolverSp.hpp>
 #include <cusparse.hpp>
 #include <cusparseModule.hpp>
 #include <device_manager.hpp>
@@ -152,6 +153,21 @@ unique_handle<cusolverDnHandle_t> *cusolverManager(const int deviceId) {
     // cuSolver Streams patch:
     // CUDA_CHECK(cudaStreamSynchronize(cuda::getStream(deviceId)));
 
+    return &handles[deviceId];
+}
+
+unique_handle<cusolverSpHandle_t> *cusolverSpManager(const int deviceId) {
+    thread_local unique_handle<cusolverSpHandle_t>
+        handles[DeviceManager::MAX_DEVICES];
+    thread_local once_flag initFlags[DeviceManager::MAX_DEVICES];
+    call_once(initFlags[deviceId], [&] {
+        handles[deviceId].create();
+        // TODO(pradeep) When multiple streams per device
+        // is added to CUDA backend, move the cublasSetStream
+        // call outside of call_once scope.
+        CUSOLVER_SP_CHECK(
+            cusolverSpSetStream(handles[deviceId], cuda::getStream(deviceId)));
+    });
     return &handles[deviceId];
 }
 
@@ -502,6 +518,10 @@ cudnnHandle_t nnHandle() {
 
 SolveHandle solverDnHandle() {
     return *cusolverManager(cuda::getActiveDeviceId());
+}
+
+SolveSpHandle solverSpHandle() {
+    return *cusolverSpManager(cuda::getActiveDeviceId());
 }
 
 SparseHandle sparseHandle() {

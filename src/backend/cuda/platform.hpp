@@ -21,6 +21,7 @@
  *  * cuBLAS
  *  * cuSparse
  *  * cuSolver
+ *  * cuSolverSp
  */
 struct cublasContext;
 typedef struct cublasContext* BlasHandle;
@@ -28,6 +29,8 @@ struct cusparseContext;
 typedef struct cusparseContext* SparseHandle;
 struct cusolverDnContext;
 typedef struct cusolverDnContext* SolveHandle;
+struct cusolverSpContext;
+typedef struct cusolverSpContext* SolveSpHandle;
 
 #ifdef WITH_CUDNN
 struct cudnnContext;
@@ -134,5 +137,7 @@ cudnnHandle_t nnHandle();
 SolveHandle solverDnHandle();
 
 SparseHandle sparseHandle();
+
+SolveSpHandle solverSpHandle();
 
 }  // namespace cuda

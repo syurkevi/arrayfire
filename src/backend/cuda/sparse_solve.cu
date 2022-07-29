@@ -14,9 +14,10 @@
 #include <cudaDataType.hpp>
 #include <cuda_runtime.h>
 #include <cusparse.hpp>
+#include <copy.hpp>
 
 #include <cusparse.h>
-#include <cusolverSp.h>
+#include <cusolverSp.hpp>
 #include <cusparseModule.hpp>
 #include <cusparse_descriptor_helpers.hpp>
 #include <math.hpp>
@@ -55,6 +56,43 @@ struct csrlsvlu_func_def_t {
                                                   int*);
 };
 
+template<typename T>
+struct csrlsvqr_func_def_t {
+    typedef cusolverStatus_t (*csrlsvqr_func_def)(cusolverSpHandle_t,
+                                                  int, int, cusparseMatDescr_t,
+                                                  const T*, const int*, const int*,
+                                                  const T*,
+                                                  float, int,
+                                                  T*,
+                                                  int*);
+};
+
+//cusolverStatus_t 
+//cusolverSpScsrlsqvqr[Host](cusolverSpHandle_t handle,
+//   int m,
+//   int n,
+//   int nnz,
+//   const cusparseMatDescr_t descrA,
+//   const float *csrValA,
+//   const int *csrRowPtrA,
+//   const int *csrColIndA,
+//   const float *b,
+//   float tol,
+//   int *rankA,
+//   float *x,
+//   int *p,
+//   float *min_norm);
+template<typename T>
+struct csrlsqvqr_func_def_t {
+    typedef cusolverStatus_t (*csrlsqvqr_func_def)(cusolverSpHandle_t,
+                                                  int, int, int, cusparseMatDescr_t,
+                                                  const T*, const int*, const int*,
+                                                  const T*,
+                                                  float, int*,
+                                                  T*, int*,
+                                                  float*);
+};
+
 #define SOLVE_FUNC_DEF(FUNC) \
     template<typename T>     \
     typename FUNC##_func_def_t<T>::FUNC##_func_def FUNC##_func();
@@ -66,35 +104,81 @@ struct csrlsvlu_func_def_t {
                cusolverSp##PREFIX##FUNC;                                    \
     }
 
-SOLVE_FUNC_DEF(csrlsvlu)
-SOLVE_FUNC(csrlsvlu, float, S)
-SOLVE_FUNC(csrlsvlu, double, D)
-SOLVE_FUNC(csrlsvlu, cfloat, C)
-SOLVE_FUNC(csrlsvlu, cdouble, Z)
+//SOLVE_FUNC_DEF(csrlsvlu)
+//SOLVE_FUNC(csrlsvlu, float, S)
+//SOLVE_FUNC(csrlsvlu, double, D)
+//SOLVE_FUNC(csrlsvlu, cfloat, C)
+//SOLVE_FUNC(csrlsvlu, cdouble, Z)
+
+// qr linear solvers
+SOLVE_FUNC_DEF(csrlsvqr)
+SOLVE_FUNC(csrlsvqr, float, S)
+SOLVE_FUNC(csrlsvqr, double, D)
+SOLVE_FUNC(csrlsvqr, cfloat, C)
+SOLVE_FUNC(csrlsvqr, cdouble, Z)
+
+//TODO: undefined??wtf
+// least-squares solvers
+//SOLVE_FUNC_DEF(csrlsqvqr)
+//SOLVE_FUNC(csrlsqvqr, float, S)
+//SOLVE_FUNC(csrlsqvqr, double, D)
+//SOLVE_FUNC(csrlsqvqr, cfloat, C)
+//SOLVE_FUNC(csrlsqvqr, cdouble, Z)
 #endif
 
 
 template<typename T>
 Array<T> generalSolveSparse(const common::SparseArray<T> &a, const Array<T> &b) {
+    static constexpr double abstol = 1e-8;
+    static constexpr int reorder = 0;
+
     dim4 aDims = a.dims();
     int M = aDims[0];
     int N = aDims[1];
     int K = b.dims()[1];
 
-    Array<T> B = copyArray<T>(b);
+    Array<T> X = copyArray<T>(b);
+
+    Array<T>   vals   = a.getValues();
+    Array<int> rowIdx = a.getRowIdx();
+    Array<int> colIdx = a.getColIdx();
 
 #if defined(AF_USE_NEW_CUSPARSE_API)
+    //TODO: check new vs. old API
     auto info = memAlloc<int>(1);
 
-    //csrlsvlu_func<T>()(
-    /*
-    CUSOLVER_CHECK(getrs_func<T>()(solverDnHandle(), CUBLAS_OP_N, N, K, A.get(),
-                                   A.strides()[1], pivot.get(), B.get(),
-                                   B.strides()[1], info.get()));
-    */
+    cusparseMatDescr_t descrA;
+    cusparseModule &_ = getCusparsePlugin();
+    CUSPARSE_CHECK(_.cusparseCreateMatDescr(&descrA));
+    CUSPARSE_CHECK(_.cusparseSetMatType(descrA, CUSPARSE_MATRIX_TYPE_GENERAL));
+    CUSPARSE_CHECK(_.cusparseSetMatIndexBase(descrA, CUSPARSE_INDEX_BASE_ZERO));
 
+    int singularity;
+
+    CUSOLVER_SP_CHECK(csrlsvqr_func<T>()(solverSpHandle(),
+                                         M, vals.elements(),
+                                         descrA,
+                                         vals.get(),
+                                         rowIdx.get(),
+                                         colIdx.get(),
+                                         b.get(),
+                                         abstol,
+                                         reorder,
+                                         X.get(),
+                                         &singularity));
+
+    CUSPARSE_CHECK(_.cusparseDestroyMatDescr(descrA));
+#else
+    //TODO: keep? assume toolkit >10.x
+    //cusparseModule &_ = getCusparsePlugin();
+    //// Create Sparse Matrix Descriptor
+    //cusparseMatDescr_t descr = 0;
+    //CUSPARSE_CHECK(_.cusparseCreateMatDescr(&descr));
+    //CUSPARSE_CHECK(_.cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL));
+    //CUSPARSE_CHECK(_.cusparseSetMatIndexBase(descr, CUSPARSE_INDEX_BASE_ZERO));
 #endif
-    return B;
+
+    return X;
 }
 
 template<typename T>
@@ -117,6 +201,7 @@ Array<T> leastSquaresSparse(const common::SparseArray<T> &a, const Array<T> &b) 
 template<typename T>
 Array<T> sparse_solve(const common::SparseArray<T> &a, const Array<T> &b,
                       const af_mat_prop options) {
+
     Array<T> X = copyArray(b);
 
     dim4 aDims = a.dims();
