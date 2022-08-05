@@ -39,6 +39,26 @@ cdouble operator*(cdouble lhs, cdouble rhs) {
     return out;
 }
 
+cfloat operator/(cfloat lhs, cfloat rhs) {
+    cfloat out;
+    float denom = (rhs.s[0] * rhs.s[0] + rhs.s[1] * rhs.s[1]);
+    out.s[0] = (lhs.s[0] * rhs.s[0] + lhs.s[1] * rhs.s[1])
+        / denom;
+    out.s[1] = (lhs.s[1] * rhs.s[0] - lhs.s[0] * rhs.s[1])
+        / denom;
+    return out;
+}
+
+cdouble operator/(cdouble lhs, cdouble rhs) {
+    cdouble out;
+    double denom = (rhs.s[0] * rhs.s[0] + rhs.s[1] * rhs.s[1]);
+    out.s[0] = (lhs.s[0] * rhs.s[0] + lhs.s[1] * rhs.s[1])
+        / denom;
+    out.s[1] = (lhs.s[1] * rhs.s[0] - lhs.s[0] * rhs.s[1])
+        / denom;
+    return out;
+}
+
 cfloat division(cfloat lhs, double rhs) {
     cfloat retVal;
     retVal.s[0] = real(lhs) / rhs;

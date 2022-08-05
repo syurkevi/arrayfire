@@ -13,10 +13,12 @@
 #include <af/algorithm.h>
 #include <af/arith.h>
 #include <af/blas.h>
+#include <af/data.h>
 #include <af/defines.h>
 #include <af/device.h>
 #include <af/dim4.hpp>
 #include <af/lapack.h>
+#include <af/random.h>
 #include <af/sparse.h>
 #include <af/traits.hpp>
 
@@ -30,10 +32,14 @@ using af::array;
 using af::cdouble;
 using af::cfloat;
 using af::deviceGC;
+using af::diag;
 using af::dim4;
 using af::dtype_traits;
+using af::identity;
 using af::setDevice;
 using af::sum;
+using af::randn;
+using af::randu;
 using std::abs;
 using std::cout;
 using std::endl;
@@ -43,7 +49,7 @@ using std::vector;
 
 template<typename T>
 void sparseSolveTester(const int m, const int n, const int k, af_storage sstype, double eps,
-                       int targetDevice = -1) {
+                       double sparsity_percentage, int targetDevice = -1) {
     if (targetDevice >= 0) setDevice(targetDevice);
 
     deviceGC();
@@ -58,13 +64,16 @@ void sparseSolveTester(const int m, const int n, const int k, af_storage sstype,
     array A  = randu(m, n, (dtype)dtype_traits<T>::af_type);
     array X0 = randu(n, k, (dtype)dtype_traits<T>::af_type);
 #endif
-    A(A < T(0.2)) = T(0);
+    //make sure matrix is non-singular for larger sparsities
+    A += identity(A.dims(), A.type());
+
+    A(A < T(sparsity_percentage)) = T(0);
     array B0 = matmul(A, X0);
 
     array A_sparse = af::sparse(A, sstype);
 
-    af_print(A_sparse);
-    af_print(A);
+    //af_print(A_sparse);
+    //af_print(A);
 
     //array Xsol = solve(A, B0);
     //af_print(Xsol);
@@ -76,8 +85,49 @@ void sparseSolveTester(const int m, const int n, const int k, af_storage sstype,
     //af_print(B0);
     //af_print(dot(B0,B0));
     array X1 = solve(A_sparse, B0);
-    af_print(X0);
-    af_print(X1);
+
+    array B1 = matmul(A, X1);
+    ASSERT_NEAR(
+        0,
+        sum<typename dtype_traits<T>::base_type>(abs(real(B0 - B1))) / (m * k),
+        eps);
+    ASSERT_NEAR(
+        0,
+        sum<typename dtype_traits<T>::base_type>(abs(imag(B0 - B1))) / (m * k),
+        eps);
+}
+
+template<typename T>
+af::array generate_sparse_psd(size_t m) {
+    array A = cpu_randu<T>(dim4(m, m));
+    array ind = af::range(af::dim4(m*m), 0, u32);
+    A(ind % 2 == 0) = T(0);
+    A = matmul(A, A.H());
+    A = (A + A.H()) / 2;
+    return A;
+}
+
+template<typename T>
+void sparseSolveSymmetricTester(const int m, const int k, af_storage sstype, double eps,
+                                bool posdef = false, int targetDevice = -1) {
+    if (targetDevice >= 0) setDevice(targetDevice);
+    deviceGC();
+
+    SUPPORTED_TYPE_CHECK(T);
+    if (noLAPACKTests()) return;
+
+    array A = generate_sparse_psd<T>(m);
+    array X0 = cpu_randu<T>(dim4(m, k));
+    array B0 = matmul(A, X0);
+
+    array A_sparse = af::sparse(A, sstype);
+
+    af_mat_prop options = AF_MAT_SYM;
+    if(posdef) {
+        options = static_cast<af_mat_prop>(AF_MAT_SYM | AF_MAT_POSDEF);
+    }
+
+    array X1 = solve(A_sparse, B0, options);
 
     array B1 = matmul(A, X1);
 
@@ -153,6 +203,12 @@ typedef ::testing::Types<float, cfloat, double, cdouble> TestTypes;
 TYPED_TEST_CASE(SparseSolve, TestTypes);
 
 template<typename T>
+class sparseSolveSymmetric : public ::testing::Test {};
+
+typedef ::testing::Types<float, double> TestTypesR;
+TYPED_TEST_CASE(sparseSolveSymmetric, TestTypes);
+
+template<typename T>
 double eps();
 
 template<>
@@ -176,23 +232,23 @@ double eps<cdouble>() {
 }
 
 TYPED_TEST(SparseSolve, Square) {
-    sparseSolveTester<TypeParam>(5, 5, 1, AF_STORAGE_CSR, eps<TypeParam>());
+    sparseSolveTester<TypeParam>(5, 5, 1, AF_STORAGE_CSR, eps<TypeParam>(), 0.4);
 }
 
 TYPED_TEST(SparseSolve, SquareMultipleRHS) {
-    sparseSolveTester<TypeParam>(5, 5, 4, AF_STORAGE_CSR, eps<TypeParam>());
+    sparseSolveTester<TypeParam>(5, 5, 4, AF_STORAGE_CSR, eps<TypeParam>(), 0.4);
 }
 
 TYPED_TEST(SparseSolve, SquareMultipleOfTwo) {
-    sparseSolveTester<TypeParam>(96, 96, 16, AF_STORAGE_CSR, eps<TypeParam>());
+    sparseSolveTester<TypeParam>(96, 96, 16, AF_STORAGE_CSR, eps<TypeParam>(), 0.4);
 }
 
 TYPED_TEST(SparseSolve, SquareLarge) {
-    sparseSolveTester<TypeParam>(1000, 1000, 10, AF_STORAGE_CSR, eps<TypeParam>());
+    sparseSolveTester<TypeParam>(1000, 1000, 10, AF_STORAGE_CSR, eps<TypeParam>(), 0.4);
 }
 
 TYPED_TEST(SparseSolve, SquareMultipleOfTwoLarge) {
-    sparseSolveTester<TypeParam>(2048, 2048, 32, AF_STORAGE_CSR, eps<TypeParam>());
+    sparseSolveTester<TypeParam>(2048, 2048, 32, AF_STORAGE_CSR, eps<TypeParam>(), 0.4);
 }
 
 TYPED_TEST(SparseSolve, SquareBatch) {
@@ -281,5 +337,82 @@ TEST(SparseSolve, SquareCSC) {
     } catch (af::exception &e) { ASSERT_EQ(e.err(), AF_ERR_ARG); }
 }
 
-//TODO: test different sparsity percentages
-//
+TYPED_TEST(sparseSolveSymmetric, Simple) {
+    sparseSolveSymmetricTester<TypeParam>(5, 1, AF_STORAGE_CSR, eps<TypeParam>(), false);
+}
+
+TYPED_TEST(sparseSolveSymmetric, SimplePosdef) {
+    sparseSolveSymmetricTester<TypeParam>(5, 1, AF_STORAGE_CSR, eps<TypeParam>(), true);
+}
+
+#if defined(USE_MTX) && defined(MTX_TEST_DIR)
+
+void sparseSolveMTX(const char* matstr) {
+    if (noLAPACKTests()) return;
+    deviceGC();
+
+    // Re-enable when double is enabled SUPPORTED_TYPE_CHECK(T);
+
+    array cooA;
+    ASSERT_TRUE(mtxReadSparseMatrix(cooA, matstr));
+
+    array spA = sparseConvertTo(cooA, AF_STORAGE_CSR);
+
+    array A = dense(spA);
+
+    int m = A.dims(0);
+    array X0 = randu(m);
+    X0 = X0.as(A.type());
+
+    array B0 = matmul(A, X0);
+
+    array X1 = solve(spA, B0);
+
+    array B1 = matmul(A, X1);
+
+    ASSERT_NEAR(
+        0,
+        sum<double>(abs(real(B0 - B1))) / (m),
+        1e-4);
+    ASSERT_NEAR(
+        0,
+        sum<double>(abs(imag(B0 - B1))) / (m),
+        1e-4);
+}
+
+TEST(SparseMTX, QuantumChemistryData1) {
+    std::string mtxfile(MTX_TEST_DIR "QCD/conf6_0-4x4-20/conf6_0-4x4-20.mtx");
+    sparseSolveMTX(mtxfile.c_str());
+}
+
+TEST(SparseMTX, QuantumChemistryData2) {
+    std::string mtxfile(MTX_TEST_DIR "QCD/conf6_0-4x4-30/conf6_0-4x4-30.mtx");
+    sparseSolveMTX(mtxfile.c_str());
+}
+
+#endif
+
+TYPED_TEST(SparseSolve, SquareSparsities) {
+    sparseSolveTester<TypeParam>(5, 5, 1, AF_STORAGE_CSR, eps<TypeParam>(), 0.1);
+    sparseSolveTester<TypeParam>(5, 5, 1, AF_STORAGE_CSR, eps<TypeParam>(), 0.2);
+    sparseSolveTester<TypeParam>(5, 5, 1, AF_STORAGE_CSR, eps<TypeParam>(), 0.6);
+    sparseSolveTester<TypeParam>(5, 5, 1, AF_STORAGE_CSR, eps<TypeParam>(), 0.8);
+    sparseSolveTester<TypeParam>(5, 5, 1, AF_STORAGE_CSR, eps<TypeParam>(), 0.9);
+}
+
+TYPED_TEST(SparseSolve, SquareMultipleRHSSparsities) {
+    sparseSolveTester<TypeParam>(5, 5, 4, AF_STORAGE_CSR, eps<TypeParam>(), 0.1);
+    sparseSolveTester<TypeParam>(5, 5, 4, AF_STORAGE_CSR, eps<TypeParam>(), 0.2);
+    sparseSolveTester<TypeParam>(5, 5, 4, AF_STORAGE_CSR, eps<TypeParam>(), 0.4);
+    sparseSolveTester<TypeParam>(5, 5, 4, AF_STORAGE_CSR, eps<TypeParam>(), 0.8);
+    sparseSolveTester<TypeParam>(5, 5, 4, AF_STORAGE_CSR, eps<TypeParam>(), 0.9);
+}
+
+TYPED_TEST(SparseSolve, SquareLargeSparsities) {
+    sparseSolveTester<TypeParam>(1000, 1000, 10, AF_STORAGE_CSR, eps<TypeParam>(), 0.1);
+    sparseSolveTester<TypeParam>(1000, 1000, 10, AF_STORAGE_CSR, eps<TypeParam>(), 0.2);
+    sparseSolveTester<TypeParam>(1000, 1000, 10, AF_STORAGE_CSR, eps<TypeParam>(), 0.6);
+    sparseSolveTester<TypeParam>(1000, 1000, 10, AF_STORAGE_CSR, eps<TypeParam>(), 0.8);
+    sparseSolveTester<TypeParam>(1000, 1000, 10, AF_STORAGE_CSR, eps<TypeParam>(), 0.9);
+}
+

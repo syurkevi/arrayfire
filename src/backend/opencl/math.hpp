@@ -153,6 +153,8 @@ cdouble operator+(cdouble lhs, cdouble rhs);
 cdouble operator+(cdouble lhs);
 cfloat operator*(cfloat lhs, cfloat rhs);
 cdouble operator*(cdouble lhs, cdouble rhs);
+cfloat operator/(cfloat lhs, cfloat rhs);
+cdouble operator/(cdouble lhs, cdouble rhs);
 common::half operator+(common::half lhs, common::half rhs) noexcept;
 }  // namespace opencl
 

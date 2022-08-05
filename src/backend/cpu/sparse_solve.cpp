@@ -38,7 +38,7 @@ namespace cpu {
 #if USE_MKL
 template<typename T>
 void pardiso_sparse_solve(CParam<T> A_vals, CParam<int> A_rows, CParam<int> A_cols,
-                          Param<T> B, Param<T> X, int N, int K) {
+                          Param<T> B, Param<T> X, int N, int K, const af_mat_prop options) {
     // PARDISO INIT
     void *pt[64];
 
@@ -52,6 +52,9 @@ void pardiso_sparse_solve(CParam<T> A_vals, CParam<int> A_rows, CParam<int> A_co
     if(IsComplex) {
         mtype = 13; // complex-unsymmetric
     }
+    //TODO: update mtype based on symmetric/posdef af_mat_prop options
+    // needs on diagonal 0s to be added to A_vals, A_rows, A_cols
+    // or pure upper triangular representation, see PARDISO docs
 
     MKL_INT nrhs = K;
     MKL_INT iparm[64];
@@ -177,9 +180,9 @@ Array<T> sparse_solve(const common::SparseArray<T> &a, const Array<T> &b,
     if (M == N) {
 
         auto func = [](Param<T> A_vals, Param<int> A_rows, Param<int>A_cols,
-                       Param<T> B, Param<T> X, int N, int K) {
+                       Param<T> B, Param<T> X, int N, int K, const af_mat_prop options) {
 #if USE_MKL
-            pardiso_sparse_solve<T>(A_vals, A_rows, A_cols, B, X, N, K);
+            pardiso_sparse_solve<T>(A_vals, A_rows, A_cols, B, X, N, K, options);
 #else
             AF_ERROR(
                 "This version of ArrayFire was built without a sparse solver"
@@ -188,7 +191,7 @@ Array<T> sparse_solve(const common::SparseArray<T> &a, const Array<T> &b,
 #endif
         };
 
-        getQueue().enqueue(func, pValues, pRowIdx, pColIdx, pB, pX, N, K);
+        getQueue().enqueue(func, pValues, pRowIdx, pColIdx, pB, pX, N, K, options);
         return X;
     } else {
         // Not supported for sparse!

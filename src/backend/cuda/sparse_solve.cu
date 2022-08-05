@@ -44,7 +44,6 @@ namespace cuda {
 //    int reorder,
 //    <> *x,
 //    int *singularity);
-
 template<typename T>
 struct csrlsvlu_func_def_t {
     typedef cusolverStatus_t (*csrlsvlu_func_def)(cusolverSpHandle_t,
@@ -56,6 +55,19 @@ struct csrlsvlu_func_def_t {
                                                   int*);
 };
 
+//cusolverStatus_t
+//cusolverSpScsrlsvqr[Host](cusolverSpHandle_t handle,
+//   int m,
+//   int nnz,
+//   const cusparseMatDescr_t descrA,
+//   const float *csrValA,
+//   const int *csrRowPtrA,
+//   const int *csrColIndA,
+//   const float *b,
+//   float tol,
+//   int reorder,
+//   float *x,
+//   int *singularity);
 template<typename T>
 struct csrlsvqr_func_def_t {
     typedef cusolverStatus_t (*csrlsvqr_func_def)(cusolverSpHandle_t,
@@ -67,7 +79,31 @@ struct csrlsvqr_func_def_t {
                                                   int*);
 };
 
-//cusolverStatus_t 
+//cusolverStatus_t
+//cusolverSpScsrlsvchol[Host](cusolverSpHandle_t handle,
+//   int m,
+//   int nnz,
+//   const cusparseMatDescr_t descrA,
+//   const float *csrVal,
+//   const int *csrRowPtr,
+//   const int *csrColInd,
+//   const float *b,
+//   float tol,
+//   int reorder,
+//   float *x,
+//   int *singularity);
+template<typename T>
+struct csrlsvchol_func_def_t {
+    typedef cusolverStatus_t (*csrlsvchol_func_def)(cusolverSpHandle_t,
+                                                  int, int, cusparseMatDescr_t,
+                                                  const T*, const int*, const int*,
+                                                  const T*,
+                                                  float, int,
+                                                  T*,
+                                                  int*);
+};
+
+//cusolverStatus_t
 //cusolverSpScsrlsqvqr[Host](cusolverSpHandle_t handle,
 //   int m,
 //   int n,
@@ -104,6 +140,9 @@ struct csrlsqvqr_func_def_t {
                cusolverSp##PREFIX##FUNC;                                    \
     }
 
+//TODO: only CPU version currently supported,
+//update once added to cuSolver
+//lu linear solvers
 //SOLVE_FUNC_DEF(csrlsvlu)
 //SOLVE_FUNC(csrlsvlu, float, S)
 //SOLVE_FUNC(csrlsvlu, double, D)
@@ -117,8 +156,16 @@ SOLVE_FUNC(csrlsvqr, double, D)
 SOLVE_FUNC(csrlsvqr, cfloat, C)
 SOLVE_FUNC(csrlsvqr, cdouble, Z)
 
-//TODO: undefined??wtf
-// least-squares solvers
+// cholesky factorization linear solvers
+SOLVE_FUNC_DEF(csrlsvchol)
+SOLVE_FUNC(csrlsvchol, float, S)
+SOLVE_FUNC(csrlsvchol, double, D)
+SOLVE_FUNC(csrlsvchol, cfloat, C)
+SOLVE_FUNC(csrlsvchol, cdouble, Z)
+
+//TODO: only CPU version currently supported,
+//update once added to cuSolver
+//least-squares solvers
 //SOLVE_FUNC_DEF(csrlsqvqr)
 //SOLVE_FUNC(csrlsqvqr, float, S)
 //SOLVE_FUNC(csrlsqvqr, double, D)
@@ -128,7 +175,7 @@ SOLVE_FUNC(csrlsvqr, cdouble, Z)
 
 
 template<typename T>
-Array<T> generalSolveSparse(const common::SparseArray<T> &a, const Array<T> &b) {
+Array<T> generalSolveSparse(const common::SparseArray<T> &a, const Array<T> &b, bool symmetric_positive_definite) {
     static constexpr double abstol = 1e-8;
     static constexpr int reorder = 0;
 
@@ -137,14 +184,13 @@ Array<T> generalSolveSparse(const common::SparseArray<T> &a, const Array<T> &b) 
     int N = aDims[1];
     int K = b.dims()[1];
 
-    Array<T> X = copyArray<T>(b);
+    Array<T> X = createValueArray<T>(af::dim4(N, K), scalar<T>(0));
 
     Array<T>   vals   = a.getValues();
     Array<int> rowIdx = a.getRowIdx();
     Array<int> colIdx = a.getColIdx();
 
 #if defined(AF_USE_NEW_CUSPARSE_API)
-    //TODO: check new vs. old API
     auto info = memAlloc<int>(1);
 
     cusparseMatDescr_t descrA;
@@ -155,27 +201,48 @@ Array<T> generalSolveSparse(const common::SparseArray<T> &a, const Array<T> &b) 
 
     int singularity;
 
-    CUSOLVER_SP_CHECK(csrlsvqr_func<T>()(solverSpHandle(),
-                                         M, vals.elements(),
-                                         descrA,
-                                         vals.get(),
-                                         rowIdx.get(),
-                                         colIdx.get(),
-                                         b.get(),
-                                         abstol,
-                                         reorder,
-                                         X.get(),
-                                         &singularity));
+    std::vector<af_seq> vecIndex(4, af_span);
+    for(size_t k=0; k<K; ++k) {
+        vecIndex[1] = {double(k), double(k), 1};
+        Array<T> bvec = createSubArray(b, vecIndex, false);
+        Array<T> xvec = createEmptyArray<T>(af::dim4(N));
+
+        if(symmetric_positive_definite) {
+            CUSOLVER_SP_CHECK(csrlsvchol_func<T>()(solverSpHandle(),
+                                                   M, vals.elements(),
+                                                   descrA,
+                                                   vals.get(),
+                                                   rowIdx.get(),
+                                                   colIdx.get(),
+                                                   bvec.get(),
+                                                   abstol,
+                                                   reorder,
+                                                   xvec.get(),
+                                                   &singularity));
+            Array<T> Xsub = createSubArray(X, vecIndex, false);
+            copyArray(Xsub, xvec);
+        } else {
+            CUSOLVER_SP_CHECK(csrlsvqr_func<T>()(solverSpHandle(),
+                                                 M, vals.elements(),
+                                                 descrA,
+                                                 vals.get(),
+                                                 rowIdx.get(),
+                                                 colIdx.get(),
+                                                 bvec.get(),
+                                                 abstol,
+                                                 reorder,
+                                                 xvec.get(),
+                                                 &singularity));
+            Array<T> Xsub = createSubArray(X, vecIndex, false);
+            copyArray(Xsub, xvec);
+        }
+        //TODO: error on singular matrix?
+    }
 
     CUSPARSE_CHECK(_.cusparseDestroyMatDescr(descrA));
 #else
-    //TODO: keep? assume toolkit >10.x
-    //cusparseModule &_ = getCusparsePlugin();
-    //// Create Sparse Matrix Descriptor
-    //cusparseMatDescr_t descr = 0;
-    //CUSPARSE_CHECK(_.cusparseCreateMatDescr(&descr));
-    //CUSPARSE_CHECK(_.cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL));
-    //CUSPARSE_CHECK(_.cusparseSetMatIndexBase(descr, CUSPARSE_INDEX_BASE_ZERO));
+    AF_ERROR("sparse solve unsupported for older (<10.x) "
+             "CUDA toolkit versions", AF_ERR_RUNTIME);
 #endif
 
     return X;
@@ -183,18 +250,11 @@ Array<T> generalSolveSparse(const common::SparseArray<T> &a, const Array<T> &b) 
 
 template<typename T>
 Array<T> leastSquaresSparse(const common::SparseArray<T> &a, const Array<T> &b) {
-    dim4 aDims = a.dims();
-    int M = aDims[0];
-    int N = aDims[1];
-
-    int K = b.dims()[1];
+    // Not supported for sparse!
+    AF_ERROR("Overdetermined or underdetermined sparse systems "
+             "are not supported for the CPU backend", AF_ERR_RUNTIME);
 
     Array<T> B = copyArray<T>(b);
-
-#if defined(AF_USE_NEW_CUSPARSE_API)
-    //TODO
-#endif
-
     return B;
 }
 
@@ -209,7 +269,12 @@ Array<T> sparse_solve(const common::SparseArray<T> &a, const Array<T> &b,
     int N = aDims[1];
 
     if (M == N) {
-        return generalSolveSparse<T>(a, b);
+        bool symmetric_positive_definite = false;
+        if (options & AF_MAT_SYM &&
+            options & AF_MAT_POSDEF) {
+            symmetric_positive_definite = true;
+        }
+        return generalSolveSparse<T>(a, b, symmetric_positive_definite);
     } else {
         return leastSquaresSparse<T>(a, b);
     }

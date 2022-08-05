@@ -12,6 +12,7 @@
 #include <common/cast.hpp>
 #include <err_opencl.hpp>
 #include <arith.hpp>
+#include <complex.hpp>
 #include <Array.hpp>
 #include <lookup.hpp>
 #include <range.hpp>
@@ -38,6 +39,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <complex>
 
 using cl::Buffer;
 using common::cast;
@@ -48,13 +50,32 @@ using std::vector;
 
 namespace opencl {
 
-
 template<typename T>
 T dot_host_helper(Array<T> &vec0, Array<T> &vec1) {
     Array<T> dotres = dot<T>(vec0, vec1, AF_MAT_NONE, AF_MAT_NONE);
     T res{};
     getQueue().enqueueReadBuffer(*dotres.get(), CL_TRUE,
                 sizeof(T) * dotres.getOffset(), sizeof(T), &res);
+    return res;
+}
+
+template<>
+cfloat dot_host_helper(Array<cfloat> &vec0, Array<cfloat> &vec1) {
+    // complex dot product
+    Array<cfloat> dotres = dot<cfloat>(vec0, vec1, AF_MAT_NONE, AF_MAT_CONJ);
+    cfloat res{};
+    getQueue().enqueueReadBuffer(*dotres.get(), CL_TRUE,
+                sizeof(cfloat) * dotres.getOffset(), sizeof(cfloat), &res);
+    return res;
+}
+
+template<>
+cdouble dot_host_helper(Array<cdouble> &vec0, Array<cdouble> &vec1) {
+    // complex dot product
+    Array<cdouble> dotres = dot<cdouble>(vec0, vec1, AF_MAT_NONE, AF_MAT_CONJ);
+    cdouble res{};
+    getQueue().enqueueReadBuffer(*dotres.get(), CL_TRUE,
+                sizeof(cdouble) * dotres.getOffset(), sizeof(cdouble), &res);
     return res;
 }
 
@@ -70,7 +91,7 @@ common::SparseArray<T> jacobiPreconditionMatrix(const common::SparseArray<T> &A)
     Array<int> colIdx = A.getColIdx();
 
     Array<T> diag = createValueArray<T>(af::dim4(rowIdx.elements()), scalar<T>(0));
-    kernel::sparseDiag<T>(diag, vals, rowIdx, colIdx, A.dims()[0], A.dims()[1]);
+    kernel::invDiag<T>(diag, vals, rowIdx, colIdx, A.dims()[0], A.dims()[1]);
 
     Array<uint> nonZeroIdx_ = where<T>(diag);
     Array<int> nonZeroIdx   = cast<int, uint>(nonZeroIdx_);
@@ -86,6 +107,152 @@ common::SparseArray<T> jacobiPreconditionMatrix(const common::SparseArray<T> &A)
 }
 
 template<typename T>
+struct CG {
+    static constexpr double abstol = 1e-8;
+    static constexpr double reltol = 1e-6;
+
+    vector<double> residual_history;
+    bool precondition;
+    int max_iterations;
+    int iterations;
+
+    Array<T> solve(const common::SparseArray<T> &a, const Array<T> &b) {
+        //residual_history.clear();
+        const int N = b.dims()[0];
+
+        Array<T> x  = createValueArray<T>(af::dim4(N), scalar<T>(0));
+        //r0 == b - Ax0
+        Array<T> r0 = arithOp<T, af_sub_t>(copyArray<T>(b),
+                matmul(a, x, AF_MAT_NONE, AF_MAT_NONE), b.dims());
+
+        double residual_norm = sqrt(abs(dot_host_helper<T>(r0, r0)));
+        double threshold = max(CG::abstol, CG::reltol * residual_norm);
+
+        if(residual_norm <= threshold) {
+            return x;
+        }
+
+        Array<T> r = copyArray<T>(r0);
+        Array<T> p = copyArray<T>(r0);
+
+        // recalculate full residual b - Ax,
+        // instead of partial update every so often
+        int recalculate_residual_iter = min(10, 1 + (max_iterations / 4));
+
+        while(iterations < max_iterations && residual_norm > threshold) {
+            Array<T> Ap = matmul(a, p, AF_MAT_NONE, AF_MAT_NONE);
+            double r0r0_dot = dot_host_helper<T>(r, r);
+
+            double alpha  = r0r0_dot /
+                            dot_host_helper<T>(p, Ap);
+
+            // x1 = x0 + alpha*p0
+            x = arithOp<T, af_add_t>(x,
+                    sv_arith_helper<T, af_mul_t>(scalar<T>(alpha),
+                    p), x.dims());
+
+            if(iterations % recalculate_residual_iter == 0) {
+                // more accurate resudual calculation,
+                // not as efficient, both should be used
+                r = arithOp<T, af_sub_t>(copyArray<T>(b),
+                        matmul(a, x, AF_MAT_NONE, AF_MAT_NONE), b.dims());
+            } else {
+                // r1 = r0 - alpha*Ap
+                // susceptible to roundoff error, faster
+                r = arithOp<T, af_sub_t>(r,
+                        sv_arith_helper<T, af_mul_t>(scalar<T>(alpha),
+                        Ap), r.dims());
+            }
+            residual_norm = sqrt(dot_host_helper<T>(r, r));
+            if(residual_norm <= threshold) {
+                return x;
+            }
+
+            double beta = dot_host_helper<T>(r, r) / r0r0_dot;
+            p = arithOp<T, af_sub_t>(r,
+                    sv_arith_helper<T, af_mul_t>(
+                        scalar<T>(beta), p), r.dims());
+
+            iterations++;
+        }
+        return x;
+    }
+
+    Array<T> solve(const common::SparseArray<T> &a, const common::SparseArray<T> &Pinv,
+                   const Array<T> &b) {
+        //residual_history.clear();
+        const int N = b.dims()[0];
+
+        Array<T> x  = createValueArray<T>(af::dim4(N), scalar<T>(0));
+        //r0 == b - Ax0
+        Array<T> r0 = arithOp<T, af_sub_t>(copyArray<T>(b),
+                matmul(a, x, AF_MAT_NONE, AF_MAT_NONE), b.dims());
+
+        double residual_norm = sqrt(abs(dot_host_helper<T>(r0, r0)));
+        double threshold = max(CG::abstol, CG::reltol * residual_norm);
+
+        if(residual_norm <= threshold) {
+            return x;
+        }
+
+        Array<T> r = copyArray<T>(r0);
+        Array<T> z = copyArray<T>(r0);
+        Array<T> p = copyArray<T>(r0);
+        if(precondition) {
+            z = matmul(Pinv, r0, AF_MAT_NONE, AF_MAT_NONE);
+            p = copyArray<T>(z);
+        }
+
+        // recalculate full residual b - Ax,
+        // instead of partial update every so often
+        int recalculate_residual_iter = min(10, 1 + (max_iterations / 4));
+
+        while(iterations < max_iterations && residual_norm > threshold) {
+            Array<T> Ap = matmul(a, p, AF_MAT_NONE, AF_MAT_NONE);
+            T r0z0_dot = dot_host_helper<T>(r, z);
+
+            T alpha  = r0z0_dot /
+                       dot_host_helper<T>(p, Ap);
+
+            // x1 = x0 + alpha*p0
+            x = arithOp<T, af_add_t>(x,
+                    //sv_arith_helper<T, af_mul_t>(scalar<T>(alpha),
+                    sv_arith_helper<T, af_mul_t>(alpha,
+                    p), x.dims());
+            // r1 = r0 - alpha*Ap
+            if(iterations % recalculate_residual_iter == 0) {
+                // more accurate resudual calculation,
+                // not as efficient, both should be used
+                r = arithOp<T, af_sub_t>(copyArray<T>(b),
+                        matmul(a, x, AF_MAT_NONE, AF_MAT_NONE), b.dims());
+            } else {
+                // susceptible to roundoff error, faster
+                r = arithOp<T, af_sub_t>(r,
+                        //sv_arith_helper<T, af_mul_t>(scalar<T>(alpha),
+                        sv_arith_helper<T, af_mul_t>(alpha,
+                        Ap), r.dims());
+            }
+            residual_norm = sqrt(abs(dot_host_helper<T>(r, r)));
+            SHOW(residual_norm);
+            if(residual_norm <= threshold) {
+                return x;
+            }
+
+            z = matmul(Pinv, r, AF_MAT_NONE, AF_MAT_NONE);
+
+            T beta = dot_host_helper<T>(r, z) / r0z0_dot;
+            p = arithOp<T, af_add_t>(z,
+                    sv_arith_helper<T, af_mul_t>(
+                        //scalar<T>(beta), p), z.dims());
+                        beta, p), z.dims());
+
+            iterations++;
+        }
+        return x;
+    }
+};
+
+template<typename T>
 struct BiCGSTAB {
     static constexpr double abstol = 1e-8;
     static constexpr double reltol = 1e-6;
@@ -99,15 +266,15 @@ struct BiCGSTAB {
         //residual_history.clear();
         const int N = b.dims()[0];
 
-        double rho   = 1.0;
-        double omega = 1.0;
-        double alpha = 1.0;
+        T rho   = scalar<T>(1.0);
+        T omega = scalar<T>(1.0);
+        T alpha = scalar<T>(1.0);
 
         Array<T> x  = createValueArray<T>(af::dim4(N), scalar<T>(0));
         Array<T> r0 = copyArray<T>(b);
 
-        double rho_next = dot_host_helper<T>(r0, r0);
-        double residual_norm = sqrt(rho_next);
+        T rho_next = dot_host_helper<T>(r0, r0);
+        double residual_norm = sqrt(abs(rho_next));
 
         double threshold = max(BiCGSTAB::abstol, BiCGSTAB::reltol * residual_norm);
 
@@ -120,14 +287,16 @@ struct BiCGSTAB {
         Array<T> v = createValueArray<T>(af::dim4(N), scalar<T>(0));
 
         while(iterations < max_iterations && residual_norm > threshold) {
-            double beta = (rho_next / rho) * (alpha / omega);
+            T beta = (rho_next / rho) * (alpha / omega);
 
             rho = rho_next; //?
 
             // p = r + beta(p - omega*v)
             p = arithOp<T, af_add_t>(r,
-                    sv_arith_helper<T, af_mul_t>(scalar<T>(beta),
-                    arithOp<T, af_sub_t>(p, sv_arith_helper<T, af_mul_t>(scalar<T>(omega), v),
+                    //sv_arith_helper<T, af_mul_t>(scalar<T>(beta),
+                    sv_arith_helper<T, af_mul_t>(beta,
+                    //arithOp<T, af_sub_t>(p, sv_arith_helper<T, af_mul_t>(scalar<T>(omega), v),
+                    arithOp<T, af_sub_t>(p, sv_arith_helper<T, af_mul_t>(omega, v),
                         p.dims())) , r.dims());
 
             Array<T> q = copyArray<T>(p);
@@ -139,11 +308,14 @@ struct BiCGSTAB {
 
             alpha = rho / dot_host_helper<T>(r0, v);
             // s = r - alpha*v
-            Array<T> s = arithOp<T, af_sub_t>(r, sv_arith_helper<T, af_mul_t>(scalar<T>(alpha), v), r.dims());
+            Array<T> s = arithOp<T, af_sub_t>(r, sv_arith_helper<T, af_mul_t>(alpha, v), r.dims());
+            //Array<T> s = arithOp<T, af_sub_t>(r, sv_arith_helper<T, af_mul_t>(scalar<T>(alpha), v), r.dims());
 
-            residual_norm = sqrt(dot_host_helper<T>(s, s));
+            residual_norm = sqrt(abs(dot_host_helper<T>(s, s)));
             if(residual_norm <= threshold) {
-                x = arithOp<T, af_add_t>(x, sv_arith_helper<T, af_mul_t>(scalar<T>(alpha), q),
+                x = arithOp<T, af_add_t>(x,
+                        //sv_arith_helper<T, af_mul_t>(scalar<T>(alpha), q),
+                        sv_arith_helper<T, af_mul_t>(alpha, q),
                                          x.dims());
                 break;
             }
@@ -155,20 +327,24 @@ struct BiCGSTAB {
 
             Array<T> t = matmul(a, z, AF_MAT_NONE, AF_MAT_NONE);
             omega = dot_host_helper(t, s) / dot_host_helper(t, t);
-            rho_next = -omega * dot_host_helper(r0, t);
+            rho_next = scalar<T>(-1.0) * omega * dot_host_helper(r0, t);
 
-            r = arithOp<T, af_sub_t>(s, sv_arith_helper<T, af_mul_t>(scalar<T>(omega), t),
+            r = arithOp<T, af_sub_t>(s,
+                    //sv_arith_helper<T, af_mul_t>(scalar<T>(omega), t),
+                    sv_arith_helper<T, af_mul_t>(omega, t),
                                      s.dims());
 
             // h = x + alpha*q
             // x = h + omega*z
             x = arithOp<T, af_add_t>(x,
                     arithOp<T, af_add_t>(
-                        sv_arith_helper<T, af_mul_t>(scalar<T>(alpha), q),
-                        sv_arith_helper<T, af_mul_t>(scalar<T>(omega), z),
+                        //sv_arith_helper<T, af_mul_t>(scalar<T>(alpha), q),
+                        sv_arith_helper<T, af_mul_t>(alpha, q),
+                        //sv_arith_helper<T, af_mul_t>(scalar<T>(omega), z),
+                        sv_arith_helper<T, af_mul_t>(omega, z),
                                      p.dims()), x.dims());
 
-            residual_norm = sqrt(dot_host_helper<T>(r, r));
+            residual_norm = sqrt(abs(dot_host_helper<T>(r, r)));
             //SHOW(residual_norm);
             //residual_history.push_back(residual_norm);
             if(residual_norm <= threshold) {
@@ -191,7 +367,24 @@ Array<T> symmetricSolveSparse(const common::SparseArray<T> &a, const Array<T> &b
     size_t K = b.dims()[1];
 
     Array<T> X = createValueArray<T>(af::dim4(N, K), scalar<T>(0));
-    //TODO:
+
+    CG<T> solver;
+    solver.precondition = true;
+
+    // use jacobi preconditioned CG as default solver
+    common::SparseArray<T> Pinv = jacobiPreconditionMatrix<T>(a);
+
+    vector<af_seq> vecIndex(4, af_span);
+    for(size_t k=0; k<K; ++k) {
+        vecIndex[1] = {double(k), double(k), 1};
+        Array<T> bvec = createSubArray(b, vecIndex, false);
+        Array<T> Xsub = createSubArray(X, vecIndex, false);
+
+        solver.iterations = 0;
+        solver.max_iterations = M * 4;
+        Array<T> x = solver.solve(a, Pinv, bvec);
+        copyArray(Xsub, x);
+    }
 
     return X;
 }
@@ -206,8 +399,7 @@ Array<T> generalSolveSparse(const common::SparseArray<T> &a, const Array<T> &b) 
 
     Array<T> X = createValueArray<T>(af::dim4(N, K), scalar<T>(0));
 
-    common::SparseArray<T> P = jacobiPreconditionMatrix<T>(a);
-    //return sparseConvertStorageToDense<T, AF_STORAGE_CSR>(P);
+    common::SparseArray<T> Pinv = jacobiPreconditionMatrix<T>(a);
 
     vector<af_seq> vecIndex(4, af_span);
     for(size_t k=0; k<K; ++k) {
@@ -219,30 +411,13 @@ Array<T> generalSolveSparse(const common::SparseArray<T> &a, const Array<T> &b) 
         solver.max_iterations = M * 2;
         solver.precondition = true;
 
-        P.eval();
-        Array<T> x = solver.solve(a, P, bvec);
+        Array<T> x = solver.solve(a, Pinv, bvec);
 
         Array<T> Xsub = createSubArray(X, vecIndex, false);
         copyArray(Xsub, x);
     }
 
     return X;
-}
-
-template<>
-Array<cfloat> generalSolveSparse(const common::SparseArray<cfloat> &a, const Array<cfloat> &b) {
-    dim4 aDims = a.dims();
-    int N = aDims[1];
-    Array<cfloat> x  = createValueArray<cfloat>(af::dim4(N), scalar<cfloat>(0));
-    return x;
-}
-
-template<>
-Array<cdouble> generalSolveSparse(const common::SparseArray<cdouble> &a, const Array<cdouble> &b) {
-    dim4 aDims = a.dims();
-    int N = aDims[1];
-    Array<cdouble> x  = createValueArray<cdouble>(af::dim4(N), scalar<cdouble>(0));
-    return x;
 }
 
 template<typename T>
@@ -253,27 +428,11 @@ Array<T> leastSquaresSparse(const common::SparseArray<T> &a, const Array<T> &b) 
 
     int K = b.dims()[1];
 
+    // TODO: implement
+    AF_ERROR("leastSquares sparse solver currently unsupported",
+        AF_ERR_RUNTIME);
+
     Array<T> B = copyArray<T>(b);
-
-    /*
-    Buffer *A_buf      = A.get();
-    int info           = 0;
-    cl_command_queue q = getQueue()();
-    auto aoffset =
-        A.getOffset() + j * A.strides()[2] + i * A.strides()[3];
-    magma_getrf_gpu<T>(M, N, (*A_buf)(), aoffset, A.strides()[1],
-                       &ipiv[0], q, &info);
-
-    Buffer *B_buf = B.get();
-    int K         = B.dims()[1];
-
-    auto boffset =
-        B.getOffset() + j * B.strides()[2] + i * B.strides()[3];
-    magma_getrs_gpu<T>(MagmaNoTrans, M, K, (*A_buf)(), aoffset,
-                       A.strides()[1], &ipiv[0], (*B_buf)(), boffset,
-                       B.strides()[1], q, &info);
-    */
-
     return B;
 }
 
@@ -292,7 +451,8 @@ Array<T> sparse_solve(const common::SparseArray<T> &a, const Array<T> &b,
         std::is_same<T, cl_float2>::value || std::is_same<T, cl_double2>::value;
 
     if (M == N) {
-        if (options == AF_MAT_SYM) {
+        if (options & AF_MAT_SYM
+         && options & AF_MAT_POSDEF) {
             return symmetricSolveSparse<T>(a, b);
         }
         return generalSolveSparse<T>(a, b);

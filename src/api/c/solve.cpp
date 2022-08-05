@@ -71,7 +71,8 @@ af_err af_sparse_solve(af_array* out, const af_array a, const af_array b,
         bool is_triangle_solve =
             (options & AF_MAT_LOWER) || (options & AF_MAT_UPPER);
 
-        if (options != AF_MAT_NONE && !is_triangle_solve) {
+        if (options != AF_MAT_NONE && !is_triangle_solve &&
+                !(options & AF_MAT_SYM) && !(options & AF_MAT_POSDEF)) {
             AF_ERROR("Using this property is not yet supported in solve",
                      AF_ERR_NOT_SUPPORTED);
         }
