@@ -1,0 +1,45 @@
+# Copyright (c) 2022, ArrayFire
+# All rights reserved.
+#
+# This file is distributed under 3-clause BSD license.
+# The complete license agreement can be obtained at:
+# http://arrayfire.com/licenses/BSD-3-Clause
+
+add_library(afoneapi
+                device_manager.cpp
+                device_manager.hpp
+                platform.cpp
+                platform.hpp)
+
+add_library(ArrayFire::afoneapi ALIAS afoneapi)
+
+target_include_directories(afoneapi
+  PUBLIC
+    $<BUILD_INTERFACE:${ArrayFire_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${ArrayFire_BINARY_DIR}/include>
+    $<INSTALL_INTERFACE:${AF_INSTALL_INC_DIR}>
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${SYCL_INCLUDE_DIR}
+  )
+
+target_compile_definitions(afoneapi
+  PRIVATE
+    AF_ONEAPI
+  )
+
+target_link_libraries(afoneapi
+  PRIVATE
+    c_api_interface
+    cpp_api_interface
+    afcommon_interface
+    ${SYCL_FLAGS}
+  )
+
+source_group(include REGULAR_EXPRESSION ${ArrayFire_SOURCE_DIR}/include/*)
+source_group(api\\cpp REGULAR_EXPRESSION ${ArrayFire_SOURCE_DIR}/src/api/cpp/*)
+source_group(api\\c   REGULAR_EXPRESSION ${ArrayFire_SOURCE_DIR}/src/api/c/*)
+source_group(backend  REGULAR_EXPRESSION ${ArrayFire_SOURCE_DIR}/src/backend/common/*|${CMAKE_CURRENT_SOURCE_DIR}/*)
+source_group(backend\\kernel  REGULAR_EXPRESSION ${CMAKE_CURRENT_SOURCE_DIR}/kernel/*)
+source_group("generated files" FILES ${ArrayFire_BINARY_DIR}/version.hpp ${ArrayFire_BINARY_DIR}/include/af/version.h)
+source_group("" FILES CMakeLists.txt)
