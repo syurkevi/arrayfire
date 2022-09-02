@@ -21,19 +21,10 @@
 // Forward declarations
 struct clfftSetupData_;
 
-namespace cl {
-class CommandQueue;
-class Context;
-class Device;
-}  // namespace cl
 
 namespace boost {
 template<typename T>
 class shared_ptr;
-
-namespace compute {
-class program_cache;
-}
 }  // namespace boost
 
 namespace spdlog {
@@ -52,7 +43,7 @@ class MemoryManagerBase;
 
 using common::memory::MemoryManagerBase;
 
-namespace opencl {
+namespace oneapi {
 
 // opencl namespace forward declarations
 class GraphicsResourceManager;
@@ -99,11 +90,11 @@ class DeviceManager {
 
     friend int getDeviceIdFromNativeId(cl_device_id id);
 
-    friend const cl::Context& getContext();
+    friend const sycl::context& getContext();
 
-    friend cl::CommandQueue& getQueue();
+    friend sycl::queue& getQueue();
 
-    friend const cl::Device& getDevice(int id);
+    friend const sycl::device& getDevice(int id);
 
     friend size_t getDeviceMemorySize(int device);
 
@@ -155,9 +146,9 @@ class DeviceManager {
     // Attributes
     std::shared_ptr<spdlog::logger> logger;
     std::mutex deviceMutex;
-    std::vector<std::unique_ptr<cl::Device>> mDevices;
-    std::vector<std::unique_ptr<cl::Context>> mContexts;
-    std::vector<std::unique_ptr<cl::CommandQueue>> mQueues;
+    std::vector<std::unique_ptr<sycl::device>> mDevices;
+    std::vector<std::unique_ptr<sycl::context>> mContexts;
+    std::vector<std::unique_ptr<sycl::queue>> mQueues;
     std::vector<bool> mIsGLSharingOn;
     std::vector<int> mDeviceTypes;
     std::vector<int> mPlatforms;
@@ -170,8 +161,8 @@ class DeviceManager {
     std::unique_ptr<clfftSetupData> mFFTSetup;
     std::mutex mutex;
 
-    using BoostProgCache = boost::shared_ptr<boost::compute::program_cache>;
-    std::vector<BoostProgCache*> mBoostProgCacheVector;
+  //using BoostProgCache = boost::shared_ptr<boost::compute::program_cache>;
+  //std::vector<BoostProgCache*> mBoostProgCacheVector;
 };
 
-}  // namespace opencl
+}  // namespace oneapi

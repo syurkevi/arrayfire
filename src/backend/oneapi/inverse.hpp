@@ -9,7 +9,7 @@
 
 #include <Array.hpp>
 
-namespace opencl {
+namespace oneapi {
 template<typename T>
 Array<T> inverse(const Array<T> &in);
 }

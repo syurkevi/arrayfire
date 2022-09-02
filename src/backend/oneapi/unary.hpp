@@ -8,6 +8,7 @@
  ********************************************************/
 
 #pragma once
+#include <af/traits.hpp>
 #include <Array.hpp>
 #include <common/jit/UnaryNode.hpp>
 #include <math.hpp>
@@ -83,7 +84,7 @@ Array<T> unaryOp(const Array<T> &in, dim4 outDim = dim4(-1, -1, -1, -1)) {
 
     auto createUnary = [](array<Node_ptr, 1> &operands) {
         return common::Node_ptr(new common::UnaryNode(
-            static_cast<af::dtype>(dtype_traits<T>::af_type), unaryName<op>(),
+                                                      static_cast<af::dtype>(af::dtype_traits<T>::af_type), unaryName<op>(),
             operands[0], op));
     };
 
@@ -98,7 +99,7 @@ Array<char> checkOp(const Array<T> &in, dim4 outDim = dim4(-1, -1, -1, -1)) {
 
     auto createUnary = [](std::array<Node_ptr, 1> &operands) {
         return Node_ptr(new common::UnaryNode(
-            static_cast<af::dtype>(dtype_traits<char>::af_type),
+                                              static_cast<af::dtype>(af::dtype_traits<char>::af_type),
             unaryName<op>(), operands[0], op));
     };
 

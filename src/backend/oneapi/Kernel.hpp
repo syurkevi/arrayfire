@@ -40,9 +40,9 @@ class Kernel
     : public common::KernelInterface<const cl::Program*, cl::Kernel, Enqueuer,
                                      cl::Buffer*> {
    public:
-    using ModuleType = const cl::Program*;
-    using KernelType = cl::Kernel;
-    using DevPtrType = cl::Buffer*;
+    using ModuleType = const sycl::program*;
+    using KernelType = sycl::kernel;
+    using DevPtrType = sycl::buffer*;
     using BaseClass =
         common::KernelInterface<ModuleType, KernelType, Enqueuer, DevPtrType>;
 

@@ -37,7 +37,8 @@ class SparseArray;
 
 namespace oneapi {
 
-typedef std::shared_ptr<sycl::Buffer> Buffer_ptr;
+template<typename T>
+using Buffer_ptr = std::shared_ptr<sycl::buffer<T>>;
 using af::dim4;
 template<typename T>
 class Array;
@@ -45,30 +46,33 @@ class Array;
 template<typename T>
 void evalMultiple(std::vector<Array<T> *> arrays);
 
-void evalNodes(Param &out, common::Node *node);
-void evalNodes(std::vector<Param> &outputs,
-               const std::vector<common::Node *> &nodes);
+  template<typename T>
+void evalNodes(Param<T> &out, common::Node *node);
 
-/// Creates a new Array object on the heap and returns a reference to it.
-template<typename T>
-Array<T> createNodeArray(const af::dim4 &dims, common::Node_ptr node);
+  template<typename T>
+  void evalNodes(std::vector<Param<T>> &outputs,
+                 const std::vector<common::Node *> &nodes);
 
-/// Creates a new Array object on the heap and returns a reference to it.
-template<typename T>
-Array<T> createValueArray(const af::dim4 &dims, const T &value);
+  /// Creates a new Array object on the heap and returns a reference to it.
+  template<typename T>
+  Array<T> createNodeArray(const af::dim4 &dims, common::Node_ptr node);
 
-/// Creates a new Array object on the heap and returns a reference to it.
-template<typename T>
-Array<T> createHostDataArray(const af::dim4 &dims, const T *const data);
+  /// Creates a new Array object on the heap and returns a reference to it.
+  template<typename T>
+  Array<T> createValueArray(const af::dim4 &dims, const T &value);
 
-template<typename T>
-Array<T> createDeviceDataArray(const af::dim4 &dims, void *data);
+  /// Creates a new Array object on the heap and returns a reference to it.
+  template<typename T>
+  Array<T> createHostDataArray(const af::dim4 &dims, const T *const data);
 
-template<typename T>
-Array<T> createStridedArray(const af::dim4 &dims, const af::dim4 &strides,
-                            dim_t offset, const T *const in_data,
-                            bool is_device) {
-    return Array<T>(dims, strides, offset, in_data, is_device);
+  template<typename T>
+  Array<T> createDeviceDataArray(const af::dim4 &dims, void *data);
+
+  template<typename T>
+  Array<T> createStridedArray(const af::dim4 &dims, const af::dim4 &strides,
+                              dim_t offset, const T *const in_data,
+                              bool is_device) {
+      return Array<T>(dims, strides, offset, in_data, is_device);
 }
 
 /// Copies data to an existing Array object from a host pointer
@@ -93,7 +97,7 @@ Array<T> createEmptyArray(const af::dim4 &dims);
 /// If false
 ///                  the Array<T> will not delete the object on destruction
 template<typename T>
-Array<T> createParamArray(Param &tmp, bool owner);
+Array<T> createParamArray(Param<T> &tmp, bool owner);
 
 template<typename T>
 Array<T> createSubArray(const Array<T> &parent,
@@ -118,7 +122,7 @@ void *getDevicePtr(const Array<T> &arr);
 
 template<typename T>
 void *getRawPtr(const Array<T> &arr) {
-    const sycl::Buffer *buf = arr.get();
+    const sycl::buffer<T> *buf = arr.get();
     if (!buf) return NULL;
     cl_mem mem = (*buf)();
     return (void *)mem;
@@ -132,7 +136,7 @@ class Array {
     ArrayInfo info;  // This must be the first element of Array<T>
 
     /// Pointer to the data
-    std::shared_ptr<sycl::Buffer> data;
+    std::shared_ptr<sycl::buffer<T>> data;
 
     /// The shape of the underlying parent data.
     af::dim4 data_dims;
@@ -148,7 +152,7 @@ class Array {
 
     Array(const Array<T> &parent, const dim4 &dims, const dim_t &offset,
           const dim4 &stride);
-    Array(Param &tmp, bool owner);
+    Array(Param<T> &tmp, bool owner);
     explicit Array(const af::dim4 &dims, common::Node_ptr n);
     explicit Array(const af::dim4 &dims, const T *const in_data);
     explicit Array(const af::dim4 &dims, cl_mem mem, size_t offset, bool copy);
@@ -221,19 +225,19 @@ class Array {
     void eval();
     void eval() const;
 
-    sycl::Buffer *device();
-    sycl::Buffer *device() const {
+    sycl::buffer<T> *device();
+    sycl::buffer<T> *device() const {
         return const_cast<Array<T> *>(this)->device();
     }
 
     // FIXME: This should do a copy if it is not owner. You do not want to
     // overwrite parents data
-    sycl::Buffer *get() {
+    sycl::buffer<T> *get() {
         if (!isReady()) eval();
         return data.get();
     }
 
-    const sycl::Buffer *get() const {
+    const sycl::buffer<T> *get() const {
         if (!isReady()) eval();
         return data.get();
     }
@@ -242,7 +246,7 @@ class Array {
 
     dim_t getOffset() const { return info.getOffset(); }
 
-    std::shared_ptr<sycl::Buffer> getData() const { return data; }
+    std::shared_ptr<sycl::buffer<T>> getData() const { return data; }
 
     dim4 getDataDims() const { return data_dims; }
 
@@ -250,12 +254,12 @@ class Array {
 
     size_t getAllocatedBytes() const;
 
-    operator Param() const {
+    operator Param<T>() const {
         KParam info = {{dims()[0], dims()[1], dims()[2], dims()[3]},
                        {strides()[0], strides()[1], strides()[2], strides()[3]},
                        getOffset()};
 
-        Param out{(sycl::Buffer *)this->get(), info};
+        Param out{(sycl::buffer<T> *)this->get(), info};
         return out;
     }
 
@@ -277,18 +281,18 @@ class Array {
         if (!isReady()) eval();
         auto func = [data = data](void *ptr) {
             if (ptr != nullptr) {
-                cl_int err = getQueue().enqueueUnmapMemObject(*data, ptr);
-                UNUSED(err);
+              //cl_int err = getQueue().enqueueUnmapMemObject(*data, ptr);
+              //UNUSED(err);
                 ptr = nullptr;
             }
         };
 
-        T *ptr = (T *)getQueue().enqueueMapBuffer(
-            *static_cast<const sycl::Buffer *>(get()), CL_TRUE, map_flags,
-            getOffset() * sizeof(T), elements() * sizeof(T), nullptr, nullptr,
-            nullptr);
+        //T *ptr = (T *)getQueue().enqueueMapBuffer(
+            //*static_cast<const sycl::buffer<T> *>(get()), CL_TRUE, map_flags,
+            //getOffset() * sizeof(T), elements() * sizeof(T), nullptr, nullptr,
+            //nullptr);
 
-        return mapped_ptr<T>(ptr, func);
+        return mapped_ptr<T>(nullptr, func);
     }
 
     friend void evalMultiple<T>(std::vector<Array<T> *> arrays);
@@ -303,7 +307,7 @@ class Array {
                                           bool is_device);
 
     friend Array<T> createEmptyArray<T>(const af::dim4 &dims);
-    friend Array<T> createParamArray<T>(Param &tmp, bool owner);
+    friend Array<T> createParamArray<T>(Param<T> &tmp, bool owner);
     friend Array<T> createNodeArray<T>(const af::dim4 &dims,
                                        common::Node_ptr node);
 

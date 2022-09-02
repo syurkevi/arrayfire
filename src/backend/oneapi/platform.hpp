@@ -10,6 +10,7 @@
 #pragma once
 
 #include <CL/sycl.hpp>
+#include <GraphicsResourceManager.hpp>
 
 #include <memory>
 #include <string>
@@ -54,7 +55,7 @@ size_t getHostMemorySize();
 
 //cl_device_type getDeviceType();
 
-bool isHostUnifiedMemory(const cl::Device& device);
+bool isHostUnifiedMemory(const sycl::device& device);
 
 //bool OpenCLCPUOffload(bool forceOffloadOSX = true);
 
@@ -67,7 +68,7 @@ bool isHalfSupported(unsigned device);
 
 void devprop(char* d_name, char* d_platform, char* d_toolkit, char* d_compute);
 
-std::string getPlatformName(const cl::Device& device);
+std::string getPlatformName(const sycl::device& device);
 
 int setDevice(int device);
 

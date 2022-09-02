@@ -14,8 +14,9 @@
 
 namespace oneapi {
 
+template<typename T>
 struct Param {
-    sycl::Buffer* data;
+    sycl::buffer<T>* data;
     KParam info;
     Param& operator=(const Param& other) = default;
     Param(const Param& other)            = default;
@@ -24,11 +25,12 @@ struct Param {
     // AF_DEPRECATED("Use Array<T>")
     Param();
     // AF_DEPRECATED("Use Array<T>")
-    Param(sycl::Buffer* data_, KParam info_);
+    Param(sycl::buffer<T>* data_, KParam info_);
     ~Param() = default;
 };
 
 // AF_DEPRECATED("Use Array<T>")
-Param makeParam(sycl::Buffer& mem, int off, const int dims[4],
-                const int strides[4]);
+template<typename T>
+Param<T> makeParam(sycl::buffer<T>& mem, int off, const int dims[4],
+                   const int strides[4]);
 }  // namespace oneapi

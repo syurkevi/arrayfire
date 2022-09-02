@@ -18,35 +18,38 @@ class OneAPIEventPolicy {
     using EventType = sycl::event;
     using QueueType = sycl::queue;
     //using ErrorType = sycl::exception; //does this make sense
-    using ErrorType = void;
+    using ErrorType = int;
 
-    static ErrorType createAndMarkEvent(cl_event *e) noexcept {
+    static ErrorType createAndMarkEvent(EventType *e) noexcept {
         // Events are created when you mark them
-        //return CL_SUCCESS;
+        return 0;
     }
 
-    static ErrorType markEvent(cl_event *e, cl_command_queue stream) noexcept {
+    static ErrorType markEvent(EventType *e, QueueType stream) noexcept {
         //return clEnqueueMarkerWithWaitList(stream, 0, nullptr, e);
+      return 0;
     }
 
-    static ErrorType waitForEvent(cl_event *e, cl_command_queue stream) noexcept {
+    static ErrorType waitForEvent(EventType *e, QueueType stream) noexcept {
         //return clEnqueueMarkerWithWaitList(stream, 1, e, nullptr);
+      return 0;
     }
 
-    static ErrorType syncForEvent(cl_event *e) noexcept {
+    static ErrorType syncForEvent(EventType *e) noexcept {
         //return clWaitForEvents(1, e);
+      return 0;
     }
 
-    static ErrorType destroyEvent(cl_event *e) noexcept {
+    static ErrorType destroyEvent(EventType *e) noexcept {
         //return clReleaseEvent(*e);
+      return 0;
     }
 };
 
 using Event = common::EventBase<OneAPIEventPolicy>;
 
 /// \brief Creates a new event and marks it in the queue
-/*
-Event makeEvent(cl::CommandQueue &queue);
+Event makeEvent(sycl::queue &queue);
 
 af_event createEvent();
 
@@ -57,6 +60,5 @@ void enqueueWaitOnActiveQueue(af_event eventHandle);
 void block(af_event eventHandle);
 
 af_event createAndMarkEvent();
-*/
 
 }  // namespace oneapi

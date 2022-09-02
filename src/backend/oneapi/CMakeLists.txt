@@ -5,6 +5,9 @@
 # The complete license agreement can be obtained at:
 # http://arrayfire.com/licenses/BSD-3-Clause
 
+include(InternalUtils)
+include(build_cl2hpp)
+
 add_library(afoneapi
                 device_manager.cpp
                 device_manager.hpp
@@ -12,6 +15,8 @@ add_library(afoneapi
                 platform.hpp)
 
 add_library(ArrayFire::afoneapi ALIAS afoneapi)
+
+arrayfire_set_default_cxx_flags(afoneapi)
 
 target_include_directories(afoneapi
   PUBLIC

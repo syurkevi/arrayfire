@@ -39,8 +39,6 @@ template<typename inType, typename outType>
 Array<outType> reshape(const Array<inType> &in, const dim4 &outDims,
                        outType defaultValue = outType(0), double scale = 1.0);
 
-/*
- *TODO: why is this one inline?
 template<typename T>
 Array<T> padArrayBorders(Array<T> const &in, dim4 const &lowerBoundPadding,
                          dim4 const &upperBoundPadding,
@@ -56,11 +54,10 @@ Array<T> padArrayBorders(Array<T> const &in, dim4 const &lowerBoundPadding,
 
     auto ret = createEmptyArray<T>(oDims);
 
-    kernel::padBorders<T>(ret, in, lowerBoundPadding, btype);
+    //kernel::padBorders<T>(ret, in, lowerBoundPadding, btype);
 
     return ret;
 }
-*/
 
 template<typename T>
 void multiply_inplace(Array<T> &in, double val);

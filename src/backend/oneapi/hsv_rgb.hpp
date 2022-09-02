@@ -9,7 +9,7 @@
 
 #include <Array.hpp>
 
-namespace opencl {
+namespace oneapi {
 
 template<typename T>
 Array<T> hsv2rgb(const Array<T>& in);
@@ -17,4 +17,4 @@ Array<T> hsv2rgb(const Array<T>& in);
 template<typename T>
 Array<T> rgb2hsv(const Array<T>& in);
 
-}  // namespace opencl
+}  // namespace oneapi

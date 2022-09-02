@@ -9,7 +9,7 @@
 
 #include <Array.hpp>
 
-namespace opencl {
+namespace oneapi {
 template<typename T>
 Array<float> moments(const Array<T> &in, const af_moment_type moment);
 }

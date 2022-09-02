@@ -10,7 +10,7 @@
 #include <Array.hpp>
 #include <optypes.hpp>
 
-namespace opencl {
+namespace oneapi {
 template<af_op_t op, typename T>
 void ireduce(Array<T> &out, Array<uint> &loc, const Array<T> &in,
              const int dim);
@@ -21,4 +21,4 @@ void rreduce(Array<T> &out, Array<uint> &loc, const Array<T> &in, const int dim,
 
 template<af_op_t op, typename T>
 T ireduce_all(unsigned *loc, const Array<T> &in);
-}  // namespace opencl
+}  // namespace oneapi

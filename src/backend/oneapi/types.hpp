@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <array>
+#include <complex>
 #include <string>
 
 namespace common {
@@ -33,9 +34,8 @@ struct kernel_type<common::half> {
 }  // namespace common
 
 namespace oneapi {
-#if 0
-using cdouble = cl_double2;
-using cfloat  = cl_float2;
+using cdouble = std::complex<double>;
+using cfloat  = std::complex<float>;
 using intl    = long long;
 using uchar   = cl_uchar;
 using uint    = cl_uint;
@@ -126,6 +126,7 @@ inline const char *getFullName<cdouble>() {
 }
 }  // namespace
 
+#if 0
 template<typename... ARGS>
 AF_CONSTEXPR const char *getTypeBuildDefinition() {
     using common::half;

@@ -12,17 +12,15 @@
 #include <common/InteropManager.hpp>
 
 #include <map>
+#include <memory>
 #include <vector>
 
-namespace sycl {
-class Buffer;
-}
 
 namespace oneapi {
 class GraphicsResourceManager
-    : public common::InteropManager<GraphicsResourceManager, sycl::Buffer> {
+    : public common::InteropManager<GraphicsResourceManager, std::byte> {
    public:
-    using ShrdResVector = std::vector<std::shared_ptr<sycl::Buffer>>;
+    using ShrdResVector = std::vector<std::shared_ptr<std::byte>>;
 
     GraphicsResourceManager() {}
     static ShrdResVector registerResources(

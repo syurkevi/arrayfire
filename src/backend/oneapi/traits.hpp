@@ -18,20 +18,6 @@
 
 namespace af {
 
-template<>
-struct dtype_traits<oneapi::cfloat> {
-    enum { af_type = c32 };
-    typedef float base_type;
-    static const char *getName() { return "float2"; }
-};
-
-template<>
-struct dtype_traits<oneapi::cdouble> {
-    enum { af_type = c64 };
-    typedef double base_type;
-    static const char *getName() { return "double2"; }
-};
-
 template<typename T>
 static bool iscplx() {
     return false;
