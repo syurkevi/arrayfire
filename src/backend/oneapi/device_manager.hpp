@@ -1,5 +1,5 @@
 /*******************************************************
- * Copyright (c) 2022, ArrayFire
+ * Copyright (c) 2019, ArrayFire
  * All rights reserved.
  *
  * This file is distributed under 3-clause BSD license.
@@ -9,25 +9,32 @@
 
 #pragma once
 
-#include <platform.hpp>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
 
-using common::memory::MemoryManagerBase;
-
-#ifndef AF_ONEAPI_MEM_DEBUG
-#define AF_ONEAPI_MEM_DEBUG 0
+#ifndef AF_OPENCL_MEM_DEBUG
+#define AF_OPENCL_MEM_DEBUG 0
 #endif
 
-#ifdef _WIN32
-#include <intrin.h>
-#include <limits.h>
-typedef unsigned __int32 uint32_t;
-#else
-#include <stdint.h>
-#endif
+// Forward declarations
+struct clfftSetupData_;
+
+namespace cl {
+class CommandQueue;
+class Context;
+class Device;
+}  // namespace cl
+
+namespace boost {
+template<typename T>
+class shared_ptr;
+
+namespace compute {
+class program_cache;
+}
+}  // namespace boost
 
 namespace spdlog {
 class logger;
@@ -43,7 +50,14 @@ class MemoryManagerBase;
 }
 }  // namespace common
 
-namespace oneapi {
+using common::memory::MemoryManagerBase;
+
+namespace opencl {
+
+// opencl namespace forward declarations
+class GraphicsResourceManager;
+struct kc_entry_t;  // kernel cache entry
+class PlanCache;    // clfft
 
 class DeviceManager {
     friend MemoryManagerBase& memoryManager();
@@ -160,5 +174,4 @@ class DeviceManager {
     std::vector<BoostProgCache*> mBoostProgCacheVector;
 };
 
-
-}  // namespace oneapi
+}  // namespace opencl

@@ -1,5 +1,5 @@
 /*******************************************************
- * Copyright (c) 2014, ArrayFire
+ * Copyright (c) 2022, ArrayFire
  * All rights reserved.
  *
  * This file is distributed under 3-clause BSD license.
@@ -28,7 +28,7 @@ using std::stoi;
 using std::string;
 using std::unique_ptr;
 
-namespace cpu {
+namespace oneapi {
 
 static string get_system() {
     string arch = (sizeof(void*) == 4) ? "32-bit " : "64-bit ";
@@ -40,9 +40,12 @@ static string get_system() {
            "Windows";
 #elif defined(OS_MAC)
            "Mac OSX";
+#else
+           "Unknown";
 #endif
 }
 
+#if 0
 int getBackend() { return AF_BACKEND_CPU; }
 
 string getDeviceInfo() noexcept {
@@ -175,5 +178,6 @@ void resetMemoryManagerPinned() {
 graphics::ForgeManager& forgeManager() {
     return *(DeviceManager::getInstance().fgMngr);
 }
+#endif
 
-}  // namespace cpu
+}  // namespace oneapi

@@ -1,5 +1,5 @@
 /*******************************************************
- * Copyright (c) 2014, ArrayFire
+ * Copyright (c) 2022, ArrayFire
  * All rights reserved.
  *
  * This file is distributed under 3-clause BSD license.
@@ -9,7 +9,9 @@
 
 #pragma once
 
-#include <queue.hpp>
+#include <CL/sycl.hpp>
+
+#include <memory>
 #include <string>
 
 namespace graphics {
@@ -24,35 +26,64 @@ class MemoryManagerBase;
 
 using common::memory::MemoryManagerBase;
 
-namespace cpu {
+namespace oneapi {
+
+bool verify_present(const std::string& pname, const std::string ref);
 
 int getBackend();
 
 std::string getDeviceInfo() noexcept;
 
-bool isDoubleSupported(int device);
-
-bool isHalfSupported(int device);
-
-void devprop(char* d_name, char* d_platform, char* d_toolkit, char* d_compute);
-
-int& getMaxJitSize();
-
-int getDeviceCount();
+int getDeviceCount() noexcept;
 
 void init();
 
 unsigned getActiveDeviceId();
 
+int& getMaxJitSize();
+
+const sycl::context& getContext();
+
+sycl::queue& getQueue();
+
+const sycl::device& getDevice(int id = -1);
+
 size_t getDeviceMemorySize(int device);
 
 size_t getHostMemorySize();
 
+//cl_device_type getDeviceType();
+
+bool isHostUnifiedMemory(const cl::Device& device);
+
+//bool OpenCLCPUOffload(bool forceOffloadOSX = true);
+
+bool isGLSharingSupported();
+
+bool isDoubleSupported(unsigned device);
+
+// Returns true if 16-bit precision floats are supported by the device
+bool isHalfSupported(unsigned device);
+
+void devprop(char* d_name, char* d_platform, char* d_toolkit, char* d_compute);
+
+std::string getPlatformName(const cl::Device& device);
+
 int setDevice(int device);
 
-queue& getQueue(int device = 0);
+//void addDeviceContext(cl_device_id dev, cl_context ctx, cl_command_queue que);
+
+//void setDeviceContext(cl_device_id dev, cl_context ctx);
+
+//void removeDeviceContext(cl_device_id dev, cl_context ctx);
 
 void sync(int device);
+
+bool synchronize_calls();
+
+int getActiveDeviceType();
+
+int getActivePlatform();
 
 bool& evalFlag();
 
@@ -62,11 +93,16 @@ void setMemoryManager(std::unique_ptr<MemoryManagerBase> mgr);
 
 void resetMemoryManager();
 
-// Pinned memory not supported
+MemoryManagerBase& pinnedMemoryManager();
+
 void setMemoryManagerPinned(std::unique_ptr<MemoryManagerBase> mgr);
 
 void resetMemoryManagerPinned();
 
 graphics::ForgeManager& forgeManager();
 
-}  // namespace cpu
+GraphicsResourceManager& interopManager();
+
+void setActiveContext(int device);
+
+}  // namespace oneapi
