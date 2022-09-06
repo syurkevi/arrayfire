@@ -10,6 +10,7 @@ include(build_cl2hpp)
 
 add_library(afoneapi
   Array.cpp
+  Event.cpp
                 device_manager.cpp
                 device_manager.hpp
                 platform.cpp
