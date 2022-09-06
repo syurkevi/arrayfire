@@ -13,6 +13,7 @@ add_library(afoneapi
   Event.cpp
   wrap.cpp
   where.cpp
+  unwrap.cpp
                 device_manager.cpp
                 device_manager.hpp
                 platform.cpp
