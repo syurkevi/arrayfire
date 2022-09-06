@@ -16,18 +16,20 @@
 #include <memory>
 #include <vector>
 
-namespace sycl {
-class buffer;
-}
 
 namespace oneapi {
-sycl::buffer *bufferAlloc(const size_t &bytes);
-void bufferFree(sycl::buffer *buf);
-
-using bufptr = std::unique_ptr<sycl::buffer std::function<void(sycl::buffer *)>>;
+template<typename T>
+sycl::buffer<T> *bufferAlloc(const size_t &bytes);
 
 template<typename T>
-bufptr memAlloc(const size_t &elements);
+void bufferFree(sycl::buffer<T> *buf);
+
+template<typename T>
+using bufptr =
+  std::unique_ptr<sycl::buffer<T>, std::function<void(sycl::buffer<T> *)>>;
+
+template<typename T>
+bufptr<T> memAlloc(const size_t &elements);
 void *memAllocUser(const size_t &bytes);
 
 // Need these as 2 separate function and not a default argument
@@ -37,38 +39,42 @@ template<typename T>
 void memFree(T *ptr);
 void memFreeUser(void *ptr);
 
-void memLock(const sycl::buffer *ptr);
-void memUnlock(const sycl::buffer *ptr);
-bool isLocked(const void *ptr);
+template<typename T>
+void memLock(const sycl::buffer<T> *ptr);
 
 template<typename T>
-T *pinnedAlloc(const size_t &elements);
-template<typename T>
-void pinnedFree(T *ptr);
+void memUnlock(const sycl::buffer<T> *ptr);
 
-void deviceMemoryInfo(size_t *alloc_bytes, size_t *alloc_buffers,
-                      size_t *lock_bytes, size_t *lock_buffers);
-void signalMemoryCleanup();
-void shutdownMemoryManager();
-void pinnedGarbageCollect();
+  bool isLocked(const void *ptr);
 
-void printMemInfo(const char *msg, const int device);
+  template<typename T>
+  T *pinnedAlloc(const size_t &elements);
+  template<typename T>
+  void pinnedFree(T *ptr);
 
-float getMemoryPressure();
-float getMemoryPressureThreshold();
-bool jitTreeExceedsMemoryPressure(size_t bytes);
-void setMemStepSize(size_t step_bytes);
-size_t getMemStepSize(void);
+  void deviceMemoryInfo(size_t *alloc_bytes, size_t *alloc_buffers,
+                        size_t *lock_bytes, size_t *lock_buffers);
+  void signalMemoryCleanup();
+  void shutdownMemoryManager();
+  void pinnedGarbageCollect();
 
-class Allocator final : public common::memory::AllocatorInterface {
-   public:
-    Allocator();
-    ~Allocator() = default;
-    void shutdown() override;
-    int getActiveDeviceId() override;
-    size_t getMaxMemorySize(int id) override;
-    void *nativeAlloc(const size_t bytes) override;
-    void nativeFree(void *ptr) override;
+  void printMemInfo(const char *msg, const int device);
+
+  float getMemoryPressure();
+  float getMemoryPressureThreshold();
+  bool jitTreeExceedsMemoryPressure(size_t bytes);
+  void setMemStepSize(size_t step_bytes);
+  size_t getMemStepSize(void);
+
+  class Allocator final : public common::memory::AllocatorInterface {
+     public:
+      Allocator();
+      ~Allocator() = default;
+      void shutdown() override;
+      int getActiveDeviceId() override;
+      size_t getMaxMemorySize(int id) override;
+      void *nativeAlloc(const size_t bytes) override;
+      void nativeFree(void *ptr) override;
 };
 
 class AllocatorPinned final : public common::memory::AllocatorInterface {
@@ -82,7 +88,6 @@ class AllocatorPinned final : public common::memory::AllocatorInterface {
     void nativeFree(void *ptr) override;
 
    private:
-    std::vector<std::map<void *, sycl::buffer *>> pinnedMaps;
 };
 
 }  // namespace oneapi

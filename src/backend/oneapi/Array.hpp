@@ -122,10 +122,13 @@ void *getDevicePtr(const Array<T> &arr);
 
 template<typename T>
 void *getRawPtr(const Array<T> &arr) {
-    const sycl::buffer<T> *buf = arr.get();
-    if (!buf) return NULL;
-    cl_mem mem = (*buf)();
-    return (void *)mem;
+  //const sycl::buffer<T> *buf = arr.get();
+  //if (!buf) return NULL;
+  //cl_mem mem = (*buf)();
+  //return (void *)mem;
+
+  // TODO:
+  return nullptr;
 }
 
 template<typename T>

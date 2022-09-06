@@ -13,12 +13,12 @@
 
 namespace oneapi {
 static std::ostream& operator<<(std::ostream& out, const cfloat& var) {
-    out << "(" << var.s[0] << "," << var.s[1] << ")";
+    out << "(" << std::real(var) << "," << std::imag(var) << ")";
     return out;
 }
 
 static std::ostream& operator<<(std::ostream& out, const cdouble& var) {
-    out << "(" << var.s[0] << "," << var.s[1] << ")";
+    out << "(" << std::real(var) << "," << std::imag(var) << ")";
     return out;
 }
 }  // namespace oneapi

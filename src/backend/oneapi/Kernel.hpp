@@ -42,9 +42,9 @@ class Kernel
    public:
     using ModuleType = const sycl::program*;
     using KernelType = sycl::kernel;
-    using DevPtrType = sycl::buffer*;
+    using DevPtrType<T> = sycl::buffer<T>*;
     using BaseClass =
-        common::KernelInterface<ModuleType, KernelType, Enqueuer, DevPtrType>;
+        common::KernelInterface<ModuleType, KernelType, Enqueuer, DevPtrType<T>>;
 
     Kernel() : BaseClass("", nullptr, cl::Kernel{nullptr, false}) {}
     Kernel(std::string name, ModuleType mod, KernelType ker)
@@ -52,35 +52,39 @@ class Kernel
 
     // clang-format off
     [[deprecated("OpenCL backend doesn't need Kernel::getDevPtr method")]]
-    DevPtrType getDevPtr(const char* name) final;
+    DevPtrType<T> getDevPtr(const char* name) final;
     // clang-format on
 
-    void copyToReadOnly(DevPtrType dst, DevPtrType src, size_t bytes) final;
+    void copyToReadOnly(DevPtrType<T> dst, DevPtrType<T> src, size_t bytes) final;
 
-    void setFlag(DevPtrType dst, int* scalarValPtr,
+    void setFlag(DevPtrType<T> dst, int* scalarValPtr,
                  const bool syncCopy = false) final;
 
-    int getFlag(DevPtrType src) final;
+    int getFlag(DevPtrType<T> src) final;
 };
 */
 
 class Kernel {
    public:
-    using ModuleType = const sycl::info::program*;
+    using ModuleType = const sycl::kernel_bundle<sycl::bundle_state::executable> *;
     using KernelType = sycl::kernel;
-    using DevPtrType = sycl::buffer*;
+  template<typename T>
+    using DevPtrType = sycl::buffer<T>*;
     //using BaseClass =
-        //common::KernelInterface<ModuleType, KernelType, Enqueuer, DevPtrType>;
+        //common::KernelInterface<ModuleType, KernelType, Enqueuer, DevPtrType<T>>;
 
     Kernel() {}
     Kernel(std::string name, ModuleType mod, KernelType ker) {}
 
-    void copyToReadOnly(DevPtrType dst, DevPtrType src, size_t bytes) final;
+    template<typename T>
+    void copyToReadOnly(DevPtrType<T> dst, DevPtrType<T> src, size_t bytes);
 
-    void setFlag(DevPtrType dst, int* scalarValPtr,
-                 const bool syncCopy = false) final;
+    template<typename T>
+    void setFlag(DevPtrType<T> dst, int* scalarValPtr,
+                 const bool syncCopy = false);
 
-    int getFlag(DevPtrType src) final;
+    template<typename T>
+    int getFlag(DevPtrType<T> src);
 };
 
 }  // namespace oneapi

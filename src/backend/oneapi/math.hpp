@@ -138,9 +138,12 @@ STATIC_ common::half minval() {
     return -std::numeric_limits<common::half>::infinity();
 }
 
-  //static inline double real(cdouble in) { return in.s[0]; }
+  template<typename T>
+  static inline T real(T in) { return std::real(in); }
   //static inline float real(cfloat in) { return in.s[0]; }
-  //static inline double imag(cdouble in) { return in.s[1]; }
+  template<typename T>
+  static inline T imag(T in) {return std::imag(in);}
+
   //static inline float imag(cfloat in) { return in.s[1]; }
 
 cfloat operator+(cfloat lhs, cfloat rhs);
