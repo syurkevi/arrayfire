@@ -158,7 +158,8 @@ class Array {
     Array(Param<T> &tmp, bool owner);
     explicit Array(const af::dim4 &dims, common::Node_ptr n);
     explicit Array(const af::dim4 &dims, const T *const in_data);
-    explicit Array(const af::dim4 &dims, cl_mem mem, size_t offset, bool copy);
+
+  explicit Array(const af::dim4 &dims, sycl::buffer<T>* const mem, size_t offset, bool copy);
 
    public:
     Array(const Array<T> &other) = default;
@@ -262,18 +263,18 @@ class Array {
                        {strides()[0], strides()[1], strides()[2], strides()[3]},
                        getOffset()};
 
-        Param out{(sycl::buffer<T> *)this->get(), info};
+        Param<T> out{(sycl::buffer<T> *)this->get(), info};
         return out;
     }
 
-    operator KParam() const {
-        KParam kinfo = {
-            {dims()[0], dims()[1], dims()[2], dims()[3]},
-            {strides()[0], strides()[1], strides()[2], strides()[3]},
-            getOffset()};
+  operator KParam() const {
+      KParam kinfo = {
+          {dims()[0], dims()[1], dims()[2], dims()[3]},
+          {strides()[0], strides()[1], strides()[2], strides()[3]},
+          getOffset()};
 
-        return kinfo;
-    }
+      return kinfo;
+  }
 
     common::Node_ptr getNode() const;
     common::Node_ptr getNode();
