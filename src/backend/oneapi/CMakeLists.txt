@@ -42,6 +42,7 @@ add_library(afoneapi
   wrap.cpp
   where.cpp
   unwrap.cpp
+  sort_index.cpp
   sparse.cpp
   sparse_arith.cpp
   sparse_blas.cpp
