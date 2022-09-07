@@ -42,6 +42,7 @@ add_library(afoneapi
   wrap.cpp
   where.cpp
   unwrap.cpp
+  random_engine.cpp
   range.cpp
   regions.cpp
   reorder.cpp
