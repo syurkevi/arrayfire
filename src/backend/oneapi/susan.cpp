@@ -1,5 +1,5 @@
 /*******************************************************
- * Copyright (c) 2015, Arrayfire
+ * Copyright (c) 2022, Arrayfire
  * all rights reserved.
  *
  * This file is distributed under 3-clause bsd license.
