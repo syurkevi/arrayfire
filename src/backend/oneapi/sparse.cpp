@@ -34,6 +34,7 @@ using namespace common;
 // However, template specialization is not allowed
 template<typename T>
 SparseArray<T> sparseConvertDenseToCOO(const Array<T> &in) {
+    ONEAPI_NOT_SUPPORTED("sparseConvertDenseToCOO Not supported");
     in.eval();
 
     Array<uint> nonZeroIdx_ = where<T>(in);
@@ -59,6 +60,7 @@ SparseArray<T> sparseConvertDenseToCOO(const Array<T> &in) {
 
 template<typename T, af_storage stype>
 SparseArray<T> sparseConvertDenseToStorage(const Array<T> &in_) {
+    ONEAPI_NOT_SUPPORTED("sparseConvertDenseToStorage Not supported");
     in_.eval();
 
     uint nNZ = getScalar<uint>(reduce_all<af_notzero_t, T, uint>(in_));
@@ -79,6 +81,7 @@ SparseArray<T> sparseConvertDenseToStorage(const Array<T> &in_) {
 // However, template specialization is not allowed
 template<typename T>
 Array<T> sparseConvertCOOToDense(const SparseArray<T> &in) {
+    ONEAPI_NOT_SUPPORTED("sparseConvertCOOToDense Not supported");
     in.eval();
 
     Array<T> dense = createValueArray<T>(in.dims(), scalar<T>(0));
@@ -95,6 +98,8 @@ Array<T> sparseConvertCOOToDense(const SparseArray<T> &in) {
 
 template<typename T, af_storage stype>
 Array<T> sparseConvertStorageToDense(const SparseArray<T> &in_) {
+    ONEAPI_NOT_SUPPORTED("sparseConvertStorageToDense Not supported");
+
     if (stype != AF_STORAGE_CSR) {
         AF_ERROR("OpenCL Backend only supports CSR or COO to Dense",
                  AF_ERR_NOT_SUPPORTED);
@@ -121,6 +126,7 @@ Array<T> sparseConvertStorageToDense(const SparseArray<T> &in_) {
 
 template<typename T, af_storage dest, af_storage src>
 SparseArray<T> sparseConvertStorageToStorage(const SparseArray<T> &in) {
+    ONEAPI_NOT_SUPPORTED("sparseConvertStorageToStorage Not supported");
     in.eval();
 
     SparseArray<T> converted = createEmptySparseArray<T>(
