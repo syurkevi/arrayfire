@@ -42,10 +42,10 @@ add_library(afoneapi
   wrap.cpp
   where.cpp
   unwrap.cpp
-  sum.cpp
   sparse.cpp
   sparse_arith.cpp
   sparse_blas.cpp
+  sum.cpp
   surface.cpp
   susan.cpp
   svd.cpp
