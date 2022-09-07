@@ -42,6 +42,7 @@ add_library(afoneapi
   wrap.cpp
   where.cpp
   unwrap.cpp
+  rotate.cpp
   scan.cpp
   scan_by_key.cpp
   select.cpp
