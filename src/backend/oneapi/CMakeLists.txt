@@ -42,6 +42,7 @@ add_library(afoneapi
   wrap.cpp
   where.cpp
   unwrap.cpp
+  orb.cpp
   plot.cpp
   product.cpp
   qr.cpp
