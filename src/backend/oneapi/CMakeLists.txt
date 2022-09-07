@@ -42,6 +42,7 @@ add_library(afoneapi
   wrap.cpp
   where.cpp
   unwrap.cpp
+  surface.cpp
   susan.cpp
   svd.cpp
   tile.cpp
