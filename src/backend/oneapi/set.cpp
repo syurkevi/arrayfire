@@ -1,5 +1,5 @@
 /*******************************************************
- * Copyright (c) 2014, ArrayFire
+ * Copyright (c) 2022, ArrayFire
  * All rights reserved.
  *
  * This file is distributed under 3-clause BSD license.
@@ -14,16 +14,6 @@
 #include <sort.hpp>
 #include <af/dim4.hpp>
 #include <common/deprecated.hpp>
-
-AF_DEPRECATED_WARNINGS_OFF
-#include <boost/compute/algorithm/set_intersection.hpp>
-#include <boost/compute/algorithm/set_union.hpp>
-#include <boost/compute/algorithm/sort.hpp>
-#include <boost/compute/algorithm/unique.hpp>
-#include <boost/compute/iterator/buffer_iterator.hpp>
-AF_DEPRECATED_WARNINGS_ON
-
-namespace compute = boost::compute;
 
 namespace oneapi {
 using af::dim4;
