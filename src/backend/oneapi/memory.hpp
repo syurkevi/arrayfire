@@ -88,6 +88,7 @@ class AllocatorPinned final : public common::memory::AllocatorInterface {
     void nativeFree(void *ptr) override;
 
    private:
+    std::vector<std::map<void *, void *>> pinnedMaps;
 };
 
 }  // namespace oneapi

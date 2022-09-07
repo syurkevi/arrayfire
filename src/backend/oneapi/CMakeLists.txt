@@ -42,6 +42,7 @@ add_library(afoneapi
   wrap.cpp
   where.cpp
   unwrap.cpp
+  memory.cpp
   min.cpp
   moments.cpp
   morph.cpp
