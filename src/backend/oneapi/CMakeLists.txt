@@ -42,6 +42,7 @@ add_library(afoneapi
   wrap.cpp
   where.cpp
   unwrap.cpp
+  transpose.cpp
   triangle.cpp
   )
 
