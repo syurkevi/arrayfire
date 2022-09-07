@@ -7,18 +7,16 @@
  * http://arrayfire.com/licenses/BSD-3-Clause
  ********************************************************/
 
-// Include this before af/opencl.h
-// Causes conflict between system cl.hpp and opencl/cl.hpp
 #include <common/graphics_common.hpp>
 
 //#include <GraphicsResourceManager.hpp>
-#include <common/DefaultMemoryManager.hpp>
+//#include <common/DefaultMemoryManager.hpp>
 #include <common/Logger.hpp>
 #include <common/defines.hpp>
 #include <common/host_memory.hpp>
 #include <common/util.hpp>
 #include <device_manager.hpp>
-//#include <err_opencl.hpp>
+#include <err_oneapi.hpp>
 //#include <errorcodes.hpp>
 #include <version.hpp>
 //#include <af/oneapi.h>
@@ -68,6 +66,7 @@ static afcl::deviceType getDeviceTypeEnum(const Device& dev) {
 
 static inline bool compare_default(const unique_ptr<Device>& ldev,
                                    const unique_ptr<Device>& rdev) {
+    ONEAPI_NOT_SUPPORTED("");
     const cl_device_type device_types[] = {CL_DEVICE_TYPE_GPU,
                                            CL_DEVICE_TYPE_ACCELERATOR};
 

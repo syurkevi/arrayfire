@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <CL/sycl.hpp>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -109,12 +110,14 @@ class DeviceManager {
 
     friend int setDevice(int device);
 
+/*
     friend void addDeviceContext(cl_device_id dev, cl_context ctx,
                                  cl_command_queue que);
 
     friend void setDeviceContext(cl_device_id dev, cl_context ctx);
 
     friend void removeDeviceContext(cl_device_id dev, cl_context ctx);
+*/
 
     friend int getActiveDeviceType();
 
