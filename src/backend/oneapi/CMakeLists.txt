@@ -11,14 +11,39 @@ include(build_cl2hpp)
 add_library(afoneapi
   Array.cpp
   Event.cpp
+  approx.cpp
+  approx.hpp
+  arith.hpp
+  assign.cpp
+  assign.hpp
+  backend.hpp
+  bilateral.cpp
+  bilateral.hpp
+  binary.hpp
+  blas.cpp
+  blas.hpp
+  canny.cpp
+  canny.hpp
+  cast.hpp
+  cholesky.cpp
+  cholesky.hpp
+  compile_module.cpp
+  complex.hpp
+  convolve.cpp
+  convolve.hpp
+  convolve_separable.cpp
+  copy.cpp
+  copy.hpp
+  count.cpp
+  device_manager.cpp
+  device_manager.hpp
+  platform.cpp
+  platform.hpp
   wrap.cpp
   where.cpp
   unwrap.cpp
   triangle.cpp
-                device_manager.cpp
-                device_manager.hpp
-                platform.cpp
-                platform.hpp)
+  )
 
 add_library(ArrayFire::afoneapi ALIAS afoneapi)
 

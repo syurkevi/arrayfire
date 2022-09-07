@@ -8,9 +8,9 @@
  ********************************************************/
 
 #include <Array.hpp>
-#include <err_opencl.hpp>
-#include <kernel/reduce.hpp>
-#include <kernel/reduce_by_key.hpp>
+#include <err_oneapi.hpp>
+//#include <kernel/reduce.hpp>
+//#include <kernel/reduce_by_key.hpp>
 #include <reduce.hpp>
 #include <af/dim4.hpp>
 #include <complex>
@@ -21,25 +21,23 @@ namespace oneapi {
 template<af_op_t op, typename Ti, typename To>
 Array<To> reduce(const Array<Ti> &in, const int dim, bool change_nan,
                  double nanval) {
-    dim4 odims    = in.dims();
-    odims[dim]    = 1;
-    Array<To> out = createEmptyArray<To>(odims);
-    kernel::reduce<Ti, To, op>(out, in, dim, change_nan, nanval);
+    ONEAPI_NOT_SUPPORTED("");
+    Array<To> out = createEmptyArray<To>(1);
     return out;
+
 }
 
 template<af_op_t op, typename Ti, typename Tk, typename To>
 void reduce_by_key(Array<Tk> &keys_out, Array<To> &vals_out,
                    const Array<Tk> &keys, const Array<Ti> &vals, const int dim,
                    bool change_nan, double nanval) {
-    kernel::reduceByKey<op, Ti, Tk, To>(keys_out, vals_out, keys, vals, dim,
-                                        change_nan, nanval);
+    ONEAPI_NOT_SUPPORTED("");
 }
 
 template<af_op_t op, typename Ti, typename To>
 Array<To> reduce_all(const Array<Ti> &in, bool change_nan, double nanval) {
+    ONEAPI_NOT_SUPPORTED("");
     Array<To> out = createEmptyArray<To>(1);
-    kernel::reduceAll<Ti, To, op>(out, in, change_nan, nanval);
     return out;
 }
 
