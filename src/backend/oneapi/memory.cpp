@@ -47,7 +47,7 @@ void signalMemoryCleanup() { memoryManager().signalMemoryCleanup(); }
 
 void shutdownMemoryManager() { memoryManager().shutdown(); }
 
-void shutdownPinnedMemoryManager() { pinnedMemoryManager().shutdown(); }
+void shutdownPinnedMemoryManager() { /*pinnedMemoryManager().shutdown();*/ }
 
 void printMemInfo(const char *msg, const int device) {
     memoryManager().printInfo(msg, device);
@@ -55,10 +55,12 @@ void printMemInfo(const char *msg, const int device) {
 
 template<typename T>
 // unique_ptr<cl::Buffer, function<void(cl::Buffer *)>> memAlloc(
-unique_ptr<int, function<void(int *)>> memAlloc(
+//unique_ptr<int, function<void(int *)>> memAlloc(
+std::unique_ptr<sycl::buffer<T>, std::function<void(sycl::buffer<T> *)>> memAlloc(
     const size_t &elements) {
     ONEAPI_NOT_SUPPORTED("memAlloc Not supported");
-    return unique_ptr<int, function<void(int *)>>();
+    //return unique_ptr<int, function<void(int *)>>();
+    return unique_ptr<sycl::buffer<T>, function<void(sycl::buffer<T> *)>>();
     // // TODO: make memAlloc aware of array shapes
     // if (elements) {
     //     dim4 dims(elements);
@@ -175,15 +177,19 @@ T *pinnedAlloc(const size_t &elements) {
 
 template<typename T>
 void pinnedFree(T *ptr) {
-    pinnedMemoryManager().unlock(static_cast<void *>(ptr), false);
+    //pinnedMemoryManager().unlock(static_cast<void *>(ptr), false);
 }
 
-#define INSTANTIATE(T)                                                         \
-    template unique_ptr<int, function<void(int *)>> memAlloc<T>(               \
-        const size_t &elements);                                               \
-    template void memFree(T *ptr);                                             \
-    template T *pinnedAlloc(const size_t &elements);                           \
-    template void pinnedFree(T *ptr);
+//template unique_ptr<int, function<void(int *)>> memAlloc<T>(
+#define INSTANTIATE(T)                                                                          \
+    template std::unique_ptr<sycl::buffer<T>, std::function<void(sycl::buffer<T> *)>> memAlloc( \
+        const size_t &elements);                                                                \
+    template void memFree(T *ptr);                                                              \
+    template T *pinnedAlloc(const size_t &elements);                                            \
+    template void pinnedFree(T *ptr);                                                           \
+    template void bufferFree(sycl::buffer<T> *buf);                                             \
+    template void memLock(const sycl::buffer<T> *buf);                                          \
+    template void memUnlock(const sycl::buffer<T> *buf);
 
 INSTANTIATE(float)
 INSTANTIATE(cfloat)

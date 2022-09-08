@@ -16,7 +16,7 @@
 #include <err_oneapi.hpp>  // error check functions and Macros
                            // specific to oneapi backend
 
-#include <kernel/exampleFunction.hpp>  // this header under the folder src/oneapi/kernel
+//#include <kernel/exampleFunction.hpp>  // this header under the folder src/oneapi/kernel
                                        // defines the OneAPI kernel wrapper
 // function to which the main computation of your
 // algorithm should be relayed to

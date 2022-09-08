@@ -10,7 +10,17 @@ include(build_cl2hpp)
 
 add_library(afoneapi
   Array.cpp
+  Array.hpp
   Event.cpp
+  Event.hpp
+  GraphicsResourceManager.cpp
+  GraphicsResourceManager.hpp
+  Module.hpp
+  Param.hpp
+  all.cpp
+  anisotropic_diffusion.cpp
+  anisotropic_diffusion.hpp
+  any.cpp
   approx.cpp
   approx.hpp
   arith.hpp
@@ -37,52 +47,158 @@ add_library(afoneapi
   count.cpp
   device_manager.cpp
   device_manager.hpp
-  platform.cpp
-  platform.hpp
-  wrap.cpp
-  where.cpp
-  unwrap.cpp
+  diagonal.cpp
+  diagonal.hpp
+  diff.cpp
+  diff.hpp
+  err_oneapi.hpp
+  errorcodes.cpp
+  errorcodes.hpp
+  exampleFunction.cpp
+  exampleFunction.hpp
+  fast.cpp
+  fast.hpp
+  fft.cpp
+  fft.hpp
+  fftconvolve.cpp
+  fftconvolve.hpp
+  flood_fill.cpp
+  flood_fill.hpp
+  gradient.cpp
+  gradient.hpp
+  harris.cpp
+  harris.hpp
+  hist_graphics.cpp
+  hist_graphics.hpp
+  histogram.cpp
+  histogram.hpp
+  homography.cpp
+  homography.hpp
+  hsv_rgb.cpp
+  hsv_rgb.hpp
+  identity.cpp
+  identity.hpp
+  iir.cpp
+  iir.hpp
+  image.cpp
+  image.hpp
+  index.cpp
+  index.hpp
+  inverse.cpp
+  inverse.hpp
+  iota.cpp
+  iota.hpp
+  ireduce.cpp
+  ireduce.hpp
+  jit.cpp
+  join.cpp
+  join.hpp
+  logic.hpp
+  lookup.cpp
+  lookup.hpp
+  lu.cpp
+  lu.hpp
+  match_template.cpp
+  match_template.hpp
+  math.cpp
+  math.hpp
   max.cpp
   mean.cpp
+  mean.hpp
   meanshift.cpp
+  meanshift.hpp
   medfilt.cpp
+  medfilt.hpp
   memory.cpp
+  memory.hpp
   min.cpp
   moments.cpp
+  moments.hpp
   morph.cpp
+  morph.hpp
   nearest_neighbour.cpp
+  nearest_neighbour.hpp
   orb.cpp
+  orb.hpp
+  platform.cpp
+  platform.hpp
   plot.cpp
+  plot.hpp
+  print.hpp
   product.cpp
   qr.cpp
+  qr.hpp
   random_engine.cpp
+  random_engine.hpp
   range.cpp
+  range.hpp
+  reduce.hpp
+  reduce_impl.hpp
   regions.cpp
+  regions.hpp
   reorder.cpp
+  reorder.hpp
   reshape.cpp
   resize.cpp
+  resize.hpp
   rotate.cpp
+  rotate.hpp
+  scalar.hpp
   scan.cpp
+  scan.hpp
   scan_by_key.cpp
+  scan_by_key.hpp
   select.cpp
+  select.hpp
   set.cpp
+  set.hpp
+  shift.cpp
+  shift.hpp
   sift.cpp
+  sift.hpp
   sobel.cpp
+  sobel.hpp
   solve.cpp
+  solve.hpp
   sort.cpp
+  sort.hpp
+  sort_by_key.cpp
+  sort_by_key.hpp
   sort_index.cpp
+  sort_index.hpp
   sparse.cpp
+  sparse.hpp
   sparse_arith.cpp
+  sparse_arith.hpp
   sparse_blas.cpp
+  sparse_blas.hpp
   sum.cpp
   surface.cpp
+  surface.hpp
   susan.cpp
+  susan.hpp
   svd.cpp
+  svd.hpp
   tile.cpp
+  tile.hpp
   topk.cpp
+  topk.hpp
   transform.cpp
+  transform.hpp
   transpose.cpp
+  transpose_inplace.cpp
+  transpose.hpp
   triangle.cpp
+  triangle.hpp
+  types.hpp
+  unwrap.cpp
+  unwrap.hpp
+  vector_field.cpp
+  vector_field.hpp
+  where.cpp
+  where.hpp
+  wrap.cpp
+  wrap.hpp
   )
 
 add_library(ArrayFire::afoneapi ALIAS afoneapi)

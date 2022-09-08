@@ -12,6 +12,7 @@
 #include <Array.hpp>
 #include <fft.hpp>
 #include <af/dim4.hpp>
+#include <err_oneapi.hpp>
 
 #include <cmath>
 #include <type_traits>

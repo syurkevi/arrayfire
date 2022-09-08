@@ -11,7 +11,7 @@
 #include <common/half.hpp>
 #include <diagonal.hpp>
 #include <err_oneapi.hpp>
-#include <kernel/diagonal.hpp>
+//#include <kernel/diagonal.hpp>
 #include <math.hpp>
 #include <af/dim4.hpp>
 

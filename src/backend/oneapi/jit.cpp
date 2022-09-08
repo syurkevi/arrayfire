@@ -48,6 +48,7 @@ string getKernelString(const string &funcName, const vector<Node *> &full_nodes,
     return "";
 }
 
+/*
 cl::Kernel getKernel(const vector<Node *> &output_nodes,
                      const vector<int> &output_ids,
                      const vector<Node *> &full_nodes,
@@ -55,7 +56,9 @@ cl::Kernel getKernel(const vector<Node *> &output_nodes,
     ONEAPI_NOT_SUPPORTED("");
     return common::getKernel("", "", true).get();
 }
+*/
 
+/*
 void evalNodes(vector<Param> &outputs, const vector<Node *> &output_nodes) {
     ONEAPI_NOT_SUPPORTED("");
 }
@@ -63,5 +66,6 @@ void evalNodes(vector<Param> &outputs, const vector<Node *> &output_nodes) {
 void evalNodes(Param &out, Node *node) {
     ONEAPI_NOT_SUPPORTED("");
 }
+*/
 
 }  // namespace oneapi

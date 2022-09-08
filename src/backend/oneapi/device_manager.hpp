@@ -19,10 +19,6 @@
 #define AF_OPENCL_MEM_DEBUG 0
 #endif
 
-// Forward declarations
-struct clfftSetupData_;
-
-
 namespace boost {
 template<typename T>
 class shared_ptr;
@@ -49,7 +45,6 @@ namespace oneapi {
 // opencl namespace forward declarations
 class GraphicsResourceManager;
 struct kc_entry_t;  // kernel cache entry
-class PlanCache;    // clfft
 
 class DeviceManager {
     friend MemoryManagerBase& memoryManager();
@@ -76,7 +71,7 @@ class DeviceManager {
 
     friend GraphicsResourceManager& interopManager();
 
-    friend PlanCache& fftManager();
+    //friend PlanCache& fftManager();
 
     friend void addKernelToCache(int device, const std::string& key,
                                  const kc_entry_t entry);
@@ -89,7 +84,7 @@ class DeviceManager {
 
     friend int getDeviceCount() noexcept;
 
-    friend int getDeviceIdFromNativeId(cl_device_id id);
+    //friend int getDeviceIdFromNativeId(cl_device_id id);
 
     friend const sycl::context& getContext();
 
@@ -133,8 +128,6 @@ class DeviceManager {
     spdlog::logger* getLogger();
 
    protected:
-    using clfftSetupData = clfftSetupData_;
-
     DeviceManager();
 
     // Following two declarations are required to
@@ -161,7 +154,6 @@ class DeviceManager {
     std::unique_ptr<MemoryManagerBase> memManager;
     std::unique_ptr<MemoryManagerBase> pinnedMemManager;
     std::unique_ptr<GraphicsResourceManager> gfxManagers[MAX_DEVICES];
-    std::unique_ptr<clfftSetupData> mFFTSetup;
     std::mutex mutex;
 
   //using BoostProgCache = boost::shared_ptr<boost::compute::program_cache>;

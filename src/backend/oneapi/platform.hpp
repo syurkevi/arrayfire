@@ -82,11 +82,11 @@ std::string getPlatformName(const sycl::device& device);
 
 int setDevice(int device);
 
-void addDeviceContext(cl_device_id dev, cl_context ctx, cl_command_queue que);
+void addDeviceContext(sycl::device dev, sycl::context ctx, sycl::queue que);
 
-void setDeviceContext(cl_device_id dev, cl_context ctx);
+void setDeviceContext(sycl::device dev, sycl::context ctx);
 
-void removeDeviceContext(cl_device_id dev, cl_context ctx);
+void removeDeviceContext(sycl::device dev, sycl::context ctx);
 
 void sync(int device);
 

@@ -22,6 +22,7 @@ namespace oneapi {
 void setFFTPlanCacheSize(size_t numPlans) {
 }
 
+/*
 template<typename T>
 struct Precision;
 template<>
@@ -32,6 +33,7 @@ template<>
 struct Precision<cdouble> {
     enum { type = CLFFT_DOUBLE };
 };
+*/
 
 void computeDims(size_t rdims[AF_MAX_DIMS], const dim4 &idims) {
     for (int i = 0; i < AF_MAX_DIMS; i++) {

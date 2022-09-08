@@ -19,7 +19,7 @@
 #include <errorcodes.hpp>
 #include <version.hpp>
 #include <af/version.h>
-#include <memory>
+#include <memory.hpp>
 
 #ifdef OS_MAC
 #include <OpenGL/CGLCurrent.h>
@@ -134,7 +134,7 @@ string getDeviceInfo() noexcept {
     return "";
 }
 
-string getPlatformName(const cl::Device& device) {
+string getPlatformName(const sycl::device& device) {
     ONEAPI_NOT_SUPPORTED("");
     return "";
 }
@@ -153,27 +153,18 @@ void setActiveContext(int device) {
     tlocalActiveDeviceId() = make_pair(device, device);
 }
 
-int getDeviceCount() noexcept try {
-    DeviceManager& devMngr = DeviceManager::getInstance();
-
-    common::lock_guard_t lock(devMngr.deviceMutex);
-    return static_cast<int>(devMngr.mQueues.size());
-} catch (const AfError& err) {
-    UNUSED(err);
-    // If device manager threw an error then return 0 because no platforms
-    // were found
+int getDeviceCount() noexcept {
+    ONEAPI_NOT_SUPPORTED("");
     return 0;
 }
 
 void init() {
-    thread_local const DeviceManager& devMngr = DeviceManager::getInstance();
-    UNUSED(devMngr);
+    ONEAPI_NOT_SUPPORTED("");
 }
 
 unsigned getActiveDeviceId() {
-    // Second element is the queue id, which is
-    // what we mean by active device id in opencl backend
-    return get<1>(tlocalActiveDeviceId());
+    ONEAPI_NOT_SUPPORTED("");
+    return 0;
 }
 
 /*
@@ -217,6 +208,9 @@ const context& getContext() {
 }
 
 sycl::queue& getQueue() {
+    sycl::queue q;
+    return q; 
+    /*
     device_id_t& devId = tlocalActiveDeviceId();
 
     DeviceManager& devMngr = DeviceManager::getInstance();
@@ -224,9 +218,13 @@ sycl::queue& getQueue() {
     common::lock_guard_t lock(devMngr.deviceMutex);
 
     return *(devMngr.mQueues[get<1>(devId)]);
+    */
 }
 
 const sycl::device& getDevice(int id) {
+    sycl::device d;
+    return d;
+    /*
     device_id_t& devId = tlocalActiveDeviceId();
 
     if (id == -1) { id = get<1>(devId); }
@@ -235,283 +233,76 @@ const sycl::device& getDevice(int id) {
 
     common::lock_guard_t lock(devMngr.deviceMutex);
     return *(devMngr.mDevices[id]);
+    */
 }
 
 size_t getDeviceMemorySize(int device) {
-    DeviceManager& devMngr = DeviceManager::getInstance();
-
-    cl::Device dev;
-    {
-        common::lock_guard_t lock(devMngr.deviceMutex);
-        // Assuming devices don't deallocate or are invalidated during execution
-        dev = *devMngr.mDevices[device];
-    }
-    size_t msize = dev.getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>();
-    return msize;
+    ONEAPI_NOT_SUPPORTED("");
+    return 0;
 }
 
 size_t getHostMemorySize() { return common::getHostMemorySize(); }
 
+/*
 cl_device_type getDeviceType() {
-    const cl::Device& device = getDevice();
-    cl_device_type type      = device.getInfo<CL_DEVICE_TYPE>();
+    const sycl::device& device = getDevice();
+    cl_device_type type        = device.getInfo<CL_DEVICE_TYPE>();
     return type;
 }
+*/
 
-bool isHostUnifiedMemory(const cl::Device& device) {
-    return device.getInfo<CL_DEVICE_HOST_UNIFIED_MEMORY>();
+bool isHostUnifiedMemory(const sycl::device& device) {
+    ONEAPI_NOT_SUPPORTED("");
+    return false;
 }
 
 bool OpenCLCPUOffload(bool forceOffloadOSX) {
-    static const bool offloadEnv = getEnvVar("AF_OPENCL_CPU_OFFLOAD") != "0";
-    bool offload                 = false;
-    if (offloadEnv) { offload = isHostUnifiedMemory(getDevice()); }
-#if OS_MAC
-    // FORCED OFFLOAD FOR LAPACK FUNCTIONS ON OSX UNIFIED MEMORY DEVICES
-    //
-    // On OSX Unified Memory devices (Intel), always offload LAPACK but not GEMM
-    // irrespective of the AF_OPENCL_CPU_OFFLOAD value
-    // From GEMM, OpenCLCPUOffload(false) is called which will render the
-    // variable inconsequential to the returned result.
-    //
-    // Issue https://github.com/arrayfire/arrayfire/issues/662
-    //
-    // Make sure device has unified memory
-    bool osx_offload = isHostUnifiedMemory(getDevice());
-    // Force condition
-    offload = osx_offload && (offload || forceOffloadOSX);
-#else
-    UNUSED(forceOffloadOSX);
-#endif
-    return offload;
+    ONEAPI_NOT_SUPPORTED("");
+    return false;
 }
 
 bool isGLSharingSupported() {
-    device_id_t& devId = tlocalActiveDeviceId();
-
-    DeviceManager& devMngr = DeviceManager::getInstance();
-
-    common::lock_guard_t lock(devMngr.deviceMutex);
-
-    return devMngr.mIsGLSharingOn[get<1>(devId)];
+    ONEAPI_NOT_SUPPORTED("");
+    return false;
 }
 
 bool isDoubleSupported(unsigned device) {
-    DeviceManager& devMngr = DeviceManager::getInstance();
-
-    cl::Device dev;
-    {
-        common::lock_guard_t lock(devMngr.deviceMutex);
-        dev = *devMngr.mDevices[device];
-    }
-    // 64bit fp is an optional extension
-    return (dev.getInfo<CL_DEVICE_EXTENSIONS>().find("cl_khr_fp64") !=
-            string::npos);
+    ONEAPI_NOT_SUPPORTED("");
+    return false;
 }
 
 bool isHalfSupported(unsigned device) {
-    DeviceManager& devMngr = DeviceManager::getInstance();
-
-    cl::Device dev;
-    {
-        common::lock_guard_t lock(devMngr.deviceMutex);
-        dev = *devMngr.mDevices[device];
-    }
-    // 16bit fp is an option extension
-    return (dev.getInfo<CL_DEVICE_EXTENSIONS>().find("cl_khr_fp16") !=
-            string::npos);
+    ONEAPI_NOT_SUPPORTED("");
+    return false;
 }
 
 void devprop(char* d_name, char* d_platform, char* d_toolkit, char* d_compute) {
-    unsigned nDevices    = 0;
-    auto currActiveDevId = static_cast<unsigned>(getActiveDeviceId());
-    bool devset          = false;
-
-    DeviceManager& devMngr = DeviceManager::getInstance();
-
-    {
-        common::lock_guard_t lock(devMngr.deviceMutex);
-
-        for (auto& context : devMngr.mContexts) {
-            vector<Device> devices = context->getInfo<CL_CONTEXT_DEVICES>();
-
-            for (auto& device : devices) {
-                const Platform platform(device.getInfo<CL_DEVICE_PLATFORM>());
-                string platStr = platform.getInfo<CL_PLATFORM_NAME>();
-
-                if (currActiveDevId == nDevices) {
-                    string dev_str;
-                    device.getInfo(CL_DEVICE_NAME, &dev_str);
-                    string com_str = device.getInfo<CL_DEVICE_VERSION>();
-                    com_str        = com_str.substr(7, 3);
-
-                    // strip out whitespace from the device string:
-                    const string& whitespace = " \t";
-                    const auto strBegin = dev_str.find_first_not_of(whitespace);
-                    const auto strEnd   = dev_str.find_last_not_of(whitespace);
-                    const auto strRange = strEnd - strBegin + 1;
-                    dev_str             = dev_str.substr(strBegin, strRange);
-
-                    // copy to output
-                    snprintf(d_name, 64, "%s", dev_str.c_str());
-                    snprintf(d_platform, 10, "OpenCL");
-                    snprintf(d_toolkit, 64, "%s", platStr.c_str());
-                    snprintf(d_compute, 10, "%s", com_str.c_str());
-                    devset = true;
-                }
-                if (devset) { break; }
-                nDevices++;
-            }
-            if (devset) { break; }
-        }
-    }
-
-    // Sanitize input
-    for (int i = 0; i < 31; i++) {
-        if (d_name[i] == ' ') {
-            if (d_name[i + 1] == 0 || d_name[i + 1] == ' ') {
-                d_name[i] = 0;
-            } else {
-                d_name[i] = '_';
-            }
-        }
-    }
+    ONEAPI_NOT_SUPPORTED("");
 }
 
 int setDevice(int device) {
-    DeviceManager& devMngr = DeviceManager::getInstance();
-
-    common::lock_guard_t lock(devMngr.deviceMutex);
-
-    if (device >= static_cast<int>(devMngr.mQueues.size()) ||
-        device >= static_cast<int>(DeviceManager::MAX_DEVICES)) {
-        return -1;
-    } else {
-        int old = getActiveDeviceId();
-        setActiveContext(device);
-        return old;
-    }
+    ONEAPI_NOT_SUPPORTED("");
+    return 0;
 }
 
 void sync(int device) {
-    int currDevice = getActiveDeviceId();
-    setDevice(device);
-    getQueue().finish();
-    setDevice(currDevice);
+    ONEAPI_NOT_SUPPORTED("");
 }
 
-void addDeviceContext(cl_device_id dev, cl_context ctx, cl_command_queue que) {
-    DeviceManager& devMngr = DeviceManager::getInstance();
-
-    int nDevices = 0;
-    {
-        common::lock_guard_t lock(devMngr.deviceMutex);
-
-        auto tDevice  = make_unique<cl::Device>(dev, true);
-        auto tContext = make_unique<cl::Context>(ctx, true);
-        auto tQueue =
-            (que == NULL ? make_unique<cl::CommandQueue>(*tContext, *tDevice)
-                         : make_unique<cl::CommandQueue>(que, true));
-        devMngr.mPlatforms.push_back(getPlatformEnum(*tDevice));
-        // FIXME: add OpenGL Interop for user provided contexts later
-        devMngr.mIsGLSharingOn.push_back(false);
-        devMngr.mDeviceTypes.push_back(
-            static_cast<int>(tDevice->getInfo<CL_DEVICE_TYPE>()));
-
-        devMngr.mDevices.push_back(move(tDevice));
-        devMngr.mContexts.push_back(move(tContext));
-        devMngr.mQueues.push_back(move(tQueue));
-        nDevices = static_cast<int>(devMngr.mDevices.size()) - 1;
-
-        // cache the boost program_cache object, clean up done on program exit
-        // not during removeDeviceContext
-        namespace compute = boost::compute;
-        using BPCache     = DeviceManager::BoostProgCache;
-        compute::context c(ctx);
-        BPCache currCache = compute::program_cache::get_global_cache(c);
-        devMngr.mBoostProgCacheVector.emplace_back(new BPCache(currCache));
-    }
-
-    // Last/newly added device needs memory management
-    memoryManager().addMemoryManagement(nDevices);
+void addDeviceContext(sycl::device dev, sycl::context ctx, sycl::queue que) {
+    ONEAPI_NOT_SUPPORTED("");
 }
 
-void setDeviceContext(cl_device_id dev, cl_context ctx) {
-    // FIXME: add OpenGL Interop for user provided contexts later
-    DeviceManager& devMngr = DeviceManager::getInstance();
-
-    common::lock_guard_t lock(devMngr.deviceMutex);
-
-    const int dCount = static_cast<int>(devMngr.mDevices.size());
-    for (int i = 0; i < dCount; ++i) {
-        if (devMngr.mDevices[i]->operator()() == dev &&
-            devMngr.mContexts[i]->operator()() == ctx) {
-            setActiveContext(i);
-            return;
-        }
-    }
-    AF_ERROR("No matching device found", AF_ERR_ARG);
+void setDeviceContext(sycl::device dev, sycl::context ctx) {
+    ONEAPI_NOT_SUPPORTED("");
 }
 
-void removeDeviceContext(cl_device_id dev, cl_context ctx) {
-    if (getDevice()() == dev && getContext()() == ctx) {
-        AF_ERROR("Cannot pop the device currently in use", AF_ERR_ARG);
-    }
-
-    DeviceManager& devMngr = DeviceManager::getInstance();
-
-    int deleteIdx = -1;
-    {
-        common::lock_guard_t lock(devMngr.deviceMutex);
-
-        const int dCount = static_cast<int>(devMngr.mDevices.size());
-        for (int i = 0; i < dCount; ++i) {
-            if (devMngr.mDevices[i]->operator()() == dev &&
-                devMngr.mContexts[i]->operator()() == ctx) {
-                deleteIdx = i;
-                break;
-            }
-        }
-    }
-
-    if (deleteIdx < static_cast<int>(devMngr.mUserDeviceOffset)) {
-        AF_ERROR("Cannot pop ArrayFire internal devices", AF_ERR_ARG);
-    } else if (deleteIdx == -1) {
-        AF_ERROR("No matching device found", AF_ERR_ARG);
-    } else {
-        // remove memory management for device added by user outside of the lock
-        memoryManager().removeMemoryManagement(deleteIdx);
-
-        common::lock_guard_t lock(devMngr.deviceMutex);
-        // FIXME: this case can potentially cause issues due to the
-        // modification of the device pool stl containers.
-
-        // IF the current active device is enumerated at a position
-        // that lies ahead of the device that has been requested
-        // to be removed. We just pop the entries from pool since it
-        // has no side effects.
-        devMngr.mDevices.erase(devMngr.mDevices.begin() + deleteIdx);
-        devMngr.mContexts.erase(devMngr.mContexts.begin() + deleteIdx);
-        devMngr.mQueues.erase(devMngr.mQueues.begin() + deleteIdx);
-        devMngr.mPlatforms.erase(devMngr.mPlatforms.begin() + deleteIdx);
-
-        // FIXME: add OpenGL Interop for user provided contexts later
-        devMngr.mIsGLSharingOn.erase(devMngr.mIsGLSharingOn.begin() +
-                                     deleteIdx);
-
-        // OTHERWISE, update(decrement) the thread local active device ids
-        device_id_t& devId = tlocalActiveDeviceId();
-
-        if (deleteIdx < static_cast<int>(devId.first)) {
-            device_id_t newVals = make_pair(devId.first - 1, devId.second - 1);
-            devId               = newVals;
-        }
-    }
+void removeDeviceContext(sycl::device dev, sycl::context ctx) {
+    ONEAPI_NOT_SUPPORTED("");
 }
 
 bool synchronize_calls() {
-    static const bool sync = getEnvVar("AF_SYNCHRONOUS_CALLS") == "1";
-    return sync;
+    return false;
 }
 
 int& getMaxJitSize() {
@@ -534,6 +325,7 @@ int& getMaxJitSize() {
 }
 
 bool& evalFlag() {
+    ONEAPI_NOT_SUPPORTED("");
     thread_local bool flag = true;
     return flag;
 }
@@ -558,64 +350,34 @@ MemoryManagerBase& memoryManager() {
     return *(inst.memManager.get());
 }
 
+/*
 MemoryManagerBase& pinnedMemoryManager() {
-    static once_flag flag;
-
-    DeviceManager& inst = DeviceManager::getInstance();
-
-    call_once(flag, [&]() {
-        // By default, create an instance of the default memory manager
-        inst.pinnedMemManager = make_unique<common::DefaultMemoryManager>(
-            getDeviceCount(), common::MAX_BUFFERS,
-            AF_MEM_DEBUG || AF_OPENCL_MEM_DEBUG);
-        // Set the memory manager's device memory manager
-        unique_ptr<AllocatorPinned> deviceMemoryManager;
-        deviceMemoryManager = make_unique<AllocatorPinned>();
-        inst.pinnedMemManager->setAllocator(move(deviceMemoryManager));
-        inst.pinnedMemManager->initialize();
-    });
-
-    return *(inst.pinnedMemManager.get());
+    ONEAPI_NOT_SUPPORTED("");
 }
+*/
 
 void setMemoryManager(unique_ptr<MemoryManagerBase> mgr) {
-    return DeviceManager::getInstance().setMemoryManager(move(mgr));
+    ONEAPI_NOT_SUPPORTED("");
 }
 
 void resetMemoryManager() {
-    return DeviceManager::getInstance().resetMemoryManager();
+    ONEAPI_NOT_SUPPORTED("");
 }
 
 void setMemoryManagerPinned(unique_ptr<MemoryManagerBase> mgr) {
-    return DeviceManager::getInstance().setMemoryManagerPinned(move(mgr));
+    ONEAPI_NOT_SUPPORTED("");
 }
 
 void resetMemoryManagerPinned() {
-    return DeviceManager::getInstance().resetMemoryManagerPinned();
+    ONEAPI_NOT_SUPPORTED("");
 }
 
 graphics::ForgeManager& forgeManager() {
-    return *(DeviceManager::getInstance().fgMngr);
+    ONEAPI_NOT_SUPPORTED("");
 }
 
 GraphicsResourceManager& interopManager() {
-    static once_flag initFlags[DeviceManager::MAX_DEVICES];
-
-    int id = getActiveDeviceId();
-
-    DeviceManager& inst = DeviceManager::getInstance();
-
-    call_once(initFlags[id], [&] {
-        inst.gfxManagers[id] = make_unique<GraphicsResourceManager>();
-    });
-
-    return *(inst.gfxManagers[id].get());
-}
-
-PlanCache& fftManager() {
-    thread_local PlanCache clfftManagers[DeviceManager::MAX_DEVICES];
-
-    return clfftManagers[getActiveDeviceId()];
+    ONEAPI_NOT_SUPPORTED("");
 }
 
 }  // namespace oneapi
