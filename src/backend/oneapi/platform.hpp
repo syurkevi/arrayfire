@@ -10,10 +10,15 @@
 #pragma once
 
 #include <CL/sycl.hpp>
-#include <GraphicsResourceManager.hpp>
+//#include <af/oneapi.h>
 
 #include <memory>
 #include <string>
+
+// Forward declarations
+namespace spdlog {
+class logger;
+}
 
 namespace graphics {
 class ForgeManager;
@@ -28,6 +33,10 @@ class MemoryManagerBase;
 using common::memory::MemoryManagerBase;
 
 namespace oneapi {
+
+// Forward declarations
+class GraphicsResourceManager;
+class PlanCache;  // clfft
 
 bool verify_present(const std::string& pname, const std::string ref);
 
@@ -53,11 +62,12 @@ size_t getDeviceMemorySize(int device);
 
 size_t getHostMemorySize();
 
+//sycl::device::is_cpu,is_gpu,is_accelerator
 //cl_device_type getDeviceType();
 
 bool isHostUnifiedMemory(const sycl::device& device);
 
-//bool OpenCLCPUOffload(bool forceOffloadOSX = true);
+bool OneAPICPUOffload(bool forceOffloadOSX = true);
 
 bool isGLSharingSupported();
 
@@ -72,11 +82,11 @@ std::string getPlatformName(const sycl::device& device);
 
 int setDevice(int device);
 
-//void addDeviceContext(cl_device_id dev, cl_context ctx, cl_command_queue que);
+void addDeviceContext(cl_device_id dev, cl_context ctx, cl_command_queue que);
 
-//void setDeviceContext(cl_device_id dev, cl_context ctx);
+void setDeviceContext(cl_device_id dev, cl_context ctx);
 
-//void removeDeviceContext(cl_device_id dev, cl_context ctx);
+void removeDeviceContext(cl_device_id dev, cl_context ctx);
 
 void sync(int device);
 
@@ -103,6 +113,8 @@ void resetMemoryManagerPinned();
 graphics::ForgeManager& forgeManager();
 
 GraphicsResourceManager& interopManager();
+
+//afcl::platform getPlatformEnum(cl::Device dev);
 
 void setActiveContext(int device);
 
