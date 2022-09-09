@@ -10,6 +10,7 @@
 #include <fftconvolve.hpp>
 
 #include <Array.hpp>
+#include <common/dispatch.hpp>
 #include <fft.hpp>
 #include <af/dim4.hpp>
 #include <err_oneapi.hpp>
