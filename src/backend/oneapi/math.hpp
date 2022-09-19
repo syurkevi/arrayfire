@@ -43,13 +43,6 @@ static inline T max(T lhs, T rhs) {
     return std::max(lhs, rhs);
 }
 
-  //static inline float abs(cfloat cval) {
-  //return std::sqrt(cval.s[0] * cval.s[0] + cval.s[1] * cval.s[1]);
-  //}
-  //static inline double abs(cdouble cval) {
-  //return std::sqrt(cval.s[0] * cval.s[0] + cval.s[1] * cval.s[1]);
-  //}
-
 template<typename T>
 static inline T division(T lhs, double rhs) {
     return lhs / rhs;
@@ -85,8 +78,8 @@ static T scalar(double val) {
 template<>
 STATIC_ cfloat scalar<cfloat>(double val) {
     cfloat cval(static_cast<float>(val));
-    //cval.real() = (float)val;
-    //cval.imag() = 0;
+    // cval.real() = (float)val;
+    // cval.imag() = 0;
     return cval;
 }
 
@@ -138,37 +131,21 @@ STATIC_ common::half minval() {
     return -std::numeric_limits<common::half>::infinity();
 }
 
-  template<typename T>
-  static inline T real(T in) { return std::real(in); }
-  //static inline float real(cfloat in) { return in.s[0]; }
-  template<typename T>
-  static inline T imag(T in) {return std::imag(in);}
+template<typename T>
+static inline T real(T in) {
+    return std::real(in);
+}
 
-  //static inline float imag(cfloat in) { return in.s[1]; }
+template<typename T>
+static inline T imag(T in) {
+    return std::imag(in);
+}
 
-cfloat operator+(cfloat lhs, cfloat rhs);
-cfloat operator+(cfloat lhs);
-cdouble operator+(cdouble lhs, cdouble rhs);
-cdouble operator+(cdouble lhs);
-cfloat operator*(cfloat lhs, cfloat rhs);
-cdouble operator*(cdouble lhs, cdouble rhs);
-common::half operator+(common::half lhs, common::half rhs) noexcept;
+inline common::half operator+(common::half lhs, common::half rhs) noexcept {
+    return common::half(static_cast<float>(lhs) + static_cast<float>(rhs));
+}
 }  // namespace oneapi
 
-//static inline bool operator==(oneapi::cfloat lhs, oneapi::cfloat rhs) noexcept {
-//    return (lhs.s[0] == rhs.s[0]) && (lhs.s[1] == rhs.s[1]);
-//}
-//static inline bool operator!=(oneapi::cfloat lhs, oneapi::cfloat rhs) noexcept {
-//    return !(lhs == rhs);
-//}
-//static inline bool operator==(oneapi::cdouble lhs,
-//                              oneapi::cdouble rhs) noexcept {
-//    return (lhs.s[0] == rhs.s[0]) && (lhs.s[1] == rhs.s[1]);
-//}
-//static inline bool operator!=(oneapi::cdouble lhs,
-//                              oneapi::cdouble rhs) noexcept {
-//    return !(lhs == rhs);
-//}
 
 #if defined(__GNUC__) || defined(__GNUG__)
 /* GCC/G++, Clang/LLVM, Intel ICC */

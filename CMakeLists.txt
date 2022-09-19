@@ -69,7 +69,6 @@ find_package(Boost 1.70 ${AF_REQUIRED})
 
 # CLFFT used in ArrayFire requires a specific fork
 #find_package(clFFT QUIET)
-find_package(IntelDPCPP)
 
 include(boost_package)
 include(config_ccache)

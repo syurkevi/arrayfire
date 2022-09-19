@@ -17,10 +17,6 @@ cfloat operator+(cfloat lhs, cfloat rhs) {
     return res;
 }
 
-common::half operator+(common::half lhs, common::half rhs) noexcept {
-    return common::half(static_cast<float>(lhs) + static_cast<float>(rhs));
-}
-
 cdouble operator+(cdouble lhs, cdouble rhs) {
     //cdouble res = {{lhs.s[0] + rhs.s[0], lhs.s[1] + rhs.s[1]}};
     cdouble res;

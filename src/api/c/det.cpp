@@ -25,6 +25,8 @@ using detail::cdouble;
 using detail::cfloat;
 using detail::createEmptyArray;
 using detail::scalar;
+using detail::imag;
+using detail::real;
 
 template<typename T>
 T det(const af_array a) {

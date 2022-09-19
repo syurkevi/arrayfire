@@ -215,6 +215,9 @@ target_include_directories(afoneapi
     ${SYCL_INCLUDE_DIR}
   )
 
+target_compile_options(afoneapi
+  PRIVATE -fsycl)
+
 target_compile_definitions(afoneapi
   PRIVATE
     AF_ONEAPI
@@ -225,7 +228,7 @@ target_link_libraries(afoneapi
     c_api_interface
     cpp_api_interface
     afcommon_interface
-    ${SYCL_FLAGS}
+    -fsycl
   )
 
 source_group(include REGULAR_EXPRESSION ${ArrayFire_SOURCE_DIR}/include/*)
