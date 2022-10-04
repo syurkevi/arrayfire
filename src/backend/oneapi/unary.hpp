@@ -8,21 +8,21 @@
  ********************************************************/
 
 #pragma once
-#include <af/traits.hpp>
 #include <Array.hpp>
 #include <common/jit/UnaryNode.hpp>
 #include <math.hpp>
 #include <optypes.hpp>
+#include <af/traits.hpp>
 
 namespace oneapi {
 
 template<af_op_t op>
 static const char *unaryName();
 
-#define UNARY_DECL(OP, FNAME)                      \
-    template<>                                     \
-    STATIC_ const char *unaryName<af_##OP##_t>() { \
-        return FNAME;                              \
+#define UNARY_DECL(OP, FNAME)                     \
+    template<>                                    \
+    inline const char *unaryName<af_##OP##_t>() { \
+        return FNAME;                             \
     }
 
 #define UNARY_FN(OP) UNARY_DECL(OP, #OP)
@@ -84,8 +84,8 @@ Array<T> unaryOp(const Array<T> &in, dim4 outDim = dim4(-1, -1, -1, -1)) {
 
     auto createUnary = [](array<Node_ptr, 1> &operands) {
         return common::Node_ptr(new common::UnaryNode(
-                                                      static_cast<af::dtype>(af::dtype_traits<T>::af_type), unaryName<op>(),
-            operands[0], op));
+            static_cast<af::dtype>(af::dtype_traits<T>::af_type),
+            unaryName<op>(), operands[0], op));
     };
 
     if (outDim == dim4(-1, -1, -1, -1)) { outDim = in.dims(); }
@@ -99,7 +99,7 @@ Array<char> checkOp(const Array<T> &in, dim4 outDim = dim4(-1, -1, -1, -1)) {
 
     auto createUnary = [](std::array<Node_ptr, 1> &operands) {
         return Node_ptr(new common::UnaryNode(
-                                              static_cast<af::dtype>(af::dtype_traits<char>::af_type),
+            static_cast<af::dtype>(af::dtype_traits<char>::af_type),
             unaryName<op>(), operands[0], op));
     };
 

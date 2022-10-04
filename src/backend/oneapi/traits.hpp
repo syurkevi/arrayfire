@@ -23,30 +23,30 @@ static bool iscplx() {
     return false;
 }
 template<>
-STATIC_ bool iscplx<oneapi::cfloat>() {
+inline bool iscplx<oneapi::cfloat>() {
     return true;
 }
 template<>
-STATIC_ bool iscplx<oneapi::cdouble>() {
+inline bool iscplx<oneapi::cdouble>() {
     return true;
 }
 
 template<typename T>
-STATIC_ std::string scalar_to_option(const T &val) {
+inline std::string scalar_to_option(const T &val) {
     using namespace common;
     using namespace std;
     return to_string(+val);
 }
 
 template<>
-STATIC_ std::string scalar_to_option<cl_float2>(const cl_float2 &val) {
+inline std::string scalar_to_option<cl_float2>(const cl_float2 &val) {
     std::ostringstream ss;
     ss << val.s[0] << "," << val.s[1];
     return ss.str();
 }
 
 template<>
-STATIC_ std::string scalar_to_option<cl_double2>(const cl_double2 &val) {
+inline std::string scalar_to_option<cl_double2>(const cl_double2 &val) {
     std::ostringstream ss;
     ss << val.s[0] << "," << val.s[1];
     return ss.str();
