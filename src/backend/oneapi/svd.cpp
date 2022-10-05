@@ -234,7 +234,7 @@ INSTANTIATE(double, double)
 INSTANTIATE(cfloat, float)
 INSTANTIATE(cdouble, double)
 
-}  // namespace opencl
+}  // namespace oneapi
 
 #else  // WITH_LINEAR_ALGEBRA
 
