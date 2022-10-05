@@ -217,6 +217,7 @@ target_sources(afoneapi
     kernel/transpose.hpp
     kernel/transpose_inplace.hpp
     kernel/triangle.hpp
+    kernel/where.hpp
 )
 
 add_library(ArrayFire::afoneapi ALIAS afoneapi)
