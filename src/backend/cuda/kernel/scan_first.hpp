@@ -70,9 +70,10 @@ static void bcast_first_launcher(Param<To> out, CParam<To> tmp,
     POST_LAUNCH_CHECK();
 }
 
+template<typename T>
 struct alignas(64) lookback {
-    uint64_t localsum;
-    uint64_t inclusive_prefix;
+    T localsum;
+    T inclusive_prefix;
     bool local_complete;
     bool prefix_complete;
 };
@@ -135,10 +136,10 @@ static void scan_first(Param<To> out, CParam<Ti> in, bool inclusive_scan) {
     blocks.z = divup(blocks.y, maxBlocksY);
     blocks.y = divup(blocks.y, blocks.z);
 
-    lookback *lookback_table;
-    CUDA_CHECK(cudaMallocAsync(&lookback_table, nblk_x * sizeof(lookback),
+    lookback<To> *lookback_table;
+    CUDA_CHECK(cudaMallocAsync(&lookback_table, nblk_x * sizeof(lookback<To>),
                                cuda::getActiveStream()));
-    CUDA_CHECK(cudaMemsetAsync(lookback_table, 0, nblk_x * sizeof(lookback),
+    CUDA_CHECK(cudaMemsetAsync(lookback_table, 0, nblk_x * sizeof(lookback<To>),
                                cuda::getActiveStream()));
 
     int *block_counter;
@@ -149,7 +150,8 @@ static void scan_first(Param<To> out, CParam<Ti> in, bool inclusive_scan) {
 
     auto scan1Pass =
         common::getKernel("cuda::scan1Pass", {scan_first_cuh_src},
-                          {TemplateTypename<To>(), TemplateTypename<Ti>()});
+                          {TemplateTypename<To>(), TemplateTypename<Ti>(), 
+                          TemplateArg(op)});
 
 
     EnqueueArgs qArgs(blocks, threads_x, getActiveStream());

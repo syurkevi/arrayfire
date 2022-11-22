@@ -133,9 +133,17 @@ __global__ void scan_first_bcast(Param<To> out, CParam<To> tmp, uint blocks_x,
     }
 }
 
-template<typename To, typename Ti>
+template<typename T>
+struct alignas(64) lookback {
+    T localsum;
+    T inclusive_prefix;
+    bool local_complete;
+    bool prefix_complete;
+};
+
+template<typename To, typename Ti, af_op_t op>
 __global__ void scan1Pass(Param<To> out, CParam<Ti> in, bool inclusive_scan,
-                          volatile lookback *lookback_table, int *block_counter,
+                          volatile lookback<To> *lookback_table, int *block_counter,
                           int nblk_x, int nblk_y) {
     __shared__ uint partition_id;
     if(threadIdx.x == 0) {
@@ -152,15 +160,15 @@ __global__ void scan1Pass(Param<To> out, CParam<Ti> in, bool inclusive_scan,
     const Ti *iptr = in.ptr;
     To *optr       = out.ptr;
 
-    typedef cub::BlockScan<size_t, THREADS> BlockScan;
-    __shared__ typename BlockScan::TempStorage scan_storage;
+    //typedef cub::BlockScan<size_t, THREADS> BlockScan;
+    //__shared__ typename BlockScan::TempStorage scan_storage;
 
     //local scan
     bool cond = (idx < in.dims[0]);
-    To scanval    = cond ? transform(iptr[id]) : init;
-    BlockScan(scan_storage).InclusiveSum(scanval, scanval);
+    To scanval    = cond ? transform(iptr[idx]) : init;
+    //BlockScan(scan_storage).InclusiveSum(scanval, scanval);
 
-    __shared__ uint64_t running_prefix;
+    __shared__ To running_prefix;
 
     // first blocks to be scheduled will fill in lookback table and determine
     // inclusive prefixes for write indexes
@@ -189,11 +197,11 @@ __global__ void scan1Pass(Param<To> out, CParam<Ti> in, bool inclusive_scan,
 
             // traverse lookback table to obtain required ids for exclusive prefix
             if(amLastInBlock) {
-                running_prefix = 0;
-                lookback l;
+                running_prefix = init;
+                lookback<To> l;
                 do {
                     // l = lookback_table[lookback_id];
-                    memcpy((void*)&l, (const void*)&lookback_table[lookback_id], sizeof(lookback));
+                    memcpy((void*)&l, (const void*)&lookback_table[lookback_id], sizeof(lookback<To>));
                     check_prefix_ready = l.prefix_complete;
                     bool check_local_ready  = l.local_complete;
 
