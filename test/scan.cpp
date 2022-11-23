@@ -350,7 +350,7 @@ TEST(Scan, ExclusiveSum2D_Dim3) {
 
 TEST(Scan, ExclusiveSumSpeed) {
     af::info();
-    const int in_size = 800000;
+    const int in_size = 8000000;
     //const int in_size = 80;
     vector<int> h_in(in_size, 1);
     vector<int> h_gold(in_size, 0);

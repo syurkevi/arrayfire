@@ -133,6 +133,7 @@ __global__ void scan_first_bcast(Param<To> out, CParam<To> tmp, uint blocks_x,
     }
 }
 
+/*
 template<typename T>
 struct alignas(64) lookback {
     T localsum;
@@ -238,6 +239,7 @@ __global__ void scan1Pass(Param<To> out, CParam<Ti> in, bool inclusive_scan,
         }
     }
 }
+*/
 
 
 }  // namespace cuda

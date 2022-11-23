@@ -501,7 +501,7 @@ add_library(afcuda
     reshape.cpp
     rotate.hpp
     scalar.hpp
-    scan.cpp
+    scan.cu
     scan.hpp
     scan_by_key.cpp
     scan_by_key.hpp
@@ -542,7 +542,7 @@ add_library(afcuda
     utility.hpp
     vector_field.cpp
     vector_field.hpp
-    where.cpp
+    where.cu
     where.hpp
     wrap.cpp
     wrap.hpp
