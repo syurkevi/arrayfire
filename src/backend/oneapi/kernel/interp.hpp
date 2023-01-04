@@ -109,9 +109,9 @@ struct Interp1<Ty, Tp, 1> {
         const int x_lim    = iInfo.dims[xdim];
         const int x_stride = iInfo.strides[xdim];
 
-        int xid   = (method == AF_INTERP_LOWER ? floor(x) : round(x));
+        int xid   = (method == AF_INTERP_LOWER ? sycl::floor(x) : sycl::round(x));
         bool cond = xid >= 0 && xid < x_lim;
-        if (clamp) xid = std::max((int)0, std::min(xid, x_lim));
+        if (clamp) xid = sycl::max((int)0, sycl::min(xid, x_lim));
 
         const int idx = ioff + xid * x_stride;
 
@@ -132,7 +132,7 @@ struct Interp1<Ty, Tp, 2> {
         typedef typename itype_t<Tp>::wtype WT;
         typedef typename itype_t<Ty>::vtype VT;
 
-        const int grid_x = floor(x);    // nearest grid
+        const int grid_x = sycl::floor(x);    // nearest grid
         const WT off_x   = x - grid_x;  // fractional offset
 
         const int x_lim    = iInfo.dims[xdim];
@@ -169,7 +169,7 @@ struct Interp1<Ty, Tp, 3> {
         typedef typename itype_t<Tp>::wtype WT;
         typedef typename itype_t<Ty>::vtype VT;
 
-        const int grid_x = floor(x);    // nearest grid
+        const int grid_x = sycl::floor(x);    // nearest grid
         const WT off_x   = x - grid_x;  // fractional offset
 
         const int x_lim    = iInfo.dims[xdim];
@@ -205,8 +205,8 @@ struct Interp2<Ty, Tp, 1> {
                     read_accessor<Ty> in, KParam iInfo, int ioff, Tp x, Tp y,
                     int xdim, int ydim, af::interpType method, int batch,
                     bool clamp, int batch_dim = 2) {
-        int xid = (method == AF_INTERP_LOWER ? floor(x) : round(x));
-        int yid = (method == AF_INTERP_LOWER ? floor(y) : round(y));
+        int xid = (method == AF_INTERP_LOWER ? sycl::floor(x) : sycl::round(x));
+        int yid = (method == AF_INTERP_LOWER ? sycl::floor(y) : sycl::round(y));
 
         const int x_lim    = iInfo.dims[xdim];
         const int y_lim    = iInfo.dims[ydim];
@@ -214,8 +214,8 @@ struct Interp2<Ty, Tp, 1> {
         const int y_stride = iInfo.strides[ydim];
 
         if (clamp) {
-            xid = std::max(0, std::min(xid, (int)iInfo.dims[xdim]));
-            yid = std::max(0, std::min(yid, (int)iInfo.dims[ydim]));
+            xid = sycl::max(0, sycl::min(xid, (int)iInfo.dims[xdim]));
+            yid = sycl::max(0, sycl::min(yid, (int)iInfo.dims[ydim]));
         }
 
         const int idx = ioff + yid * y_stride + xid * x_stride;
@@ -243,10 +243,10 @@ struct Interp2<Ty, Tp, 2> {
         typedef typename itype_t<Tp>::wtype WT;
         typedef typename itype_t<Ty>::vtype VT;
 
-        const int grid_x = floor(x);
+        const int grid_x = sycl::floor(x);
         const WT off_x   = x - grid_x;
 
-        const int grid_y = floor(y);
+        const int grid_y = sycl::floor(y);
         const WT off_y   = y - grid_y;
 
         const int x_lim    = iInfo.dims[xdim];
@@ -295,10 +295,10 @@ struct Interp2<Ty, Tp, 3> {
         typedef typename itype_t<Tp>::wtype WT;
         typedef typename itype_t<Ty>::vtype VT;
 
-        const int grid_x = floor(x);
+        const int grid_x = sycl::floor(x);
         const WT off_x   = x - grid_x;
 
-        const int grid_y = floor(y);
+        const int grid_y = sycl::floor(y);
         const WT off_y   = y - grid_y;
 
         const int x_lim    = iInfo.dims[xdim];
