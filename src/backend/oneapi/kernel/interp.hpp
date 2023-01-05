@@ -109,7 +109,7 @@ struct Interp1<Ty, Tp, 1> {
         const int x_lim    = iInfo.dims[xdim];
         const int x_stride = iInfo.strides[xdim];
 
-        int xid   = (method == AF_INTERP_LOWER ? sycl::floor(x) : sycl::round(x));
+        int xid = (method == AF_INTERP_LOWER ? sycl::floor(x) : sycl::round(x));
         bool cond = xid >= 0 && xid < x_lim;
         if (clamp) xid = sycl::max((int)0, sycl::min(xid, x_lim));
 
@@ -132,8 +132,8 @@ struct Interp1<Ty, Tp, 2> {
         typedef typename itype_t<Tp>::wtype WT;
         typedef typename itype_t<Ty>::vtype VT;
 
-        const int grid_x = sycl::floor(x);    // nearest grid
-        const WT off_x   = x - grid_x;  // fractional offset
+        const int grid_x = sycl::floor(x);  // nearest grid
+        const WT off_x   = x - grid_x;      // fractional offset
 
         const int x_lim    = iInfo.dims[xdim];
         const int x_stride = iInfo.strides[xdim];
@@ -169,8 +169,8 @@ struct Interp1<Ty, Tp, 3> {
         typedef typename itype_t<Tp>::wtype WT;
         typedef typename itype_t<Ty>::vtype VT;
 
-        const int grid_x = sycl::floor(x);    // nearest grid
-        const WT off_x   = x - grid_x;  // fractional offset
+        const int grid_x = sycl::floor(x);  // nearest grid
+        const WT off_x   = x - grid_x;      // fractional offset
 
         const int x_lim    = iInfo.dims[xdim];
         const int x_stride = iInfo.strides[xdim];

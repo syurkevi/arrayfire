@@ -20,7 +20,6 @@
 namespace oneapi {
 template<typename T>
 Array<T> sort(const Array<T> &in, const unsigned dim, bool isAscending) {
-    printf("WTFFFF\n");
     try {
         Array<T> out = copyArray<T>(in);
         switch (dim) {
