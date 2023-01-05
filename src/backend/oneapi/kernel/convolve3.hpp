@@ -7,7 +7,7 @@ class conv3HelperCreateKernel {
    public:
     conv3HelperCreateKernel(write_accessor<T> out, KParam oInfo,
                             read_accessor<T> signal, KParam sInfo,
-                            local_accessor<aT> localMem,
+                            sycl::local_accessor<aT> localMem,
                             read_accessor<aT> impulse, KParam fInfo, int nBBS0,
                             int nBBS1, int ostep1, int ostep2, int ostep3,
                             int sstep1, int sstep2, int sstep3,
@@ -61,12 +61,6 @@ class conv3HelperCreateKernel {
         int gx  = g.get_local_range(0) * (g.get_group_id(0) - b2 * nBBS0_) + lx;
         int gy  = g.get_local_range(1) * g.get_group_id(1) + ly;
         int gz  = g.get_local_range(2) * g.get_group_id(2) + lz;
-        int lx2 = lx + g.get_local_range(0);
-        int ly2 = ly + g.get_local_range(1);
-        int lz2 = lz + g.get_local_range(2);
-        int gx2 = gx + g.get_local_range(0);
-        int gy2 = gy + g.get_local_range(1);
-        int gz2 = gz + g.get_local_range(2);
 
         int s0 = sInfo_.strides[0];
         int s1 = sInfo_.strides[1];
@@ -123,7 +117,7 @@ class conv3HelperCreateKernel {
     KParam oInfo_;
     read_accessor<T> signal_;
     KParam sInfo_;
-    local_accessor<aT> localMem_;
+    sycl::local_accessor<aT> localMem_;
     read_accessor<aT> impulse_;
     KParam fInfo_;
     int nBBS0_;
@@ -143,9 +137,7 @@ void conv3Helper(const conv_kparam_t<aT> &param, Param<T> &out,
                  const int rank, const bool EXPAND) {
     auto Q = getQueue();
     Q.submit([&](auto &h) {
-        sycl::accessor<aT, 1, sycl::access::mode::read_write,
-                       sycl::access::target::local>
-            localMem(param.loc_size, h);
+        sycl::local_accessor<aT> localMem(param.loc_size, h);
         sycl::accessor outAcc{*out.data, h, sycl::write_only, sycl::no_init};
         sycl::accessor signalAcc{*signal.data, h, sycl::read_only};
         sycl::accessor impulseAcc{*param.impulse, h, sycl::read_only};

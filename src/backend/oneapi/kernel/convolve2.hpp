@@ -5,7 +5,7 @@ class conv2HelperCreateKernel {
                             read_accessor<T> signal, KParam sInfo,
                             read_accessor<aT> impulse, KParam fInfo, int nBBS0,
                             int nBBS1, int ostep2, int ostep3, int sstep2,
-                            int sstep3, local_accessor<aT> localMem,
+                            int sstep3, sycl::local_accessor<aT> localMem,
                             const int f0, const int f1, const bool expand)
         : out_(out)
         , oInfo_(oInfo)
@@ -111,7 +111,7 @@ class conv2HelperCreateKernel {
     int ostep3_;
     int sstep2_;
     int sstep3_;
-    local_accessor<aT> localMem_;
+    sycl::local_accessor<aT> localMem_;
     const int f0_;
     const int f1_;
     const bool expand_;
@@ -121,9 +121,6 @@ template<typename T, typename aT>
 void conv2Helper(const conv_kparam_t<aT> &param, Param<T> out,
                  const Param<T> signal, const Param<aT> filter,
                  const bool expand) {
-    constexpr bool IsComplex =
-        std::is_same<T, cfloat>::value || std::is_same<T, cdouble>::value;
-
     const int f0 = filter.info.dims[0];
     const int f1 = filter.info.dims[1];
     const size_t LOC_SIZE =
@@ -131,9 +128,7 @@ void conv2Helper(const conv_kparam_t<aT> &param, Param<T> out,
 
     auto Q = getQueue();
     Q.submit([&](auto &h) {
-        sycl::accessor<aT, 1, sycl::access::mode::read_write,
-                       sycl::access::target::local>
-            localMem(LOC_SIZE, h);
+        sycl::local_accessor<aT> localMem(LOC_SIZE, h);
         sycl::accessor outAcc{*out.data, h, sycl::write_only, sycl::no_init};
         sycl::accessor signalAcc{*signal.data, h, sycl::read_only};
         sycl::accessor impulseAcc{*param.impulse, h, sycl::read_only};

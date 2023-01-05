@@ -3,7 +3,7 @@ class conv1HelperCreateKernel {
    public:
     conv1HelperCreateKernel(write_accessor<T> out, KParam oInfo,
                             read_accessor<T> signal, KParam sInfo,
-                            local_accessor<aT> localMem,
+                            sycl::local_accessor<aT> localMem,
                             read_accessor<aT> impulse, KParam fInfo, int nBBS0,
                             int nBBS1, int ostep1, int ostep2, int ostep3,
                             int sstep1, int sstep2, int sstep3,
@@ -87,7 +87,7 @@ class conv1HelperCreateKernel {
     KParam oInfo_;
     read_accessor<T> signal_;
     KParam sInfo_;
-    local_accessor<aT> localMem_;
+    sycl::local_accessor<aT> localMem_;
     read_accessor<aT> impulse_;
     KParam fInfo_;
     int nBBS0_;
@@ -107,9 +107,7 @@ void conv1Helper(const conv_kparam_t<aT> &param, Param<T> &out,
                  const int rank, const bool expand) {
     auto Q = getQueue();
     Q.submit([&](auto &h) {
-        sycl::accessor<aT, 1, sycl::access::mode::read_write,
-                       sycl::access::target::local>
-            localMem(param.loc_size, h);
+        sycl::local_accessor<aT> localMem(param.loc_size, h);
         sycl::accessor outAcc{*out.data, h, sycl::write_only, sycl::no_init};
         sycl::accessor signalAcc{*signal.data, h, sycl::read_only};
         sycl::accessor impulseAcc{*param.impulse, h, sycl::read_only};
