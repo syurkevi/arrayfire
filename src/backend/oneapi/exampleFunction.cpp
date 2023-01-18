@@ -1,5 +1,5 @@
 /*******************************************************
- * Copyright (c) 2022, ArrayFire
+ * Copyright (c) 2023, ArrayFire
  * All rights reserved.
  *
  * This file is distributed under 3-clause BSD license.
@@ -7,20 +7,22 @@
  * http://arrayfire.com/licenses/BSD-3-Clause
  ********************************************************/
 
-#include <Array.hpp>  // header with oneapi backend specific
-                      // Array class implementation that inherits
-                      // ArrayInfo base class
+// header with oneapi backend specific
+// Array class implementation that inherits
+// ArrayInfo base class
+#include <Array.hpp>
 
 #include <exampleFunction.hpp>  // oneapi backend function header
 
-#include <err_oneapi.hpp>  // error check functions and Macros
-                           // specific to oneapi backend
+// error check functions and Macros
+// specific to oneapi backend
+#include <err_oneapi.hpp>
 
-//#include <kernel/exampleFunction.hpp>  // this header under the folder
-// src/oneapi/kernel
-// defines the OneAPI kernel wrapper
+// this header is under the folder src/oneapi/kernel
+// defines the oneapi kernel and its wrapper
 // function to which the main computation of your
 // algorithm should be relayed to
+#include <kernel/exampleFunction.hpp>
 
 using af::dim4;
 
@@ -30,7 +32,6 @@ namespace oneapi {
 template<typename T>
 Array<T> exampleFunction(const Array<T> &a, const Array<T> &b,
                          const af_someenum_t method) {
-    ONEAPI_NOT_SUPPORTED("");
     dim4 outputDims;  // this should be '= in.dims();' in most cases
                       // but would definitely depend on the type of
                       // algorithm you are implementing.
@@ -42,8 +43,8 @@ Array<T> exampleFunction(const Array<T> &a, const Array<T> &b,
     // file to know what are the different types you
     // can create.
 
-    // Relay the actual computation to OneAPI kernel wrapper
-    // kernel::exampleFunc<T>(out, a, b, method);
+    // Relay the actual computation to the oneapi kernel wrapper
+    kernel::exampleFunc<T>(out, a, b, method);
 
     return out;  // return the result
 }

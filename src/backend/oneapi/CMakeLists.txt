@@ -212,6 +212,7 @@ target_sources(afoneapi
     kernel/bilateral.hpp
     kernel/diagonal.hpp
     kernel/diff.hpp
+    kernel/exampleFunction.hpp
     kernel/interp.hpp
     kernel/iota.hpp
     kernel/histogram.hpp
