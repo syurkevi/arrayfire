@@ -20,6 +20,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <chrono>
 
 using af::array;
 using af::cdouble;
@@ -2367,4 +2368,35 @@ TEST(Reduce, SNIPPET_algorithm_func_sum) {
     ASSERT_VEC_ARRAY_EQ(gold_c, c.dims(), c);
     ASSERT_VEC_ARRAY_EQ(gold_a, d.dims(), d);
     ASSERT_VEC_ARRAY_EQ(gold_a, e.dims(), e);
+}
+
+// disabled since these arrays can get quite large
+// and require server-grade cards with enough memory
+TEST(Reduce, SzGreaterThanUintSum) {
+    dim_t sz = 4295967296;
+    //array a = constant(0, dim4(sz), u32);
+    array a = randu(dim4(sz), f32);
+    a(seq(0,sz-1,10)) = 1;
+    //long long res = af::suM<long long>(a);
+    float res = af::sum<float>(a);
+    ASSERT_EQ(res, sz/10);
+
+    /*
+    array a = randu(dim4(sz,2), u8);
+    //array a = randu(dim4(2,sz), u8);
+    af::sync();
+    printf("nowai\n");
+    af_print(a(seq(0,10)));
+    af::sync();
+    //printf("finalsum %.17g\n", res);
+    //af::array rr = af::sum(a,0);
+    //af::array rr = af::sum(a,1);
+    af::array v,l;
+    //af::min(v, l, a, 0);
+    af::min(v, l, a, 1);
+    //unsigned ll;float vv;
+    //af::min(&vv, &ll, a);
+    //af_print(rr);
+    af::sync();
+    */
 }

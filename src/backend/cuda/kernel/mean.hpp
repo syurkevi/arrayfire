@@ -201,8 +201,8 @@ void mean_dim_launcher(Param<To> out, Param<Tw> owt, CParam<Ti> in,
 
 template<typename Ti, typename Tw, typename To, int dim>
 void mean_dim(Param<To> out, CParam<Ti> in, CParam<Tw> iwt) {
-    uint threads_y = std::min(THREADS_Y, nextpow2(in.dims[dim]));
-    uint threads_x = THREADS_X;
+    uintl threads_y = std::min((uintl)THREADS_Y, nextpow2(in.dims[dim]));
+    uintl threads_x = THREADS_X;
 
     dim_t blocks_dim[] = {divup(in.dims[0], threads_x), in.dims[1], in.dims[2],
                           in.dims[3]};

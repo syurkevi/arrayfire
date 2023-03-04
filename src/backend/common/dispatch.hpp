@@ -17,7 +17,7 @@
 
 #define divup(a, b) (((a) + (b)-1) / (b))
 
-unsigned nextpow2(unsigned x);
+long long unsigned nextpow2(long long unsigned x);
 
 // isPrime & greatestPrimeFactor are tailored after
 // itk::Math::{IsPrimt, GreatestPrimeFactor}

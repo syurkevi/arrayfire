@@ -32,7 +32,7 @@ void unwrap(Param<T> out, CParam<T> in, const int wx, const int wy,
     int reps;
 
     if (is_column) {
-        int TX = std::min(THREADS_PER_BLOCK, nextpow2(out.dims[0]));
+        int TX = std::min((uintl)THREADS_PER_BLOCK, nextpow2(out.dims[0]));
 
         threads = dim3(TX, THREADS_PER_BLOCK / TX);
         blocks = dim3(divup(out.dims[1], threads.y), out.dims[2] * out.dims[3]);

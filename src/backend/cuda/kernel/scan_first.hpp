@@ -71,9 +71,9 @@ static void bcast_first_launcher(Param<To> out, CParam<To> tmp,
 
 template<typename Ti, typename To, af_op_t op>
 static void scan_first(Param<To> out, CParam<Ti> in, bool inclusive_scan) {
-    uint threads_x = nextpow2(std::max(32u, (uint)out.dims[0]));
-    threads_x      = std::min(threads_x, THREADS_PER_BLOCK);
-    uint threads_y = THREADS_PER_BLOCK / threads_x;
+    uintl threads_x = nextpow2(std::max(32ull, (uintl)out.dims[0]));
+    threads_x       = std::min(threads_x, (uintl)THREADS_PER_BLOCK);
+    uintl threads_y = THREADS_PER_BLOCK / threads_x;
 
     uint blocks_x = divup(out.dims[0], threads_x * REPEAT);
     uint blocks_y = divup(out.dims[1], threads_y);

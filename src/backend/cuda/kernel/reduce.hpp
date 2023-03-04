@@ -41,7 +41,7 @@ __global__ static void reduce_dim_kernel(Param<To> out, CParam<Ti> in,
 
     const uint zid        = blockIdx.x / blocks_x;
     const uint blockIdx_x = blockIdx.x - (blocks_x)*zid;
-    const uint xid        = blockIdx_x * blockDim.x + tidx;
+    const uintl xid       = blockIdx_x * blockDim.x + tidx;
 
     __shared__ compute_t<To> s_val[THREADS_X * DIMY];
 
@@ -50,7 +50,7 @@ __global__ static void reduce_dim_kernel(Param<To> out, CParam<Ti> in,
         (blockIdx.y + blockIdx.z * gridDim.y) - (blocks_y)*wid;
     const uint yid = blockIdx_y;  // yid  of output. updated for input later.
 
-    uint ids[4] = {xid, yid, zid, wid};
+    uintl ids[4] = {xid, yid, zid, wid};
 
     // There is only one element per block for out
     // There are blockDim.y elements per block for in
@@ -67,7 +67,7 @@ __global__ static void reduce_dim_kernel(Param<To> out, CParam<Ti> in,
                              ids[2] * in.strides[2] + ids[1] * in.strides[1] +
                              ids[0];
 
-    const uint id_dim_in   = ids[dim];
+    const uintl id_dim_in  = ids[dim];
     const uint istride_dim = in.strides[dim];
 
     bool is_valid = (ids[0] < in.dims[0]) && (ids[1] < in.dims[1]) &&
@@ -76,7 +76,7 @@ __global__ static void reduce_dim_kernel(Param<To> out, CParam<Ti> in,
     common::Transform<Ti, compute_t<To>, op> transform;
     common::Binary<compute_t<To>, op> reduce;
     compute_t<To> out_val = common::Binary<compute_t<To>, op>::init();
-    for (int id = id_dim_in; is_valid && (id < in.dims[dim]);
+    for (uintl id = id_dim_in; is_valid && (id < in.dims[dim]);
          id += offset_dim * blockDim.y) {
         compute_t<To> in_val = transform(*iptr);
         if (change_nan)
@@ -150,13 +150,14 @@ void reduce_dim_launcher(Param<To> out, CParam<Ti> in, const uint threads_y,
 
 template<typename Ti, typename To, af_op_t op, int dim>
 void reduce_dim(Param<To> out, CParam<Ti> in, bool change_nan, double nanval) {
-    uint threads_y = std::min(THREADS_Y, nextpow2(in.dims[dim]));
-    uint threads_x = THREADS_X;
+    uintl threads_y = std::min((uintl)THREADS_Y, nextpow2(in.dims[dim]));
+    uintl threads_x = THREADS_X;
 
-    dim_t blocks_dim[] = {divup(in.dims[0], threads_x), in.dims[1], in.dims[2],
-                          in.dims[3]};
+    dim_t blocks_dim[] = {divup(in.dims[0], static_cast<dim_t>(threads_x)),
+                          in.dims[1], in.dims[2], in.dims[3]};
 
-    blocks_dim[dim] = divup(in.dims[dim], threads_y * REPEAT);
+    blocks_dim[dim] = divup(in.dims[dim],
+                            static_cast<dim_t>(threads_y * REPEAT));
 
     Param<To> tmp = out;
     uptr<To> tmp_alloc;
@@ -198,7 +199,7 @@ __global__ static void reduce_first_kernel(Param<To> out, CParam<Ti> in,
 
     const uint zid        = blockIdx.x / blocks_x;
     const uint blockIdx_x = blockIdx.x - (blocks_x)*zid;
-    const uint xid        = blockIdx_x * blockDim.x * repeat + tidx;
+    const uintl xid       = blockIdx_x * blockDim.x * repeat + tidx;
 
     common::Binary<compute_t<To>, op> reduce;
     common::Transform<Ti, compute_t<To>, op> transform;
@@ -216,10 +217,10 @@ __global__ static void reduce_first_kernel(Param<To> out, CParam<Ti> in,
 
     if (yid >= in.dims[1] || zid >= in.dims[2] || wid >= in.dims[3]) return;
 
-    int lim = min((int)(xid + repeat * DIMX), in.dims[0]);
+    uintl lim = min((uintl)(xid + repeat * DIMX), in.dims[0]);
 
     compute_t<To> out_val = common::Binary<compute_t<To>, op>::init();
-    for (int id = xid; id < lim; id += DIMX) {
+    for (uintl id = xid; id < lim; id += DIMX) {
         compute_t<To> in_val = transform(iptr[id]);
         if (change_nan)
             in_val =
@@ -272,7 +273,7 @@ __global__ static void reduce_all_kernel(Param<To> out,
 
     const uint zid        = blockIdx.x / blocks_x;
     const uint blockIdx_x = blockIdx.x - (blocks_x)*zid;
-    const uint xid        = blockIdx_x * blockDim.x * repeat + tidx;
+    const uintl xid       = blockIdx_x * blockDim.x * repeat + tidx;
 
     const uint wid = (blockIdx.y + blockIdx.z * gridDim.y) / blocks_y;
     const uint blockIdx_y =
@@ -291,10 +292,10 @@ __global__ static void reduce_all_kernel(Param<To> out,
 
     bool cond = yid < in.dims[1] && zid < in.dims[2] && wid < in.dims[3];
 
-    int lim = min((int)(xid + repeat * DIMX), in.dims[0]);
+    uintl lim = min((uintl)(xid + repeat * DIMX), in.dims[0]);
 
     compute_t<To> out_val = common::Binary<compute_t<To>, op>::init();
-    for (int id = xid; cond && id < lim; id += DIMX) {
+    for (uintl id = xid; cond && id < lim; id += DIMX) {
         compute_t<To> in_val = transform(iptr[id]);
         if (change_nan)
             in_val =
@@ -324,7 +325,7 @@ __global__ static void reduce_all_kernel(Param<To> out,
     }
 
     const unsigned total_blocks = (gridDim.x * gridDim.y * gridDim.z);
-    const int uubidx            = (gridDim.x * gridDim.y) * blockIdx.z +
+    const unsigned uubidx       = (gridDim.x * gridDim.y) * blockIdx.z +
                        (gridDim.x * blockIdx.y) + blockIdx.x;
     if (cond && tid == 0) {
         if (total_blocks != 1) {
@@ -388,13 +389,13 @@ void reduce_all_launcher(Param<To> out, CParam<Ti> in, const uint blocks_x,
     dim3 threads(threads_x, THREADS_PER_BLOCK / threads_x);
     dim3 blocks(blocks_x * in.dims[2], blocks_y * in.dims[3]);
 
-    uint repeat = divup(in.dims[0], (blocks_x * threads_x));
+    uint repeat = divup(in.dims[0], static_cast<dim_t>(blocks_x * threads_x));
 
     const int maxBlocksY = getDeviceProp(getActiveDeviceId()).maxGridSize[1];
     blocks.z             = divup(blocks.y, maxBlocksY);
     blocks.y             = divup(blocks.y, blocks.z);
 
-    long tmp_elements = blocks.x * blocks.y * blocks.z;
+    dim_t tmp_elements = blocks.x * blocks.y * blocks.z;
     if (tmp_elements > UINT_MAX) {
         AF_ERROR("Too many blocks requested (retirementCount == unsigned)",
                  AF_ERR_RUNTIME);
@@ -435,7 +436,7 @@ void reduce_first_launcher(Param<To> out, CParam<Ti> in, const uint blocks_x,
     dim3 threads(threads_x, THREADS_PER_BLOCK / threads_x);
     dim3 blocks(blocks_x * in.dims[2], blocks_y * in.dims[3]);
 
-    uint repeat = divup(in.dims[0], (blocks_x * threads_x));
+    uint repeat = divup(in.dims[0], static_cast<dim_t>(blocks_x * threads_x));
 
     const int maxBlocksY = getDeviceProp(getActiveDeviceId()).maxGridSize[1];
     blocks.z             = divup(blocks.y, maxBlocksY);
@@ -470,9 +471,9 @@ void reduce_first_launcher(Param<To> out, CParam<Ti> in, const uint blocks_x,
 template<typename Ti, typename To, af_op_t op>
 void reduce_first(Param<To> out, CParam<Ti> in, bool change_nan,
                   double nanval) {
-    uint threads_x = nextpow2(std::max(32u, (uint)in.dims[0]));
-    threads_x      = std::min(threads_x, THREADS_PER_BLOCK);
-    uint threads_y = THREADS_PER_BLOCK / threads_x;
+    uintl threads_x = nextpow2(std::max((dim_t)32, in.dims[0]));
+    threads_x      = std::min(threads_x, (uintl)THREADS_PER_BLOCK);
+    uintl threads_y = THREADS_PER_BLOCK / threads_x;
 
     uint blocks_x = divup(in.dims[0], threads_x * REPEAT);
     uint blocks_y = divup(in.dims[1], threads_y);
@@ -515,7 +516,7 @@ void reduce(Param<To> out, CParam<Ti> in, int dim, bool change_nan,
 }
 template<typename Ti, typename To, af_op_t op>
 void reduce_all(Param<To> out, CParam<Ti> in, bool change_nan, double nanval) {
-    int in_elements = in.dims[0] * in.dims[1] * in.dims[2] * in.dims[3];
+    dim_t in_elements = in.dims[0] * in.dims[1] * in.dims[2] * in.dims[3];
     bool is_linear  = (in.strides[0] == 1);
     for (int k = 1; k < 4; k++) {
         is_linear &= (in.strides[k] == (in.strides[k - 1] * in.dims[k - 1]));
@@ -529,9 +530,9 @@ void reduce_all(Param<To> out, CParam<Ti> in, bool change_nan, double nanval) {
         }
     }
 
-    uint threads_x = nextpow2(std::max(32u, (uint)in.dims[0]));
-    threads_x      = std::min(threads_x, THREADS_PER_BLOCK);
-    uint threads_y = THREADS_PER_BLOCK / threads_x;
+    uintl threads_x = nextpow2(std::max((dim_t)32, in.dims[0]));
+    threads_x       = std::min(threads_x, (uintl)THREADS_PER_BLOCK);
+    uintl threads_y = (dim_t)THREADS_PER_BLOCK / threads_x;
 
     // TODO: perf REPEAT, consider removing or runtime eval
     // max problem size < SM resident threads, don't use REPEAT

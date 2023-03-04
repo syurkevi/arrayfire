@@ -9,12 +9,13 @@
 
 #include "dispatch.hpp"
 
-unsigned nextpow2(unsigned x) {
-    x = x - 1U;
-    x = x | (x >> 1U);
-    x = x | (x >> 2U);
-    x = x | (x >> 4U);
-    x = x | (x >> 8U);
-    x = x | (x >> 16U);
-    return x + 1U;
+long long unsigned nextpow2(long long unsigned x) {
+    x = x - 1ULL;
+    x = x | (x >> 1ULL);
+    x = x | (x >> 2ULL);
+    x = x | (x >> 4ULL);
+    x = x | (x >> 8ULL);
+    x = x | (x >> 16ULL);
+    x = x | (x >> 32ULL);
+    return x + 1ULL;
 }

@@ -52,13 +52,13 @@ void ireduce_dim_launcher(Param<T> out, uint *olptr, CParam<T> in,
 
 template<typename T, af_op_t op, int dim>
 void ireduce_dim(Param<T> out, uint *olptr, CParam<T> in, CParam<uint> rlen) {
-    uint threads_y = std::min(THREADS_Y, nextpow2(in.dims[dim]));
-    uint threads_x = THREADS_X;
+    uintl threads_y = std::min((uintl)THREADS_Y, nextpow2(in.dims[dim]));
+    uintl threads_x = THREADS_X;
 
-    dim_t blocks_dim[] = {divup(in.dims[0], threads_x), in.dims[1], in.dims[2],
-                          in.dims[3]};
+    dim_t blocks_dim[] = {divup(in.dims[0], static_cast<dim_t>(threads_x)),
+                          in.dims[1], in.dims[2], in.dims[3]};
 
-    blocks_dim[dim] = divup(in.dims[dim], threads_y * REPEAT);
+    blocks_dim[dim] = divup(in.dims[dim], static_cast<dim_t>(threads_y * REPEAT));
 
     Param<T> tmp = out;
     uint *tlptr  = olptr;
@@ -118,12 +118,12 @@ void ireduce_first_launcher(Param<T> out, uint *olptr, CParam<T> in,
 
 template<typename T, af_op_t op>
 void ireduce_first(Param<T> out, uint *olptr, CParam<T> in, CParam<uint> rlen) {
-    uint threads_x = nextpow2(std::max(32u, (uint)in.dims[0]));
-    threads_x      = std::min(threads_x, THREADS_PER_BLOCK);
-    uint threads_y = THREADS_PER_BLOCK / threads_x;
+    uintl threads_x = nextpow2(std::max(32ull, (uintl)in.dims[0]));
+    threads_x       = std::min(threads_x, (uintl)THREADS_PER_BLOCK);
+    uintl threads_y = THREADS_PER_BLOCK / threads_x;
 
-    uint blocks_x = divup(in.dims[0], threads_x * REPEAT);
-    uint blocks_y = divup(in.dims[1], threads_y);
+    uint blocks_x = divup(in.dims[0], static_cast<dim_t>(threads_x * REPEAT));
+    uint blocks_y = divup(in.dims[1], static_cast<dim_t>(threads_y));
 
     Param<T> tmp = out;
     uint *tlptr  = olptr;
@@ -181,15 +181,15 @@ T ireduce_all(uint *idx, CParam<T> in) {
             }
         }
 
-        uint threads_x = nextpow2(std::max(32u, (uint)in.dims[0]));
-        threads_x      = std::min(threads_x, THREADS_PER_BLOCK);
-        uint threads_y = THREADS_PER_BLOCK / threads_x;
+        uintl threads_x = nextpow2(std::max(32ull, (uintl)in.dims[0]));
+        threads_x       = std::min(threads_x, (uintl)THREADS_PER_BLOCK);
+        uintl threads_y = THREADS_PER_BLOCK / threads_x;
 
         Param<T> tmp;
         uint *tlptr;
 
-        uint blocks_x = divup(in.dims[0], threads_x * REPEAT);
-        uint blocks_y = divup(in.dims[1], threads_y);
+        uint blocks_x = divup(in.dims[0], static_cast<dim_t>(threads_x * REPEAT));
+        uint blocks_y = divup(in.dims[1], static_cast<dim_t>(threads_y));
 
         tmp.dims[0]    = blocks_x;
         tmp.strides[0] = 1;

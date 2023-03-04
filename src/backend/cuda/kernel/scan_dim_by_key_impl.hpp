@@ -95,8 +95,8 @@ static void bcast_dim_launcher(Param<To> out, CParam<To> tmp, Param<int> tlid,
 template<typename Ti, typename Tk, typename To, af_op_t op>
 void scan_dim_by_key(Param<To> out, CParam<Ti> in, CParam<Tk> key, int dim,
                      bool inclusive_scan) {
-    uint threads_y = std::min(THREADS_Y, nextpow2(out.dims[dim]));
-    uint threads_x = THREADS_X;
+    uintl threads_y = std::min((uintl)THREADS_Y, nextpow2(out.dims[dim]));
+    uintl threads_x = THREADS_X;
 
     dim_t blocks_all[] = {divup(out.dims[0], threads_x), out.dims[1],
                           out.dims[2], out.dims[3]};

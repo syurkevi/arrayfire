@@ -33,7 +33,7 @@ __global__ static void ireduceDim(Param<T> out, uint *olptr, CParam<T> in,
     const uint xid = blockIdx_x * blockDim.x + tidx;
     const uint yid = blockIdx_y;  // yid  of output. updated for input later.
 
-    uint ids[4] = {xid, yid, zid, wid};
+    uintl ids[4] = {xid, yid, zid, wid};
 
     const T *iptr = in.ptr;
     T *optr       = out.ptr;
@@ -55,7 +55,7 @@ __global__ static void ireduceDim(Param<T> out, uint *olptr, CParam<T> in,
     olptr += ids[3] * out.strides[3] + ids[2] * out.strides[2] +
              ids[1] * out.strides[1] + ids[0];
 
-    const uint blockIdx_dim = ids[dim];
+    const uintl blockIdx_dim = ids[dim];
 
     ids[dim] = ids[dim] * blockDim.y + tidy;
     iptr += ids[3] * in.strides[3] + ids[2] * in.strides[2] +
@@ -63,7 +63,7 @@ __global__ static void ireduceDim(Param<T> out, uint *olptr, CParam<T> in,
     if (!is_first)
         ilptr += ids[3] * in.strides[3] + ids[2] * in.strides[2] +
                  ids[1] * in.strides[1] + ids[0];
-    const uint id_dim_in = ids[dim];
+    const uintl id_dim_in = ids[dim];
 
     const uint istride_dim = in.strides[dim];
 
@@ -71,7 +71,7 @@ __global__ static void ireduceDim(Param<T> out, uint *olptr, CParam<T> in,
                     (ids[2] < in.dims[2]) && (ids[3] < in.dims[3]);
 
     T val    = common::Binary<T, op>::init();
-    uint idx = id_dim_in;
+    uintl idx = id_dim_in;
 
     uint lim = (rlenptr) ? *rlenptr : in.dims[dim];
     lim      = (is_first) ? min((uint)in.dims[dim], lim) : lim;
@@ -90,7 +90,7 @@ __global__ static void ireduceDim(Param<T> out, uint *olptr, CParam<T> in,
     __shared__ T s_val[THREADS_X * DIMY];
     __shared__ uint s_idx[THREADS_X * DIMY];
 
-    for (int id = id_dim_in_start; is_valid && (id < lim);
+    for (uintl id = id_dim_in_start; is_valid && (id < lim);
          id += offset_dim * blockDim.y) {
         iptr = iptr + offset_dim * blockDim.y * istride_dim;
         if (!is_first) {
@@ -169,8 +169,8 @@ __global__ static void ireduceFirst(Param<T> out, uint *olptr, CParam<T> in,
     const uint blockIdx_x = blockIdx.x - (blocks_x)*zid;
     const uint blockIdx_y =
         (blockIdx.y + blockIdx.z * gridDim.y) - (blocks_y)*wid;
-    const uint xid = blockIdx_x * blockDim.x * repeat + tidx;
-    const uint yid = blockIdx_y * blockDim.y + tidy;
+    const uintl xid = blockIdx_x * blockDim.x * repeat + tidx;
+    const uint  yid = blockIdx_y * blockDim.y + tidy;
 
     const data_t<T> *iptr = in.ptr;
     data_t<T> *optr       = out.ptr;
@@ -189,8 +189,8 @@ __global__ static void ireduceFirst(Param<T> out, uint *olptr, CParam<T> in,
 
     if (yid >= in.dims[1] || zid >= in.dims[2] || wid >= in.dims[3]) return;
 
-    int minlen = rlenptr ? min(*rlenptr, in.dims[0]) : in.dims[0];
-    int lim    = min((int)(xid + repeat * DIMX), minlen);
+    uintl minlen = rlenptr ? min(*rlenptr, in.dims[0]) : in.dims[0];
+    uintl lim    = min((uintl)(xid + repeat * DIMX), minlen);
 
     compute_t<T> val = common::Binary<compute_t<T>, op>::init();
     uint idx         = xid;
@@ -205,7 +205,7 @@ __global__ static void ireduceFirst(Param<T> out, uint *olptr, CParam<T> in,
     __shared__ compute_t<T> s_val[THREADS_PER_BLOCK];
     __shared__ uint s_idx[THREADS_PER_BLOCK];
 
-    for (int id = xid + DIMX; id < lim; id += DIMX) {
+    for (uintl id = xid + DIMX; id < lim; id += DIMX) {
         Op(static_cast<compute_t<T>>(iptr[id]), (!is_first) ? ilptr[id] : id);
     }
 
