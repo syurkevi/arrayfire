@@ -265,7 +265,6 @@ add_library(ArrayFire::afoneapi ALIAS afoneapi)
 arrayfire_set_default_cxx_flags(afoneapi)
 
 find_package(MKL CONFIG REQUIRED)
-message(STATUS "${MKL_IMPORTED_TARGETS}")
 
 target_include_directories(afoneapi
   SYSTEM PRIVATE
@@ -286,7 +285,7 @@ target_include_directories(afoneapi
 target_compile_options(afoneapi
   PRIVATE
     -fsycl
-    -qopenmp -qmkl=parallel
+    -openmp -Qmkl=parallel
     -sycl-std=2020
   $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>
 )
@@ -310,10 +309,9 @@ target_link_libraries(afoneapi
     afcommon_interface
     OpenCL::OpenCL
     OpenCL::cl2hpp
-    -fsycl
     -fsycl-device-code-split=per_kernel
     -fsycl-link-huge-device-code
-    -qopenmp
+    -openmp
     -DMKL_ILP64
     -Qmkl=parallel
     MKL::MKL_DPCPP
