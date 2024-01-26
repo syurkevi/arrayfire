@@ -312,7 +312,8 @@ if(NOT TARGET nonstd::span-lite)
     URI https://github.com/martinmoene/span-lite
     REF "ccf2351"
     )
-  add_subdirectory(${span-lite_SOURCE_DIR} EXCLUDE_FROM_ALL)
+  message("${span-lite_SOURCE_DIR} ${span-lite_BINARY_DIR}")
+  add_subdirectory(${span-lite_SOURCE_DIR} ${span-lite_BINARY_DIR} EXCLUDE_FROM_ALL)
   get_property(span_include_dir
     TARGET span-lite
     PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
