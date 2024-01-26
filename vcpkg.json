@@ -71,10 +71,8 @@
             ]
         },
         "mkl": {
-            "description": "Build with MKL",
-            "dependencies": [
-                "intel-mkl"
-            ]
+            "description": "Build with MKL"
+            
         },
         "cudnn": {
             "description": "Build CUDA with support for cuDNN",

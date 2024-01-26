@@ -6,6 +6,11 @@
 #http:  // arrayfire.com/licenses/BSD-3-Clause
 
 if(AF_BUILD_ONEAPI)
+    # TODO on MSVC windows
+    # CMake Error in src/backend/oneapi/CMakeLists.txt:
+    # MSVC_RUNTIME_LIBRARY value 'MultiThreadedDLL' not known for this SYCL
+	# compiler.
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "") #FIXME
     enable_language(SYCL)
 endif()
 
@@ -359,7 +364,7 @@ target_link_libraries(afoneapi
     $<$<PLATFORM_ID:Linux>:-fvisibility-inlines-hidden>
     $<$<PLATFORM_ID:Linux>:-fno-sycl-rdc>
     -fsycl-max-parallel-link-jobs=${NumberOfThreads}
-    MKL::MKL_DPCPP
+    MKL::MKL_SYCL
   )
   set_sycl_language(afcommon_interface
     oneapi_sort_by_key
@@ -368,7 +373,58 @@ target_link_libraries(afoneapi
     afoneapi)
 
 
-#af_split_debug_info(afoneapi ${AF_INSTALL_LIB_DIR})
+af_split_debug_info(afoneapi ${AF_INSTALL_LIB_DIR})
+set (PX ${CMAKE_SHARED_LIBRARY_PREFIX})
+set (SX ${CMAKE_SHARED_LIBRARY_SUFFIX})
+set (dlib_path_prefix ${SYCL_PACKAGE_DIR})
+if (WIN32)
+  set(dlib_path_prefix "${SYCL_PACKAGE_DIR}/bin")
+  message(${dlib_path_prefix})
+endif ()
+
+function(afsycl_collect_libs libname)
+  set(options "FULL_VERSION")
+  set(single_args "LIB_MAJOR;LIB_MINOR")
+  set(multi_args "")
+
+  cmake_parse_arguments(sycl_args "${options}" "${single_args}" "${multi_args}" ${ARGN})
+
+  if(sycl_args_LIB_MAJOR AND sycl_args_LIB_MINOR)
+    set(lib_major ${sycl_args_LIB_MAJOR})
+       set(lib_minor ${sycl_args_LIB_MINOR})
+    set(lib_version "${lib_major}.${lib_minor}")
+  else()
+    set(lib_major ${SYCL_LIB_VER_CACHE})
+    set(lib_version "${lib_major}")
+  endif()
+
+  if (WIN32)
+    find_file(SYCL_${libname}_LIBRARY_DLL
+      NAMES
+        "${PX}${libname}${SX}"
+        "${PX}${libname}${lib_major}${SX}"
+        "${PX}${libname}${lib_major}${lib_minor}${SX}"
+        "${PX}${libname}${lib_major}${lib_minor}_${SX}"
+      PATHS ${dlib_path_prefix}
+    )
+    mark_as_advanced(SYCL_${libname}_LIBRARY_DLL)
+    install(FILES "${SYCL_${libname}_LIBRARY_DLL}"
+      DESTINATION ${AF_INSTALL_BIN_DIR}
+      COMPONENT oneapi)
+    message("${SYCL_${libname}_LIBRARY_DLL}")
+  else () #UNIX
+  endif ()
+endfunction()
+
+if(AF_INSTALL_STANDALONE)
+  if(WIN32)
+    afsycl_collect_libs("sycl")
+    afsycl_collect_libs("pi_opencl")
+    afsycl_collect_libs("pi_win_proxy_loader")
+	afsycl_collect_libs("libmmd")
+  endif()
+endif()
+
 
 install(TARGETS afoneapi
   EXPORT ArrayFireoneAPITargets

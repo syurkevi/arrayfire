@@ -61,7 +61,7 @@ else()
   set(MKL_INTERFACE_INTEGER_SIZE 4)
 endif()
 
-find_package(CUDA 10.2)
+find_package(CUDA)
 find_package(cuDNN 4.0)
 find_package(OpenCL 1.2)
 find_package(OpenGL)
@@ -138,10 +138,10 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.13)
   if(DEFINED ENV{MKLROOT} AND NOT DEFINED MKL_ROOT)
     set(MKL_ROOT "$ENV{MKLROOT}")
   endif()
-  set(DPCPP_COMPILER ON)
+  set(SYCL_COMPILER ON)
   set(MKL_THREADING "tbb_thread")
   set(MKL_INTERFACE "ilp64")
-  find_package(MKL 2023.1)
+  find_package(MKL)
 endif()
 
 af_multiple_option(NAME        AF_COMPUTE_LIBRARY
@@ -179,10 +179,12 @@ if(AF_BUILD_CUDA)
   check_language(CUDA)
   if(CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
+    set(CUDA_FOUND TRUE)
   elseif(CUDA_NVCC_EXECUTABLE)
     message(STATUS "Using the FindCUDA script to search for the CUDA compiler")
     set(CMAKE_CUDA_COMPILER ${CUDA_NVCC_EXECUTABLE} CACHE INTERNAL "CUDA compiler executable")
     enable_language(CUDA)
+    set(CUDA_FOUND TRUE)
   else()
     message(WARNING "No CUDA support")
   endif()
@@ -550,15 +552,33 @@ if(BUILD_WITH_MKL AND AF_INSTALL_STANDALONE)
     get_filename_component(mkl_rnt ${MKL_RT_LINK_LIBRARY} REALPATH)
     get_filename_component(mkl_shd ${MKL_Core_LINK_LIBRARY} REALPATH)
     get_filename_component(mkl_tly ${MKL_ThreadLayer_LINK_LIBRARY} REALPATH)
+
+    if(WIN32)
+        set(AF_ADDITIONAL_MKL_WIN32_DLLS
+            "${MKL_mkl_avx_DLL_LIBRARY}"
+            "${MKL_mkl_avx2_DLL_LIBRARY}"
+            "${MKL_mkl_avx512_DLL_LIBRARY}"
+            "${MKL_mkl_mc3_DLL_LIBRARY}"
+            "${MKL_mkl_def_DLL_LIBRARY}"
+            "${MKL_Interface_DLL_LIBRARY}"#TODO: needed? for sycl? group there?
+        )
+		if(AF_BUILD_ONEAPI)
+            list(APPEND AF_ADDITIONAL_MKL_WIN32_DLLS ${MKL_Sycl_DLL_LIBRARY})
+			list(APPEND AF_ADDITIONAL_MKL_WIN32_DLLS ${MKL_SyclLapack_DLL_LIBRARY})
+            list(APPEND AF_ADDITIONAL_MKL_WIN32_DLLS ${MKL_SyclBlas_DLL_LIBRARY})
+            list(APPEND AF_ADDITIONAL_MKL_WIN32_DLLS ${MKL_SyclDft_DLL_LIBRARY})
+            list(APPEND AF_ADDITIONAL_MKL_WIN32_DLLS ${MKL_SyclSparse_DLL_LIBRARY})
+		endif()
+    endif()
+
     install(FILES
-      ${mkl_rnt}
-      ${mkl_shd}
-      ${mkl_tly}
+      ${mkl_sycl}
       $<TARGET_FILE:MKL::RT>
       $<TARGET_FILE:MKL::Shared>
       $<TARGET_FILE:MKL::ThreadLayer>
       ${MKL_RUNTIME_KERNEL_LIBRARIES}
-
+      
+      ${AF_ADDITIONAL_MKL_WIN32_DLLS}
       # This variable is used to add tbb.so.2 library because the main lib
       # is a linker script and not a symlink so it cant be resolved using
       # get_filename_component

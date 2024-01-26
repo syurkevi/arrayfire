@@ -144,4 +144,11 @@ endif()
 
 set(CPACK_PROJECT_CONFIG_FILE "${CMAKE_SOURCE_DIR}/CMakeModules/CPackProjectConfig.cmake")
 
+if (WIN32)
+  # Configure file with custom definitions for NSIS.
+  configure_file(
+    ${PROJECT_SOURCE_DIR}/CMakeModules/nsis/NSIS.definitions.nsh.in
+    ${CMAKE_CURRENT_BINARY_DIR}/NSIS.definitions.nsh)
+endif ()
+
 include(CPack)

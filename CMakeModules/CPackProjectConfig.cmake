@@ -161,9 +161,9 @@ if(NOT CPACK_GENERATOR MATCHES "DEB")
     DESCRIPTION "ArrayFire development files including headers and configuration files"
     EXPANDED)
 
-  cpack_add_component_group(debug
-    DISPLAY_NAME "ArrayFire Debug Symbols"
-    DESCRIPTION "ArrayFire Debug symbols")
+#  cpack_add_component_group(debug
+    #DISPLAY_NAME "ArrayFire Debug Symbols"
+    #DESCRIPTION "ArrayFire Debug symbols")
 endif()
 
 set(arrayfire_cuda_runtime_name "CUDA Runtime(${CPACK_CUDA_VERSION_MAJOR}.${CPACK_CUDA_VERSION_MINOR})")
@@ -344,6 +344,42 @@ af_component(
 )
 
 af_component(
+  COMPONENT oneapi
+  DISPLAY_NAME "oneAPI Runtime"
+  SUMMARY "ArrayFire oneAPI backend shared libraries"
+  DESCRIPTION "ArrayFire oneAPI backend shared libraries"
+  REQUIRES ${oneapi_deps_comps} licenses
+  OPTIONAL forge
+  GROUP afruntime
+  INSTALL_TYPES All Runtime
+
+  DEB_PACKAGE_NAME ${deb_oneapi_runtime_package_name}
+  DEB_PROVIDES "arrayfire-oneapi (= ${CPACK_PACKAGE_VERSION}), arrayfire-oneapi${CPACK_PACKAGE_VERSION_MAJOR} (= ${CPACK_PACKAGE_VERSION}), libarrayfire-oneapi${CPACK_PACKAGE_VERSION_MAJOR} (= ${CPACK_PACKAGE_VERSION})"
+  DEB_REPLACES "arrayfire-oneapi (<< ${CPACK_PACKAGE_VERSION}), arrayfire-oneapi${CPACK_PACKAGE_VERSION_MAJOR} (<< ${CPACK_PACKAGE_VERSION}), libarrayfire-oneapi${CPACK_PACKAGE_VERSION_MAJOR} (<< ${CPACK_PACKAGE_VERSION})"
+  DEB_REQUIRES ${deb_oneapi_runtime_requirements}
+  DEB_USE_SHLIBDEPS
+  DEB_ADD_POSTINST
+  DEB_OPTIONAL forge libfreeimage3
+)
+
+af_component(
+  COMPONENT oneapi_dev
+  DISPLAY_NAME "oneAPI Dev"
+  SUMMARY  "ArrayFire oneAPI backend development files"
+  DESCRIPTION  "ArrayFire oneAPI backend development files"
+  REQUIRES oneapi headers cmake
+  GROUP afdevelopment
+  INSTALL_TYPES All Development
+
+  DEB_PACKAGE_NAME arrayfire-oneapi${CPACK_PACKAGE_VERSION_MAJOR}-dev
+  DEB_PROVIDES "arrayfire-oneapi-dev (= ${CPACK_PACKAGE_VERSION}), arrayfire-oneapi${CPACK_PACKAGE_VERSION_MAJOR}-dev (= ${CPACK_PACKAGE_VERSION}), libarrayfire-oneapi-dev (= ${CPACK_PACKAGE_VERSION})"
+  DEB_REPLACES "arrayfire-oneapi-dev (<< ${CPACK_PACKAGE_VERSION}), arrayfire-oneapi${CPACK_PACKAGE_VERSION_MAJOR}-dev (<< ${CPACK_PACKAGE_VERSION}), libarrayfire-oneapi-dev (<< ${CPACK_PACKAGE_VERSION})"
+  DEB_REQUIRES "arrayfire-oneapi${CPACK_PACKAGE_VERSION_MAJOR} (>= ${CPACK_PACKAGE_VERSION}), arrayfire-headers (>= ${CPACK_PACKAGE_VERSION})"
+  DEB_RECOMMENDS "arrayfire-cmake (>= ${CPACK_PACKAGE_VERSION})"
+  DEB_OPTIONAL "cmake (>= 3.0)"
+)
+
+af_component(
   COMPONENT unified
   DISPLAY_NAME "Unified Runtime"
   SUMMARY "ArrayFire Unified backend shared libraries."
@@ -437,37 +473,46 @@ endif()
 # Debug symbols in debian installers are created using the DEBINFO property
 if(NOT APPLE AND
    NOT CPACK_GENERATOR MATCHES "DEB")
-  af_component(
-    COMPONENT afopencl_debug_symbols
-    DISPLAY_NAME "OpenCL Debug Symbols"
-    DESCRIPTION "Debug symbols for the OpenCL backend."
-    GROUP debug
-    DISABLED
-    INSTALL_TYPES Development)
 
-  af_component(
-    COMPONENT afcuda_debug_symbols
-    DISPLAY_NAME "CUDA Debug Symbols"
-    DESCRIPTION "Debug symbols for CUDA backend backend."
-    GROUP debug
-    DISABLED
-    INSTALL_TYPES Development)
+  #af_component(
+    #COMPONENT afoneapi_debug_symbols
+    #DISPLAY_NAME "oneAPI Debug Symbols"
+    #DESCRIPTION "Debug symbols for the oneAPI backend."
+    #GROUP debug
+    #DISABLED
+    #INSTALL_TYPES Development)
 
-  af_component(
-    COMPONENT afcpu_debug_symbols
-    DISPLAY_NAME "CPU Debug Symbols"
-    DESCRIPTION "Debug symbols for CPU backend backend."
-    GROUP debug
-    DISABLED
-    INSTALL_TYPES Development)
+  #af_component(
+    #COMPONENT afopencl_debug_symbols
+    #DISPLAY_NAME "OpenCL Debug Symbols"
+    #DESCRIPTION "Debug symbols for the OpenCL backend."
+    #GROUP debug
+    #DISABLED
+    #INSTALL_TYPES Development)
 
-  af_component(
-    COMPONENT af_debug_symbols
-    DISPLAY_NAME "Unified Debug Symbols"
-    DESCRIPTION "Debug symbols for the Unified backend."
-    GROUP debug
-    DISABLED
-    INSTALL_TYPES Development)
+  #af_component(
+    #COMPONENT afcuda_debug_symbols
+    #DISPLAY_NAME "CUDA Debug Symbols"
+    #DESCRIPTION "Debug symbols for CUDA backend backend."
+    #GROUP debug
+    #DISABLED
+    #INSTALL_TYPES Development)
+
+  #af_component(
+    #COMPONENT afcpu_debug_symbols
+    #DISPLAY_NAME "CPU Debug Symbols"
+    #DESCRIPTION "Debug symbols for CPU backend backend."
+    #GROUP debug
+    #DISABLED
+    #INSTALL_TYPES Development)
+
+  #af_component(
+    #COMPONENT af_debug_symbols
+    #DISPLAY_NAME "Unified Debug Symbols"
+    #DESCRIPTION "Debug symbols for the Unified backend."
+    #GROUP debug
+    #DISABLED
+    #INSTALL_TYPES Development)
 endif()
 
 # if (AF_INSTALL_FORGE_DEV)
