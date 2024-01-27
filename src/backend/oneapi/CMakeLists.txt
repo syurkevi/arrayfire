@@ -399,19 +399,23 @@ function(afsycl_collect_libs libname)
   endif()
 
   if (WIN32)
-    find_file(SYCL_${libname}_LIBRARY_DLL
-      NAMES
-        "${PX}${libname}${SX}"
-        "${PX}${libname}${lib_major}${SX}"
-        "${PX}${libname}${lib_major}${lib_minor}${SX}"
-        "${PX}${libname}${lib_major}${lib_minor}_${SX}"
-      PATHS ${dlib_path_prefix}
-    )
-    mark_as_advanced(SYCL_${libname}_LIBRARY_DLL)
+    if (NOT SYCL_${libname}_LIBRARY_DLL)
+		find_file(SYCL_${libname}_LIBRARY_DLL
+		  NAMES
+			"${PX}${libname}${SX}"
+			"${PX}${libname}${lib_major}${SX}"
+			"${PX}${libname}${lib_major}${lib_minor}${SX}"
+			"${PX}${libname}${lib_major}${lib_minor}_${SX}"
+		  PATHS ${dlib_path_prefix}
+		)
+    endif()
+	mark_as_advanced(SYCL_${libname}_LIBRARY_DLL)
+    message(${SYCL_${libname}_LIBRARY_DLL})
+    message("${SYCL_${libname}_LIBRARY_DLL}")
+
     install(FILES "${SYCL_${libname}_LIBRARY_DLL}"
       DESTINATION ${AF_INSTALL_BIN_DIR}
       COMPONENT oneapi)
-    message("${SYCL_${libname}_LIBRARY_DLL}")
   else () #UNIX
   endif ()
 endfunction()
